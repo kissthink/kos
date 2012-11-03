@@ -1,0 +1,99 @@
+diff -ruN orig-gcc-4.7.1/bfd/config.bfd gcc-4.7.1/bfd/config.bfd
+--- orig-gcc-4.7.1/bfd/config.bfd	2011-07-28 18:35:13.000000000 -0400
++++ gcc-4.7.1/bfd/config.bfd	2012-08-21 12:28:43.946674134 -0400
+@@ -587,6 +587,11 @@
+     targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec bfd_elf64_k1om_vec i386coff_vec"
+     want64=true
+     ;;
++  x86_64-*-kos*)
++    targ_defvec=bfd_elf64_x86_64_vec
++    targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec bfd_elf64_k1om_vec i386coff_vec"
++    want64=true
++    ;;
+   x86_64-*-dragonfly*)
+     targ_defvec=bfd_elf64_x86_64_vec
+     targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec bfd_elf64_k1om_vec"
+diff -ruN orig-gcc-4.7.1/config.sub gcc-4.7.1/config.sub
+--- orig-gcc-4.7.1/config.sub	2011-11-01 20:56:32.000000000 -0400
++++ gcc-4.7.1/config.sub	2012-08-21 12:27:23.690792056 -0400
+@@ -1333,7 +1333,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -kos* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruN orig-gcc-4.7.1/gas/configure.tgt gcc-4.7.1/gas/configure.tgt
+--- orig-gcc-4.7.1/gas/configure.tgt	2011-06-20 09:23:21.000000000 -0400
++++ gcc-4.7.1/gas/configure.tgt	2012-08-21 12:29:34.502846290 -0400
+@@ -422,6 +422,7 @@
+   *-*-xray | *-*-hms)			fmt=coff ;;
+   *-*-sim)				fmt=coff ;;
+   *-*-elf | *-*-sysv4*)			fmt=elf ;;
++  *-*-kos)			fmt=elf ;;
+   *-*-solaris*)				fmt=elf em=solaris ;;
+   *-*-aros*)				fmt=elf em=linux ;;
+   *-*-vxworks* | *-*-windiss)		fmt=elf em=vxworks ;;
+diff -ruN orig-gcc-4.7.1/gcc/config.gcc gcc-4.7.1/gcc/config.gcc
+--- orig-gcc-4.7.1/gcc/config.gcc	2012-06-04 05:51:00.000000000 -0400
++++ gcc-4.7.1/gcc/config.gcc	2012-08-21 12:33:00.627494501 -0400
+@@ -759,6 +759,11 @@
+   default_use_cxa_atexit=yes
+   use_gcc_stdint=wrap
+   ;;
++*-*-kos)
++  # Assume that newlib is being used and so __cxa_atexit is provided.
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=wrap
++  ;;
+ esac
+ 
+ case ${target} in
+@@ -1196,6 +1201,9 @@
+ x86_64-*-elf*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+ 	;;
++x86_64-*-kos*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
++	;;
+ i[34567]86-*-freebsd*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${fbsd_tm_file} i386/freebsd.h"
+ 	;;
+diff -ruN orig-gcc-4.7.1/ld/configure.tgt gcc-4.7.1/ld/configure.tgt
+--- orig-gcc-4.7.1/ld/configure.tgt	2011-11-21 04:29:37.000000000 -0500
++++ gcc-4.7.1/ld/configure.tgt	2012-08-21 12:36:48.855255631 -0400
+@@ -233,6 +233,9 @@
+ x86_64-*-elf*)		targ_emul=elf_x86_64
+ 			targ_extra_emuls="elf_i386 elf_l1om elf_k1om"
+ 			;;
++x86_64-*-kos*)		targ_emul=elf_x86_64
++			targ_extra_emuls="elf_i386 elf_l1om elf_k1om"
++			;;
+ i[3-7]86-*-kaos*)	targ_emul=elf_i386 ;;
+ i[3-7]86-*-freebsdaout* | i[3-7]86-*-freebsd[12].* | i[3-7]86-*-freebsd[12])
+ 			targ_emul=i386bsd ;;
+diff -ruN orig-gcc-4.7.1/libgcc/config.host gcc-4.7.1/libgcc/config.host
+--- orig-gcc-4.7.1/libgcc/config.host	2012-04-30 13:39:57.000000000 -0400
++++ gcc-4.7.1/libgcc/config.host	2012-08-21 12:37:24.651570646 -0400
+@@ -263,6 +263,9 @@
+ *-*-elf)
+   extra_parts="crtbegin.o crtend.o"
+   ;;
++*-*-kos)
++  extra_parts="crtbegin.o crtend.o"
++  ;;
+ esac
+ 
+ case ${host} in
+@@ -523,6 +526,9 @@
+ x86_64-*-elf*)
+ 	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
+ 	;;
++x86_64-*-kos*)
++	tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++	;;
+ i[34567]86-*-freebsd*)
+ 	tmake_file="${tmake_file} i386/t-freebsd i386/t-crtstuff"
+ 	;;
