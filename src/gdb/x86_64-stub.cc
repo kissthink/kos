@@ -148,6 +148,10 @@ return_to_prog ();
 asm(".text");
 asm(".globl return_to_prog");
 asm("return_to_prog:");
+asm("       movq registers+184, %r15");             /* 23 */
+asm("       movq registers+176, %r14");             /* 22 */
+asm("       movq registers+168, %r13");             /* 21 */
+asm("       movq registers+160, %r12");             /* 20 */
 asm("       movq registers+152, %r11");             /* 19 */
 asm("       movq registers+144, %r10");             /* 18 */
 asm("       movq registers+136, %r9");              /* 17 */
@@ -179,44 +183,54 @@ asm("        iret");
 #define BREAKPOINT() asm("   int $3");
 
 /* Put the error code here just in case the user cares.  */
-int gdb_i386errcode;
+int64_t gdb_x8664errcode;
 /* Likewise, the vector number here (since GDB only gets the signal
    number through the usual means, and that's not very specific).  */
-int gdb_i386vector = -1;
+int64_t gdb_x8664vector = -1;
 
 /* GDB stores segment registers in 32-bit words (that's just the way
    m-i386v.h is written).  So zero the appropriate areas in registers.  */
 #define SAVE_REGISTERS1() \
-  asm ("movq %rax, registers");                                   	  \
-  asm ("movq %rcx, registers+8");			  		     \
-  asm ("movq %rdx, registers+16");			  		     \
-  asm ("movq %rbx, registers+24");			  		     \
-  asm ("movq %rbp, registers+40");			  		     \
-  asm ("movq %rsi, registers+48");			  		     \
-  asm ("movq %rdi, registers+56");			  		     \
-  asm ("movw $0, %ax");							     \
-  asm ("movw %ds, registers+96");			  		     \
-  asm ("movw %ax, registers+100");					     \
-  asm ("movw %es, registers+104");			  		     \
-  asm ("movw %ax, registers+108");					     \
-  asm ("movw %fs, registers+112");			  		     \
-  asm ("movw %ax, registers+116");					     \
-  asm ("movw %gs, registers+120");			  		     \
-  asm ("movw %ax, registers+124");
+  asm ("movq %rax, registers");                         \
+  asm ("movq %rcx, registers+8");                       \
+  asm ("movq %rdx, registers+16");                      \
+  asm ("movq %rbx, registers+24");                      \
+  /* save stack pointer later */                        \
+  asm ("movq %rbp, registers+40");                      \
+  asm ("movq %rsi, registers+48");                      \
+  asm ("movq %rdi, registers+56");                      \
+  asm ("movw $0, %ax");                                 \
+  /* rip (pc) eflags (ps), cs, ss saved later */        \
+  asm ("movw %ds, registers+96");                       \
+  asm ("movw %ax, registers+100");                      \
+  asm ("movw %es, registers+104");                      \
+  asm ("movw %ax, registers+108");                      \
+  asm ("movw %fs, registers+112");                      \
+  asm ("movw %ax, registers+116");                      \
+  asm ("movw %gs, registers+120");                      \
+  asm ("movw %ax, registers+124");                      \
+  asm ("movq %r8, registers+128");                      \
+  asm ("movq %r9, registers+136");                      \
+  asm ("movq %r10, registers+144");                     \
+  asm ("movq %r11, registers+152");                     \
+  asm ("movq %r12, registers+160");                     \
+  asm ("movq %r13, registers+168");                     \
+  asm ("movq %r14, registers+176");                     \
+  asm ("movq %r15, registers+184");
 #define SAVE_ERRCODE() \
-  asm ("popq %rbx");                                  \
-  asm ("movl %ebx, gdb_i386errcode");
+  asm ("popq %rbx");                                    \
+  asm ("movl %ebx, gdb_x8664errcode");
 #define SAVE_REGISTERS2() \
-  asm ("popq %rbx"); /* old rip */			  		     \
-  asm ("movq %rbx, registers+64");			  		     \
-  asm ("popq %rbx");	 /* old cs */			  		     \
-  asm ("movq %rbx, registers+80");			  		     \
-  asm ("movw %ax, registers+84");                                           \
-  asm ("popq %rbx");	 /* old eflags */		  		     \
-  asm ("movq %rbx, registers+72");			 		     \
+  asm ("popq %rbx"); /* old rip */                      \
+  asm ("movq %rbx, registers+64");                      \
+  asm ("popq %rbx");	 /* old cs */                   \
+  asm ("movq %rbx, registers+80");                      \
+  asm ("movw %ax, registers+84");                       \
+  asm ("popq %rbx");	 /* old eflags */               \
+  asm ("movq %rbx, registers+72");                      \
   /* Now that we've done the pops, we can save the stack pointer.");  */   \
-  asm ("movw %ss, registers+88");					     \
-  asm ("movw %ax, registers+92");     	       	       	       	       	     \
+  asm ("movw %ss, registers+88");                       \
+  asm ("movw %ax, registers+92");                       \
   asm ("movq %rsp, registers+32");
 
 /* See if mem_fault_routine is set, if so just IRET to that address.  */
@@ -229,7 +243,7 @@ asm ("mem_fault:");
 /* OK to clobber temp registers; we're just going to end up in set_mem_err.  */
 /* Pop error code from the stack and save it.  */
 asm ("     popq %rax");
-asm ("     movl %eax, gdb_i386errcode");
+asm ("     movq %rax, gdb_x8664errcode");
 
 asm ("     popq %rax"); /* eip */
 /* We don't want to return there, we want to return to the function
@@ -431,11 +445,11 @@ CALL_HOOK();
  * stack pointer into an area reserved for debugger use.
  */
 asm("_remcomHandler:");
-asm("           popq %rax");        /* pop off return address     */
-asm("           popq %rax");      /* get the exception number   */
-asm("		movq stackPtr, %rsp"); /* move to remcom stack area  */
-asm("		pushq %rax");	/* push exception onto stack  */
-asm("		call  handle_exception");    /* this never returns */
+asm("           popq %rax");            /* pop off return address     */
+asm("           popq %rax");            /* get the exception number   */
+asm("		movq stackPtr, %rsp");      /* move to remcom stack area  */
+asm("		pushq %rax");	            /* push exception onto stack  */
+asm("		call  handle_exception");   /* this never returns */
 
 void
 _returnFromException ()
@@ -653,7 +667,7 @@ hex2mem (char *buf, char *mem, int count, int may_fault)
 /* this function takes the 386 exception vector and attempts to
    translate this number into a unix compatible signal value */
 int
-computeSignal (int exceptionVector)
+computeSignal (int64_t exceptionVector)
 {
   int sigval;
   switch (exceptionVector)
@@ -742,14 +756,14 @@ hexToInt (char **ptr, long *intValue)
  * This function does all command procesing for interfacing to gdb.
  */
 extern "C" void
-handle_exception (int exceptionVector)
+handle_exception (int64_t exceptionVector)
 {
   int sigval, stepping;
   long addr, length;
   char *ptr;
   int newPC;
 
-  gdb_i386vector = exceptionVector;
+  gdb_x8664vector = exceptionVector;
 
   if (remote_debug)
     {
@@ -763,6 +777,7 @@ handle_exception (int exceptionVector)
   ptr = remcomOutBuffer;
 
   *ptr++ = 'T';			/* notify gdb with signo, PC, FP and SP */
+  /* hexchars 0123456789abcdef */
   *ptr++ = hexchars[sigval >> 4];
   *ptr++ = hexchars[sigval & 0xf];
 
