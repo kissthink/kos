@@ -99,7 +99,8 @@ Thread.o: kern/Thread.cc mach/CPU.h util/basics.h mach/platform.h \
 GdbStubImpl.o: gdb/GdbStubImpl.cc dev/IODev.h dev/Screen.h util/basics.h \
  mach/platform.h util/Log.h util/Bitmask.h mach/bitstrops.h \
  kern/globals.h mach/Machine.h mach/Descriptors.h
-i386-stub.o: gdb/i386-stub.cc
+x86_64-stub.o: gdb/x86_64-stub.cc util/Log.h util/basics.h util/Bitmask.h \
+ mach/bitstrops.h mach/platform.h kern/globals.h
 Debug.s: util/Debug.cc util/Debug.h util/Bitmask.h util/basics.h \
  mach/bitstrops.h mach/platform.h util/SpinLock.h mach/Processor.h \
  util/Log.h kern/globals.h mach/APIC.h mach/CPU.h mach/Memory.h
@@ -201,7 +202,8 @@ Thread.s: kern/Thread.cc mach/CPU.h util/basics.h mach/platform.h \
 GdbStubImpl.s: gdb/GdbStubImpl.cc dev/IODev.h dev/Screen.h util/basics.h \
  mach/platform.h util/Log.h util/Bitmask.h mach/bitstrops.h \
  kern/globals.h mach/Machine.h mach/Descriptors.h
-i386-stub.s: gdb/i386-stub.cc
+x86_64-stub.s: gdb/x86_64-stub.cc util/Log.h util/basics.h util/Bitmask.h \
+ mach/bitstrops.h mach/platform.h kern/globals.h
 Debug.e: util/Debug.cc util/Debug.h util/Bitmask.h util/basics.h \
  mach/bitstrops.h mach/platform.h util/SpinLock.h mach/Processor.h \
  util/Log.h kern/globals.h mach/APIC.h mach/CPU.h mach/Memory.h
@@ -303,4 +305,5 @@ Thread.e: kern/Thread.cc mach/CPU.h util/basics.h mach/platform.h \
 GdbStubImpl.e: gdb/GdbStubImpl.cc dev/IODev.h dev/Screen.h util/basics.h \
  mach/platform.h util/Log.h util/Bitmask.h mach/bitstrops.h \
  kern/globals.h mach/Machine.h mach/Descriptors.h
-i386-stub.e: gdb/i386-stub.cc
+x86_64-stub.e: gdb/x86_64-stub.cc util/Log.h util/basics.h util/Bitmask.h \
+ mach/bitstrops.h mach/platform.h kern/globals.h

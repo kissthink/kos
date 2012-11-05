@@ -1,7 +1,11 @@
 target remote localhost:1234
-break Breakpoint
-break Machine::init2
-break PageManager::bootstrap
+#break Breakpoint
+#break Machine::init2
+#break PageManager::bootstrap
+#break set_debug_traps
+#break exceptionHandler
+#break catchException3
+break handle_exception
 cont # startup breakpoint
 
 define refault

@@ -27,7 +27,8 @@ static ScreenBuffer<char> dbgbuf(debugDevice);
 
 ostream kcout(&topbuf);
 ostream kcerr(&botbuf);
-ostream kcdbg(&dbgbuf);
+//ostream kcdbg(&dbgbuf);
+ostream kcdbg(&botbuf);
 
 void kassertprint(const char* const loc, int line, const char* const func) {
   kcerr << loc << line << " in " << func << " - ";

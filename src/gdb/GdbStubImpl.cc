@@ -21,7 +21,7 @@
 unsigned int sys_gdb_port;
 static SerialDevice serialDevice;       // InitSerialPort done while creating SerialDevice
 
-extern void set_debug_traps();          // from i386-stub.c
+extern void set_debug_traps();          // from x86_64-stub.c
 
 void putDebugChar(unsigned char ch) {
     streamsize written = serialDevice.write((const char *)&ch, 1);
