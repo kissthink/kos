@@ -5,7 +5,8 @@ target remote localhost:1234
 #break set_debug_traps
 #break exceptionHandler
 #break catchException3
-break handle_exception
+#break handle_exception
+break x86_64-stub.cc:883
 cont # startup breakpoint
 
 define refault

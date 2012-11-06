@@ -161,10 +161,13 @@ asm("       movw registers+112, %fs");              /* 14 */
 asm("       movw registers+104, %es");              /* 13 */
 asm("       movw registers+96,  %ds");              /* 12 */
 asm("       movw registers+88,  %ss");              /* 11 */
+/* saved cs */
 asm("       movq registers+80,  %rax");             /* 10 */
 asm("       pushq %rax");   /* saved cs */
+/* saved eflags */
 asm("       movq registers+72,  %rax");             /* 9 */
 asm("       pushq %rax");   /* saved eflags */
+/* saved rip */
 asm("       movq registers+64,  %rax");             /* 8 */
 asm("       pushq %rax");   /* saved rip */
 asm("       movq registers+56,  %rdi");             /* 7 */
@@ -199,38 +202,55 @@ int64_t gdb_x8664vector = -1;
   asm ("movq %rbp, registers+40");                      \
   asm ("movq %rsi, registers+48");                      \
   asm ("movq %rdi, registers+56");                      \
-  asm ("movw $0, %ax");                                 \
+  asm ("movl $0, %eax");                                \
   /* rip (pc) eflags (ps), cs, ss saved later */        \
-  asm ("movw %ds, registers+90");       /* 16 */        \
-  asm ("movw %ax, registers+92");       /* 16 */        \
-  asm ("movw %es, registers+94");       /* 16 */        \
-  asm ("movw %ax, registers+96");       /* 16 */        \
-  asm ("movw %fs, registers+98");       /* 16 */        \
-  asm ("movw %ax, registers+100");      /* 16 */        \
-  asm ("movw %gs, registers+102");      /* 16 */        \
-  asm ("movw %ax, registers+104");      /* 16 */        \
-  asm ("movq %r8, registers+106");      /* 64 */        \
-  asm ("movq %r9, registers+114");      /* 64 */        \
-  asm ("movq %r10, registers+122");     /* 64 */        \
-  asm ("movq %r11, registers+130");     /* 64 */        \
-  asm ("movq %r12, registers+138");     /* 64 */        \
-  asm ("movq %r13, registers+146");     /* 64 */        \
-  asm ("movq %r14, registers+154");     /* 64 */        \
-  asm ("movq %r15, registers+162");
+  /* ds 96-98 */                                        \
+  asm ("movw %ds, registers+96");       /* 16 */        \
+  asm ("movw %ax, registers+98");                       \
+  asm ("movl %eax, registers+100");                     \
+  /* es 104-106 */                                      \
+  asm ("movw %es, registers+104");      /* 16 */        \
+  asm ("movw %ax, registers+106");                      \
+  asm ("movl %eax, registers+108");                     \
+  /* fs 112-114 */                                      \
+  asm ("movw %fs, registers+112");      /* 16 */        \
+  asm ("movw %ax, registers+114");                      \
+  asm ("movl %eax, registers+116");                     \
+  /* gs 120-122 */                                      \
+  asm ("movw %gs, registers+120");      /* 16 */        \
+  asm ("movw %ax, registers+122");                      \
+  asm ("movl %eax, registers+124");                     \
+  /* r8 128-136 */                                      \
+  asm ("movq %r8, registers+128");      /* 64 */        \
+  asm ("movq %r9, registers+136");      /* 64 */        \
+  asm ("movq %r10, registers+144");     /* 64 */        \
+  asm ("movq %r11, registers+152");     /* 64 */        \
+  asm ("movq %r12, registers+160");     /* 64 */        \
+  asm ("movq %r13, registers+168");     /* 64 */        \
+  asm ("movq %r14, registers+176");     /* 64 */        \
+  asm ("movq %r15, registers+184");
 #define SAVE_ERRCODE() \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, gdb_x8664errcode");
 #define SAVE_REGISTERS2() \
-  asm ("popq %rbx"); /* old rip */                      \
+  /* old rip 64-72 */                                   \
+  asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+64");      /* 64 */        \
-  asm ("popq %rbx");	 /* old cs */                   \
-  asm ("movq %rbx, registers+76");      /* 64 */        \
-  asm ("movw %ax, registers+84");       /* 16 */        \
-  asm ("popq %rbx");	 /* old eflags */               \
-  asm ("movl %ebx, registers+72");      /* 32 */        \
+  /* old cs 80-82 */                                    \
+  asm ("popq %rbx");                                    \
+  asm ("movq %rbx, registers+80");                      \
+  asm ("movw %ax,  registers+82");                      \
+  asm ("movl %eax, registers+84");      /* 16 */        \
+  /* old eflags 72-76 */                                \
+  asm ("popq %rbx");                                    \
+  asm ("movq %rbx, registers+72");      /* 32 */        \
+  asm ("movl %eax, registers+76");                      \
+  /* old ss 88-90 */                                    \
+  asm ("movw %ss, registers+88");       /* 16 */        \
+  asm ("movw %ax, registers+90");                       \
+  asm ("movl %eax, registers+92");                      \
   /* Now that we've done the pops, we can save the stack pointer.");  */   \
-  asm ("movw %ss, registers+86");       /* 16 */        \
-  asm ("movw %ax, registers+88");       /* 16 */        \
+  /* stack 32-40 */                                     \
   asm ("movq %rsp, registers+32");      /* 64 */
 
 /* See if mem_fault_routine is set, if so just IRET to that address.  */
@@ -550,7 +570,7 @@ getpacket (void)
 void
 putpacket (char *buffer)
 {
-  char checksum;
+  unsigned char checksum;
   int count;
   char ch;
 
@@ -639,6 +659,7 @@ mem2hex (char *mem, char *buf, int count, int may_fault)
   *buf = 0;
   if (may_fault)
     mem_fault_routine = NULL;
+
   return (buf);
 }
 
@@ -762,7 +783,7 @@ handle_exception (int64_t exceptionVector)
   int sigval, stepping;
   long addr, length;
   char *ptr;
-  int newPC;
+  int64_t newPC;
 
   gdb_x8664vector = exceptionVector;
 
@@ -774,15 +795,16 @@ handle_exception (int64_t exceptionVector)
 
   /* reply to host that an exception has occurred */
   sigval = computeSignal (exceptionVector);
-
+/*
   // listen to qSupported request
   ptr = getpacket();
   if (strncmp(ptr, "qSupported", 10) == 0) {
-      putDebugChar('+');        // Ack
-      putDebugChar('\0');       // return empty string for qSupported query
+//      putDebugChar('+');        // Ack
+//      putDebugChar('\0');       // return empty string for qSupported query
+        char emptyReply = 0;
+        putpacket(&emptyReply);
   }
-  ptr = getpacket();
-#if 0
+*/
   ptr = remcomOutBuffer;
 
   *ptr++ = 'T';			/* notify gdb with signo, PC, FP and SP */
@@ -808,7 +830,6 @@ handle_exception (int64_t exceptionVector)
   *ptr = '\0';
 
   putpacket (remcomOutBuffer);
-#endif
 
   stepping = 0;
 
@@ -817,6 +838,7 @@ handle_exception (int64_t exceptionVector)
       remcomOutBuffer[0] = 0;
       ptr = getpacket ();
 
+READ_NEXT_CHAR:
       switch (*ptr++)
 	{
 	case '?':
@@ -915,7 +937,7 @@ handle_exception (int64_t exceptionVector)
 	  newPC = registers[PC];
 
 	  /* clear the trace bit */
-	  registers[PS] &= 0xfffffeff;
+	  registers[PS] &= 0xfffffffffffffeff;
 
 	  /* set the trace bit if we're stepping */
 	  if (stepping)
@@ -946,21 +968,21 @@ set_debug_traps (void)
 {
   stackPtr = &remcomStack[STACKSIZE / sizeof (int64_t) - 1];
 
-//  exceptionHandler (0, catchException0);
-//  exceptionHandler (1, catchException1);
+  exceptionHandler (0, catchException0);
+  exceptionHandler (1, catchException1);
   exceptionHandler (3, catchException3);
-//  exceptionHandler (4, catchException4);
-//  exceptionHandler (5, catchException5);
-//  exceptionHandler (6, catchException6);
-//  exceptionHandler (7, catchException7);
-//  exceptionHandler (8, catchException8);
-//  exceptionHandler (9, catchException9);
-//  exceptionHandler (10, catchException10);
-//  exceptionHandler (11, catchException11);
-//  exceptionHandler (12, catchException12);
-//  exceptionHandler (13, catchException13);
-//  exceptionHandler (14, catchException14);
-//  exceptionHandler (16, catchException16);
+  exceptionHandler (4, catchException4);
+  exceptionHandler (5, catchException5);
+  exceptionHandler (6, catchException6);
+  exceptionHandler (7, catchException7);
+  exceptionHandler (8, catchException8);
+  exceptionHandler (9, catchException9);
+  exceptionHandler (10, catchException10);
+  exceptionHandler (11, catchException11);
+  exceptionHandler (12, catchException12);
+  exceptionHandler (13, catchException13);
+  exceptionHandler (14, catchException14);
+  exceptionHandler (16, catchException16);
 
   initialized = 1;
 }
