@@ -106,7 +106,7 @@ extern void exceptionHandler(int, void (*)());	/* assign an exception handler   
 /************************************************************************/
 /* BUFMAX defines the maximum number of characters in inbound/outbound buffers*/
 /* at least NUMREGBYTES*2 are needed for register packets */
-#define BUFMAX 400
+#define BUFMAX 1000
 
 static char initialized;  /* boolean flag. != 0 means we've been initialized */
 
@@ -122,19 +122,19 @@ static const char hexchars[]="0123456789abcdef";
 #define NUMREGBYTES (NUMREGS * 8)
 
 enum regnames {RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
+        R8, R9, R10, R11, R12, R13, R14, R15,
         PC, /* also known as rip */
         PS, /* also known as eflags */
-        CS, SS, DS, ES, FS, GS,
-        R8, R9, R10, R11, R12, R13, R14, R15};
+        CS, SS, DS, ES, FS, GS};
 
 /*
  * these should not be static cuz they can be used outside this module
  */
-int64_t registers[NUMREGS];
+uint64_t registers[NUMREGS];
 
 #define STACKSIZE 10000
-int64_t remcomStack[STACKSIZE/sizeof(int64_t)];
-/*static*/ int64_t* stackPtr = &remcomStack[STACKSIZE/sizeof(int64_t) - 1];
+uint64_t remcomStack[STACKSIZE/sizeof(uint64_t)];
+/*static*/ uint64_t* stackPtr = &remcomStack[STACKSIZE/sizeof(uint64_t) - 1];
 
 /***************************  ASSEMBLY CODE MACROS *************************/
 /* 									   */
@@ -148,28 +148,28 @@ return_to_prog ();
 asm(".text");
 asm(".globl return_to_prog");
 asm("return_to_prog:");
-asm("       movq registers+184, %r15");             /* 23 */
-asm("       movq registers+176, %r14");             /* 22 */
-asm("       movq registers+168, %r13");             /* 21 */
-asm("       movq registers+160, %r12");             /* 20 */
-asm("       movq registers+152, %r11");             /* 19 */
-asm("       movq registers+144, %r10");             /* 18 */
-asm("       movq registers+136, %r9");              /* 17 */
-asm("       movq registers+128, %r8");              /* 16 */
-asm("       movw registers+120, %gs");              /* 15 */
-asm("       movw registers+112, %fs");              /* 14 */
-asm("       movw registers+104, %es");              /* 13 */
-asm("       movw registers+96,  %ds");              /* 12 */
-asm("       movw registers+88,  %ss");              /* 11 */
+asm("       movw registers+184, %gs");              /* 23 */
+asm("       movw registers+176, %fs");              /* 22 */
+asm("       movw registers+168, %es");              /* 21 */
+asm("       movw registers+160, %ds");              /* 20 */
+asm("       movw registers+152, %ss");              /* 19 */
 /* saved cs */
-asm("       movq registers+80,  %rax");             /* 10 */
+asm("       movq registers+144, %rax");             /* 18 */
 asm("       pushq %rax");   /* saved cs */
 /* saved eflags */
-asm("       movq registers+72,  %rax");             /* 9 */
+asm("       movq registers+136, %rax");             /* 17 */
 asm("       pushq %rax");   /* saved eflags */
 /* saved rip */
-asm("       movq registers+64,  %rax");             /* 8 */
+asm("       movq registers+128, %rax");             /* 16 */
 asm("       pushq %rax");   /* saved rip */
+asm("       movq registers+120, %r15");             /* 15 */
+asm("       movq registers+112, %r14");             /* 14 */
+asm("       movq registers+104, %r13");             /* 13 */
+asm("       movq registers+96,  %r12");             /* 12 */
+asm("       movq registers+88,  %r11");             /* 11 */
+asm("       movq registers+80,  %r10");             /* 10 */
+asm("       movq registers+72,  %r9");              /* 9 */
+asm("       movq registers+64,  %r8");              /* 8 */
 asm("       movq registers+56,  %rdi");             /* 7 */
 asm("       movq registers+48,  %rsi");             /* 6 */
 asm("       movq registers+40,  %rbp");             /* 5 */
@@ -202,53 +202,53 @@ int64_t gdb_x8664vector = -1;
   asm ("movq %rbp, registers+40");                      \
   asm ("movq %rsi, registers+48");                      \
   asm ("movq %rdi, registers+56");                      \
+  /* r8-r15 */                                          \
+  asm ("movq %r8, registers+64");       /* 64 */        \
+  asm ("movq %r9, registers+72");       /* 64 */        \
+  asm ("movq %r10, registers+80");      /* 64 */        \
+  asm ("movq %r11, registers+88");      /* 64 */        \
+  asm ("movq %r12, registers+96");      /* 64 */        \
+  asm ("movq %r13, registers+104");     /* 64 */        \
+  asm ("movq %r14, registers+112");     /* 64 */        \
+  asm ("movq %r15, registers+120");                     \
   asm ("movl $0, %eax");                                \
   /* rip (pc) eflags (ps), cs, ss saved later */        \
-  /* ds 96-98 */                                        \
-  asm ("movw %ds, registers+96");       /* 16 */        \
-  asm ("movw %ax, registers+98");                       \
-  asm ("movl %eax, registers+100");                     \
-  /* es 104-106 */                                      \
-  asm ("movw %es, registers+104");      /* 16 */        \
-  asm ("movw %ax, registers+106");                      \
-  asm ("movl %eax, registers+108");                     \
-  /* fs 112-114 */                                      \
-  asm ("movw %fs, registers+112");      /* 16 */        \
-  asm ("movw %ax, registers+114");                      \
-  asm ("movl %eax, registers+116");                     \
-  /* gs 120-122 */                                      \
-  asm ("movw %gs, registers+120");      /* 16 */        \
-  asm ("movw %ax, registers+122");                      \
-  asm ("movl %eax, registers+124");                     \
-  /* r8 128-136 */                                      \
-  asm ("movq %r8, registers+128");      /* 64 */        \
-  asm ("movq %r9, registers+136");      /* 64 */        \
-  asm ("movq %r10, registers+144");     /* 64 */        \
-  asm ("movq %r11, registers+152");     /* 64 */        \
-  asm ("movq %r12, registers+160");     /* 64 */        \
-  asm ("movq %r13, registers+168");     /* 64 */        \
-  asm ("movq %r14, registers+176");     /* 64 */        \
-  asm ("movq %r15, registers+184");
+  /* ds */                                              \
+  asm ("movw %ds, registers+160");      /* 16 */        \
+  asm ("movw %ax, registers+162");                      \
+  asm ("movl %eax, registers+164");                     \
+  /* es */                                              \
+  asm ("movw %es, registers+168");      /* 16 */        \
+  asm ("movw %ax, registers+170");                      \
+  asm ("movl %eax, registers+172");                     \
+  /* fs */                                              \
+  asm ("movw %fs, registers+176");      /* 16 */        \
+  asm ("movw %ax, registers+178");                      \
+  asm ("movl %eax, registers+180");                     \
+  /* gs */                                              \
+  asm ("movw %gs, registers+184");      /* 16 */        \
+  asm ("movw %ax, registers+186");                      \
+  asm ("movl %eax, registers+188");
 #define SAVE_ERRCODE() \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, gdb_x8664errcode");
 #define SAVE_REGISTERS2() \
   /* old rip 64-72 */                                   \
   asm ("popq %rbx");                                    \
-  asm ("movq %rbx, registers+64");      /* 64 */        \
+  asm ("movq %rbx, registers+128");     /* 64 */        \
   /* old cs 80-82 */                                    \
   asm ("popq %rbx");                                    \
-  asm ("movq %rbx, registers+80");                      \
-  asm ("movw %ax,  registers+82");                      \
-  asm ("movl %eax, registers+84");      /* 16 */        \
+  asm ("movq %rbx, registers+144");                     \
+  asm ("movw %ax,  registers+146");                     \
+  asm ("movl %eax, registers+148");      /* 16 */       \
   /* old eflags 72-76 */                                \
   asm ("popq %rbx");                                    \
-  asm ("movq %rbx, registers+72");      /* 32 */        \
-  asm ("movl %eax, registers+76");                      \
+  asm ("movq %rbx, registers+136");     /* 32 */        \
+  asm ("movl %eax, registers+140");                     \
   /* old ss 88-90 */                                    \
-  asm ("movw %ss, registers+88");       /* 16 */        \
-  asm ("movw %ax, registers+90");                       \
-  asm ("movl %eax, registers+92");                      \
+  asm ("movw %ss, registers+152");      /* 16 */        \
+  asm ("movw %ax, registers+154");                      \
+  asm ("movl %eax, registers+156");                     \
   /* Now that we've done the pops, we can save the stack pointer.");  */   \
   /* stack 32-40 */                                     \
   asm ("movq %rsp, registers+32");      /* 64 */
@@ -780,184 +780,174 @@ hexToInt (char **ptr, long *intValue)
 extern "C" void
 handle_exception (int64_t exceptionVector)
 {
-  int sigval, stepping;
-  long addr, length;
-  char *ptr;
-  int64_t newPC;
+    int sigval, stepping;
+    long addr, length;
+    char *ptr;
+    uint64_t newPC;
 
-  gdb_x8664vector = exceptionVector;
+    gdb_x8664vector = exceptionVector;
 
-  if (remote_debug)
-    {
-      printf ("vector=%ld, sr=0x%x, pc=0x%x\n",
-	      exceptionVector, registers[PS], registers[PC]);
+    if (remote_debug) {
+        printf ("vector=%ld, sr=0x%x, pc=0x%x\n",
+	        exceptionVector, registers[PS], registers[PC]);
     }
 
-  /* reply to host that an exception has occurred */
-  sigval = computeSignal (exceptionVector);
-/*
-  // listen to qSupported request
-  ptr = getpacket();
-  if (strncmp(ptr, "qSupported", 10) == 0) {
-//      putDebugChar('+');        // Ack
-//      putDebugChar('\0');       // return empty string for qSupported query
-        char emptyReply = 0;
-        putpacket(&emptyReply);
-  }
-*/
-  ptr = remcomOutBuffer;
+    /* reply to host that an exception has occurred */
+    sigval = computeSignal(exceptionVector);
 
-  *ptr++ = 'T';			/* notify gdb with signo, PC, FP and SP */
-  /* hexchars 0123456789abcdef */
-  *ptr++ = hexchars[sigval >> 4];
-  *ptr++ = hexchars[sigval & 0xf];
+    ptr = remcomOutBuffer;
 
-  *ptr++ = hexchars[RSP]; 
-  *ptr++ = ':';
-  ptr = mem2hex((char *)&registers[RSP], ptr, 8, 0);	/* SP */
-  *ptr++ = ';';
+    *ptr++ = 'T';			/* notify gdb with signo, PC, FP and SP */
+    /* hexchars 0123456789abcdef */
+    *ptr++ = hexchars[sigval >> 4];
+    *ptr++ = hexchars[sigval & 0xf];
 
-  *ptr++ = hexchars[RBP]; 
-  *ptr++ = ':';
-  ptr = mem2hex((char *)&registers[RBP], ptr, 8, 0); 	/* FP */
-  *ptr++ = ';';
+    *ptr++ = hexchars[RSP]; 
+    *ptr++ = ':';
+    ptr = mem2hex((char *)&registers[RSP], ptr, 8, 0);	/* SP */
+    *ptr++ = ';';
 
-  *ptr++ = hexchars[PC]; 
-  *ptr++ = ':';
-  ptr = mem2hex((char *)&registers[PC], ptr, 8, 0); 	/* PC */
-  *ptr++ = ';';
+    *ptr++ = hexchars[RBP]; 
+    *ptr++ = ':';
+    ptr = mem2hex((char *)&registers[RBP], ptr, 8, 0); 	/* FP */
+    *ptr++ = ';';
 
-  *ptr = '\0';
+    *ptr++ = hexchars[PC]; 
+    *ptr++ = ':';
+    ptr = mem2hex((char *)&registers[PC], ptr, 8, 0); 	/* PC */
+    *ptr++ = ';';
 
-  putpacket (remcomOutBuffer);
+    *ptr = '\0';
 
-  stepping = 0;
+    /* T:054:RSP;5:RBP;8:RIP */
 
-  while (1 == 1)
-    {
-      remcomOutBuffer[0] = 0;
-      ptr = getpacket ();
+//    putpacket (remcomOutBuffer);
 
-READ_NEXT_CHAR:
-      switch (*ptr++)
-	{
-	case '?':
-	  remcomOutBuffer[0] = 'S';
-	  remcomOutBuffer[1] = hexchars[sigval >> 4];
-	  remcomOutBuffer[2] = hexchars[sigval % 16];
-	  remcomOutBuffer[3] = 0;
-	  break;
-	case 'd':
-	  remote_debug = !(remote_debug);	/* toggle debug flag */
-	  break;
-	case 'g':		/* return the value of the CPU registers */
-	  mem2hex ((char *) registers, remcomOutBuffer, NUMREGBYTES, 0);
-	  break;
-	case 'G':		/* set the value of the CPU registers - return OK */
-	  hex2mem (ptr, (char *) registers, NUMREGBYTES, 0);
-	  strcpy (remcomOutBuffer, "OK");
-	  break;
-	case 'P':		/* set the value of a single CPU register - return OK */
-	  {
-	    long regno;
+    stepping = 0;
 
-	    if (hexToInt (&ptr, &regno) && *ptr++ == '=')
-	      if (regno >= 0 && regno < NUMREGS)
-		{
-		  hex2mem (ptr, (char *) &registers[regno], 4, 0);
-		  strcpy (remcomOutBuffer, "OK");
-		  break;
-		}
+    while (1 == 1) {
+        remcomOutBuffer[0] = 0;     // reset out buffer to 0
+        memset(remcomOutBuffer, 0, BUFMAX);
+        ptr = getpacket ();         // get request from gdb
 
-	    strcpy (remcomOutBuffer, "E01");
-	    break;
-	  }
+        switch (*ptr++) {
+            case '?':
+                remcomOutBuffer[0] = 'S';
+                remcomOutBuffer[1] = hexchars[sigval >> 4];
+                remcomOutBuffer[2] = hexchars[sigval % 16];
+                remcomOutBuffer[3] = 0;
+	            break;
+            case 'd':
+	            remote_debug = !(remote_debug);	/* toggle debug flag */
+	            break;
+            case 'g':		/* return the value of the CPU registers */
+                mem2hex ((char *) registers, remcomOutBuffer, NUMREGBYTES, 0);
+	            break;
+	        case 'G':		/* set the value of the CPU registers - return OK */
+                hex2mem (ptr, (char *) registers, NUMREGBYTES, 0);
+                strcpy (remcomOutBuffer, "OK");
+                break;
+            case 'P':		/* set the value of a single CPU register - return OK */
+	        {
+	            long regno;
 
-	  /* mAA..AA,LLLL  Read LLLL bytes at address AA..AA */
-	case 'm':
-	  /* TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0 */
-	  if (hexToInt (&ptr, &addr))
-	    if (*(ptr++) == ',')
-	      if (hexToInt (&ptr, &length))
-		{
-		  ptr = 0;
-		  mem_err = 0;
-		  mem2hex ((char *) addr, remcomOutBuffer, length, 1);
-		  if (mem_err)
-		    {
-		      strcpy (remcomOutBuffer, "E03");
-		      debug_error ("memory fault");
-		    }
-		}
+	            if (hexToInt (&ptr, &regno) && *ptr++ == '=') {
+                    if (regno >= 0 && regno < NUMREGS) {
+                        hex2mem (ptr, (char *) &registers[regno], 4, 0);
+                        strcpy (remcomOutBuffer, "OK");
+                        break;
+		            }
+                }
 
-	  if (ptr)
-	    {
-	      strcpy (remcomOutBuffer, "E01");
-	    }
-	  break;
+                strcpy (remcomOutBuffer, "E01");
+	        }
+                break;
+            /* mAA..AA,LLLL  Read LLLL bytes at address AA..AA */
+            case 'm':
+            /* TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0 */
+            {
+	            if (hexToInt (&ptr, &addr)) {
+                    if (*(ptr++) == ',') {
+	                    if (hexToInt (&ptr, &length)) {
+		                    ptr = 0;
+		                    mem_err = 0;
+		                    mem2hex ((char *) addr, remcomOutBuffer, length, 1);
+		                    if (mem_err) {
+		                        strcpy (remcomOutBuffer, "E03");
+		                        debug_error ("memory fault");
+		                    }
+		                }
+                    }
+                }
 
-	  /* MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK */
-	case 'M':
-	  /* TRY TO READ '%x,%x:'.  IF SUCCEED, SET PTR = 0 */
-	  if (hexToInt (&ptr, &addr))
-	    if (*(ptr++) == ',')
-	      if (hexToInt (&ptr, &length))
-		if (*(ptr++) == ':')
-		  {
-		    mem_err = 0;
-		    hex2mem (ptr, (char *) addr, length, 1);
+	            if (ptr) {
+	                strcpy (remcomOutBuffer, "E01");
+	            }
+            }
+	            break;
+	        /* MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK */
+	        case 'M':
+	        /* TRY TO READ '%x,%x:'.  IF SUCCEED, SET PTR = 0 */
+            {
+	            if (hexToInt (&ptr, &addr)) {
+	                if (*(ptr++) == ',') {
+	                    if (hexToInt (&ptr, &length)) {
+		                    if (*(ptr++) == ':') {
+                                mem_err = 0;
+                                hex2mem (ptr, (char *) addr, length, 1);
 
-		    if (mem_err)
-		      {
-			strcpy (remcomOutBuffer, "E03");
-			debug_error ("memory fault");
-		      }
-		    else
-		      {
-			strcpy (remcomOutBuffer, "OK");
-		      }
+                                if (mem_err) {
+                                    strcpy (remcomOutBuffer, "E03");
+                                    debug_error ("memory fault");
+                                } else {
+                                    strcpy (remcomOutBuffer, "OK");
+                                }
 
-		    ptr = 0;
-		  }
-	  if (ptr)
-	    {
-	      strcpy (remcomOutBuffer, "E02");
-	    }
-	  break;
+                                ptr = 0;
+		                    }
+                        }
+                    }
+                }
+                if (ptr) {
+                    strcpy (remcomOutBuffer, "E02");
+                }
+            }
+	            break;
+	        /* cAA..AA    Continue at address AA..AA(optional) */
+	        /* sAA..AA   Step one instruction from AA..AA(optional) */
+	        case 's':
+	            stepping = 1;
+	        case 'c':
+	        /* try to read optional parameter, pc unchanged if no parm */
+                if (hexToInt (&ptr, &addr)) {
+                    registers[PC] = addr;
+                }
 
-	  /* cAA..AA    Continue at address AA..AA(optional) */
-	  /* sAA..AA   Step one instruction from AA..AA(optional) */
-	case 's':
-	  stepping = 1;
-	case 'c':
-	  /* try to read optional parameter, pc unchanged if no parm */
-	  if (hexToInt (&ptr, &addr))
-	    registers[PC] = addr;
+	            newPC = registers[PC];
 
-	  newPC = registers[PC];
+	            /* clear the trace bit */
+	            registers[PS] &= 0xfffffffffffffeff;
 
-	  /* clear the trace bit */
-	  registers[PS] &= 0xfffffffffffffeff;
+	            /* set the trace bit if we're stepping */
+	            if (stepping) {
+                    registers[PS] |= 0x100;
+                }
 
-	  /* set the trace bit if we're stepping */
-	  if (stepping)
-	    registers[PS] |= 0x100;
+	            _returnFromException ();	/* this is a jump */
+	            break;
 
-	  _returnFromException ();	/* this is a jump */
-	  break;
-
-	  /* kill the program */
-	case 'k':		/* do nothing */
+	        /* kill the program */
+	        case 'k':		/* do nothing */
 #if 0
 	  /* Huh? This doesn't look like "nothing".
 	     m68k-stub.c and sparc-stub.c don't have it.  */
 	  BREAKPOINT ();
 #endif
-	  break;
-	}			/* switch */
+	            break;
+	    }			/* switch */
 
-      /* reply to the request */
-      putpacket (remcomOutBuffer);
+        /* reply to the request */
+        putpacket(remcomOutBuffer);
     }
 }
 
@@ -966,7 +956,7 @@ READ_NEXT_CHAR:
 void
 set_debug_traps (void)
 {
-  stackPtr = &remcomStack[STACKSIZE / sizeof (int64_t) - 1];
+  stackPtr = &remcomStack[STACKSIZE / sizeof (uint64_t) - 1];
 
   exceptionHandler (0, catchException0);
   exceptionHandler (1, catchException1);
