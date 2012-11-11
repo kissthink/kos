@@ -148,18 +148,22 @@ return_to_prog ();
 asm(".text");
 asm(".globl return_to_prog");
 asm("return_to_prog:");
-asm("       movw registers+184, %gs");              /* 23 */
-asm("       movw registers+176, %fs");              /* 22 */
-asm("       movw registers+168, %es");              /* 21 */
-asm("       movw registers+160, %ds");              /* 20 */
 asm("       movw registers+152, %ss");              /* 19 */
-/* saved cs */
-asm("       movq registers+144, %rax");             /* 18 */
-asm("       pushq %rax");   /* saved cs */
-/* saved eflags */
+asm("       movq registers+32,  %rsp");             /* 4 */
+asm("       movq registers+8,   %rcx");             /* 1 */
+asm("       movq registers+16,  %rdx");             /* 2 */
+asm("       movq registers+24,  %rbx");             /* 3 */
+asm("       movq registers+40,  %rbp");             /* 5 */
+asm("       movq registers+48,  %rsi");             /* 6 */
+asm("       movq registers+56,  %rdi");             /* 7 */
+asm("       movw registers+160, %ds");              /* 20 */
+asm("       movw registers+168, %es");              /* 21 */
+asm("       movw registers+176, %fs");              /* 22 */
+asm("       movw registers+184, %gs");              /* 23 */
 asm("       movq registers+136, %rax");             /* 17 */
 asm("       pushq %rax");   /* saved eflags */
-/* saved rip */
+asm("       movq registers+144, %rax");             /* 18 */
+asm("       pushq %rax");   /* saved cs */
 asm("       movq registers+128, %rax");             /* 16 */
 asm("       pushq %rax");   /* saved rip */
 asm("       movq registers+120, %r15");             /* 15 */
@@ -170,13 +174,6 @@ asm("       movq registers+88,  %r11");             /* 11 */
 asm("       movq registers+80,  %r10");             /* 10 */
 asm("       movq registers+72,  %r9");              /* 9 */
 asm("       movq registers+64,  %r8");              /* 8 */
-asm("       movq registers+56,  %rdi");             /* 7 */
-asm("       movq registers+48,  %rsi");             /* 6 */
-asm("       movq registers+40,  %rbp");             /* 5 */
-asm("       movq registers+32,  %rsp");             /* 4 */
-asm("       movq registers+24,  %rbx");             /* 3 */
-asm("       movq registers+16,  %rdx");             /* 2 */
-asm("       movq registers+8,   %rcx");             /* 1 */
 asm("       movq registers,     %rax");             /* 0 */
 
 /* use iret to restore pc and flags together so
@@ -233,24 +230,24 @@ int64_t gdb_x8664vector = -1;
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, gdb_x8664errcode");
 #define SAVE_REGISTERS2() \
-  /* old rip 64-72 */                                   \
+  /* old rip */                                         \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+128");     /* 64 */        \
-  /* old cs 80-82 */                                    \
+  /* old */                                             \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+144");                     \
   asm ("movw %ax,  registers+146");                     \
   asm ("movl %eax, registers+148");      /* 16 */       \
-  /* old eflags 72-76 */                                \
+  /* old eflags */                                      \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+136");     /* 32 */        \
   asm ("movl %eax, registers+140");                     \
-  /* old ss 88-90 */                                    \
+  /* old ss */                                          \
   asm ("movw %ss, registers+152");      /* 16 */        \
   asm ("movw %ax, registers+154");                      \
   asm ("movl %eax, registers+156");                     \
   /* Now that we've done the pops, we can save the stack pointer.");  */   \
-  /* stack 32-40 */                                     \
+  /* stack */                                           \
   asm ("movq %rsp, registers+32");      /* 64 */
 
 /* See if mem_fault_routine is set, if so just IRET to that address.  */
@@ -283,8 +280,8 @@ asm ("     pushq %rcx"); /* cs */
 asm ("     pushq %rax"); /* eip */
 
 /* Zero mem_fault_routine.  */
-asm ("     movl $0, %eax");
-asm ("     movl %eax, mem_fault_routine");
+asm ("     movq $0, %rax");
+asm ("     movq %rax, mem_fault_routine");
 
 asm ("iret");
 
@@ -468,7 +465,6 @@ asm("_remcomHandler:");
 asm("           popq %rax");            /* pop off return address     */
 asm("           popq %rax");            /* get the exception number   */
 asm("		movq stackPtr, %rsp");      /* move to remcom stack area  */
-//asm("		pushq %rax");	            /* push exception onto stack  */
 asm("       movq %rax, %rdi");          /* pass exception as argument */
 asm("		call  handle_exception");   /* this never returns */
 

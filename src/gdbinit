@@ -4,10 +4,9 @@ target remote localhost:1234
 #break PageManager::bootstrap
 #break set_debug_traps
 #break exceptionHandler
-#break catchException3
+break catchException3
 #break handle_exception
-break x86_64-stub.cc:869
-break putpacket
+break return_to_prog
 cont # startup breakpoint
 
 define refault
