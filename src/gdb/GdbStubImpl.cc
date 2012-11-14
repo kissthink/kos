@@ -21,7 +21,8 @@
 unsigned int sys_gdb_port;
 static SerialDevice serialDevice;       // InitSerialPort done while creating SerialDevice
 
-extern void set_debug_traps();          // from x86_64-stub.c
+extern void set_debug_traps();          // from x86_64-stub.cc
+extern void breakpoint();               // from x86_64-stub.cc
 
 void putDebugChar(unsigned char ch) {
     streamsize written = serialDevice.write((const char *)&ch, 1);
@@ -42,6 +43,6 @@ void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
 void startGdb() {
     set_debug_traps();
     kcout << "Waiting for GDB(" << sys_gdb_port << ") : " << kendl;
-    asm ("int3");
-    kcout << "Connected!" << kendl;
+    breakpoint();
+//    kcout << "Connected!" << kendl;
 }

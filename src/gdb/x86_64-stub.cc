@@ -123,8 +123,8 @@ static const char hexchars[]="0123456789abcdef";
 
 enum regnames {RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
         R8, R9, R10, R11, R12, R13, R14, R15,
-        PC, /* also known as rip */
-        PS, /* also known as eflags */
+        RIP, /* also known as rip */
+        EFLAGS, /* also known as eflags */
         CS, SS, DS, ES, FS, GS};
 
 /*
@@ -148,37 +148,41 @@ return_to_prog ();
 asm(".text");
 asm(".globl return_to_prog");
 asm("return_to_prog:");
-asm("       movw registers+152, %ss");              /* 19 */
-asm("       movq registers+32,  %rsp");             /* 4 */
-asm("       movq registers+8,   %rcx");             /* 1 */
-asm("       movq registers+16,  %rdx");             /* 2 */
-asm("       movq registers+24,  %rbx");             /* 3 */
-asm("       movq registers+40,  %rbp");             /* 5 */
-asm("       movq registers+48,  %rsi");             /* 6 */
-asm("       movq registers+56,  %rdi");             /* 7 */
-asm("       movw registers+160, %ds");              /* 20 */
-asm("       movw registers+168, %es");              /* 21 */
-asm("       movw registers+176, %fs");              /* 22 */
-asm("       movw registers+184, %gs");              /* 23 */
-asm("       movq registers+136, %rax");             /* 17 */
-asm("       pushq %rax");   /* saved eflags */
-asm("       movq registers+144, %rax");             /* 18 */
-asm("       pushq %rax");   /* saved cs */
-asm("       movq registers+128, %rax");             /* 16 */
-asm("       pushq %rax");   /* saved rip */
-asm("       movq registers+120, %r15");             /* 15 */
-asm("       movq registers+112, %r14");             /* 14 */
-asm("       movq registers+104, %r13");             /* 13 */
-asm("       movq registers+96,  %r12");             /* 12 */
-asm("       movq registers+88,  %r11");             /* 11 */
-asm("       movq registers+80,  %r10");             /* 10 */
-asm("       movq registers+72,  %r9");              /* 9 */
-asm("       movq registers+64,  %r8");              /* 8 */
-asm("       movq registers,     %rax");             /* 0 */
+asm("       movw registers+152, %ss");
+asm("       movq registers+8,   %rcx");
+asm("       movq registers+16,  %rdx");
+asm("       movq registers+24,  %rbx");
+asm("       movq registers+40,  %rbp");
+asm("       movq registers+48,  %rsi");
+asm("       movq registers+56,  %rdi");
+asm("       movw registers+160, %ds");
+asm("       movw registers+168, %es");
+asm("       movw registers+176, %fs");
+asm("       movw registers+184, %gs");
+asm("       movq registers+152, %rax");
+asm("       pushq %rax");                           /* ss */
+asm("       movq registers+32,  %rax");
+asm("       pushq %rax");                           /* saved rsp */
+asm("       movq registers+136, %rax");
+asm("       pushq %rax");                           /* saved eflags */
+asm("       movq registers+144, %rax");
+asm("       pushq %rax");                           /* saved cs */
+asm("       movq registers+128, %rax");
+asm("       pushq %rax");                           /* saved rip */
+asm("       movq registers+120, %r15");
+asm("       movq registers+112, %r14");
+asm("       movq registers+104, %r13");
+asm("       movq registers+96,  %r12");
+asm("       movq registers+88,  %r11");
+asm("       movq registers+80,  %r10");
+asm("       movq registers+72,  %r9");
+asm("       movq registers+64,  %r8");
+asm("       movq registers+24,  %rbx");
+asm("       movq registers,     %rax");
 
 /* use iret to restore pc and flags together so
    that trace flag works right.  */
-asm("        iret");
+asm("        iretq");
 
 #define BREAKPOINT() asm("   int $3");
 
@@ -233,7 +237,7 @@ int64_t gdb_x8664vector = -1;
   /* old rip */                                         \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+128");     /* 64 */        \
-  /* old */                                             \
+  /* old cs */                                          \
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+144");                     \
   asm ("movw %ax,  registers+146");                     \
@@ -242,13 +246,15 @@ int64_t gdb_x8664vector = -1;
   asm ("popq %rbx");                                    \
   asm ("movq %rbx, registers+136");     /* 32 */        \
   asm ("movl %eax, registers+140");                     \
-  /* old ss */                                          \
-  asm ("movw %ss, registers+152");      /* 16 */        \
-  asm ("movw %ax, registers+154");                      \
-  asm ("movl %eax, registers+156");                     \
-  /* Now that we've done the pops, we can save the stack pointer.");  */   \
-  /* stack */                                           \
-  asm ("movq %rsp, registers+32");      /* 64 */
+  /* pop rsp and ss too from stack for 64-bit */        \
+  /* rsp register */                                    \
+  asm("popq %rbx");                                     \
+  asm("movq %rbx, registers+32");                       \
+  /* ss register */                                     \
+  asm("popq %rbx");                                     \
+  asm("movq %rbx, registers+152");                      \
+  asm("movw %ax, registers+154");                       \
+  asm("movl %eax, registers+156");
 
 /* See if mem_fault_routine is set, if so just IRET to that address.  */
 #define CHECK_FAULT() \
@@ -784,8 +790,8 @@ handle_exception (int64_t exceptionVector)
     gdb_x8664vector = exceptionVector;
 
     if (remote_debug) {
-        printf ("vector=%ld, sr=0x%x, pc=0x%x\n",
-	        exceptionVector, registers[PS], registers[PC]);
+        printf ("vector=%ld, sr=0x%lx, pc=0x%lx\n",
+	        exceptionVector, registers[EFLAGS], registers[RIP]);
     }
 
     /* reply to host that an exception has occurred */
@@ -793,7 +799,7 @@ handle_exception (int64_t exceptionVector)
 
     ptr = remcomOutBuffer;
 
-    *ptr++ = 'T';			/* notify gdb with signo, PC, FP and SP */
+    *ptr++ = 'T';			/* notify gdb with signo, RIP, FP and SP */
     /* hexchars 0123456789abcdef */
     *ptr++ = hexchars[sigval >> 4];
     *ptr++ = hexchars[sigval & 0xf];
@@ -808,9 +814,9 @@ handle_exception (int64_t exceptionVector)
     ptr = mem2hex((char *)&registers[RBP], ptr, 8, 0); 	/* FP */
     *ptr++ = ';';
 
-    *ptr++ = hexchars[PC]; 
+    *ptr++ = hexchars[RIP]; 
     *ptr++ = ':';
-    ptr = mem2hex((char *)&registers[PC], ptr, 8, 0); 	/* PC */
+    ptr = mem2hex((char *)&registers[RIP], ptr, 8, 0); 	/* RIP */
     *ptr++ = ';';
 
     *ptr = '\0';
@@ -916,17 +922,17 @@ handle_exception (int64_t exceptionVector)
 	        case 'c':
 	        /* try to read optional parameter, pc unchanged if no parm */
                 if (hexToInt (&ptr, &addr)) {
-                    registers[PC] = addr;
+                    registers[RIP] = addr;
                 }
 
-	            newPC = registers[PC];
+	            newPC = registers[RIP];
 
 	            /* clear the trace bit */
-	            registers[PS] &= 0xfffffffffffffeff;
+	            registers[EFLAGS] &= 0xfffffffffffffeff;
 
 	            /* set the trace bit if we're stepping */
 	            if (stepping) {
-                    registers[PS] |= 0x100;
+                    registers[EFLAGS] |= 0x100;
                 }
 
 	            _returnFromException ();	/* this is a jump */
@@ -967,7 +973,7 @@ set_debug_traps (void)
   exceptionHandler (11, catchException11);
   exceptionHandler (12, catchException12);
   exceptionHandler (13, catchException13);
-  exceptionHandler (14, catchException14);
+//  exceptionHandler (14, catchException14);
   exceptionHandler (16, catchException16);
 
   initialized = 1;

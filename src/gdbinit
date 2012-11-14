@@ -7,6 +7,7 @@ target remote localhost:1234
 break catchException3
 #break handle_exception
 break return_to_prog
+break catchException14
 cont # startup breakpoint
 
 define refault
