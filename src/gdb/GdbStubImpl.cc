@@ -44,5 +44,5 @@ void startGdb() {
     set_debug_traps();
     kcout << "Waiting for GDB(" << sys_gdb_port << ") : " << kendl;
     breakpoint();
-//    kcout << "Connected!" << kendl;
+    kcout << "Connected!" << kendl;
 }
