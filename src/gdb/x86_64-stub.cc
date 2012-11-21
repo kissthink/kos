@@ -106,7 +106,7 @@ extern void exceptionHandler(int, void (*)());	/* assign an exception handler   
 /************************************************************************/
 /* BUFMAX defines the maximum number of characters in inbound/outbound buffers*/
 /* at least NUMREGBYTES*2 are needed for register packets */
-#define BUFMAX 1000
+#define BUFMAX 10000
 
 static char initialized;  /* boolean flag. != 0 means we've been initialized */
 
@@ -128,8 +128,8 @@ uint32_t eflags, cs, ss, ds, es, fs, gs;
 
 enum regnames {RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP,
         R8, R9, R10, R11, R12, R13, R14, R15,
-        RIP, /* also known as rip */
-        EFLAGS, /* also known as eflags */
+        RIP,
+        EFLAGS,
         CS, SS, DS, ES, FS, GS};
 
 /*
@@ -174,15 +174,15 @@ asm("       movw es, %es");
 asm("       movw fs, %fs");
 asm("       movw gs, %gs");
 asm("       movq $0, %rax");
-asm("       movq ss, %rax");
+asm("       movw %ss, %ax");
 asm("       pushq %rax");                           /* ss */
 asm("       movq registers+56,  %rax");
 asm("       pushq %rax");                           /* saved rsp */
 asm("       movq $0, %rax");
-asm("       movq eflags, %rax");
+asm("       movl eflags, %eax");
 asm("       pushq %rax");                           /* saved eflags */
 asm("       movq $0, %rax");
-asm("       movq cs, %rax");
+asm("       movw cs, %ax");
 asm("       pushq %rax");                           /* saved cs */
 asm("       movq registers+128, %rax");
 asm("       pushq %rax");                           /* saved rip */
@@ -267,12 +267,14 @@ asm ("mem_fault:");
 asm ("     popq %rax");
 asm ("     movq %rax, gdb_x8664errcode");
 
-asm ("     popq %rax"); /* eip */
+asm ("     popq %rax"); /* rip */
 /* We don't want to return there, we want to return to the function
    pointed to by mem_fault_routine instead.  */
 asm ("     movq mem_fault_routine, %rax");
 asm ("     popq %rcx"); /* cs (low 16 bits; junk in hi 16 bits).  */
 asm ("     popq %rdx"); /* eflags */
+asm ("     popq %rbx"); /* rsp */
+asm ("     popq %rsi"); /* ss */
 
 /* Remove this stack frame; when we do the iret, we will be going to
    the start of a function, so we want the stack to look just like it
@@ -280,6 +282,8 @@ asm ("     popq %rdx"); /* eflags */
 asm ("     leave");
 
 /* Push the stuff that iret wants.  */
+asm ("     pushq %rsi"); /* ss */
+asm ("     pushq %rbx"); /* rsp */
 asm ("     pushq %rdx"); /* eflags */
 asm ("     pushq %rcx"); /* cs */
 asm ("     pushq %rax"); /* eip */
@@ -288,7 +292,7 @@ asm ("     pushq %rax"); /* eip */
 asm ("     movq $0, %rax");
 asm ("     movq %rax, mem_fault_routine");
 
-asm ("iret");
+asm ("iretq");
 
 #define CALL_HOOK() asm("call _remcomHandler");
 
@@ -494,7 +498,7 @@ hex (char ch)
 static char remcomInBuffer[BUFMAX];
 static char remcomOutBuffer[BUFMAX];
 
-/* scan for the sequence $<data>#<checksum>     */
+/* scan for the sequence $<data>#<checksum> */
 
 char *
 getpacket (void)
@@ -813,7 +817,8 @@ handle_exception (int64_t exceptionVector)
     ptr = mem2hex((char *)&registers[RBP], ptr, 8, 0); 	/* FP */
     *ptr++ = ';';
 
-    *ptr++ = hexchars[RIP]; 
+    *ptr++ = hexchars[RIP >> 4]; 
+    *ptr++ = hexchars[RIP & 0xf];
     *ptr++ = ':';
     ptr = mem2hex((char *)&registers[RIP], ptr, 8, 0); 	/* RIP */
     *ptr++ = ';';
@@ -878,39 +883,33 @@ handle_exception (int64_t exceptionVector)
                         switch (regno) {
                             case EFLAGS:
                                 hex2mem(ptr, (char *)&eflags, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case CS:
                                 hex2mem(ptr, (char *)&cs, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case SS:
                                 hex2mem(ptr, (char *)&ss, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case DS:
                                 hex2mem(ptr, (char *)&ds, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case ES:
                                 hex2mem(ptr, (char *)&es, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case FS:
                                 hex2mem(ptr, (char *)&fs, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                             case GS:
                                 hex2mem(ptr, (char *)&gs, 4, 0);
-                                strcpy(remcomOutBuffer, "OK");
-                                goto EXIT_P;
+                                break;
                         }
+                        strcpy(remcomOutBuffer, "OK");
+                        break;
                     }
                 }
 
                 strcpy (remcomOutBuffer, "E01");
 	        }
-EXIT_P:
                 break;
             /* mAA..AA,LLLL  Read LLLL bytes at address AA..AA */
             case 'm':
@@ -976,12 +975,10 @@ EXIT_P:
 	            newPC = registers[RIP];
 
 	            /* clear the trace bit */
-	            //registers[EFLAGS] &= 0xfffffffffffffeff;
                 eflags &= 0xfffffeff;
 
 	            /* set the trace bit if we're stepping */
 	            if (stepping) {
-                    //registers[EFLAGS] |= 0x100;
                     eflags |= 0x100;
                 }
 

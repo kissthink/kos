@@ -40,9 +40,35 @@ void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
     Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
 }
 
+int g() {
+//    kcout << "hello word!";
+    int b = 3;
+    return b;
+}
+
+void f() {
+    int a = 5;
+    a = g();
+    a = g();
+    a = g();
+    a = g();
+    a = g();
+    a = g();
+    a = g();
+}
+
 void startGdb() {
     set_debug_traps();
     kcout << "Waiting for GDB(" << sys_gdb_port << ") : " << kendl;
     breakpoint();
-    kcout << "Connected!" << kendl;
+    //f();
+    //kcout << "Connected!" << kendl;
+    int a = 0, b = 0, c = 0;
+    a = 5;
+    b = 3;
+    c = 1;
+    a = b + c;
+    b = a - c;
+    f();
+    c = a * b;
 }
