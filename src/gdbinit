@@ -1,0 +1,29 @@
+target remote localhost:1234
+break Breakpoint2
+break Machine::init2
+
+#break set_debug_traps
+#break exceptionHandler
+#break startGdb
+#break x86_64-stub.cc:846
+#break x86_64-stub.cc:966
+#break return_to_prog
+#break handle_exception
+break catchException3
+break catchException14
+
+cont # startup breakpoint
+
+define refault
+break *ia
+return
+cont
+end
+
+# refault # breakpoint and restart to debug fault
+
+# print $rip=0xffffffff8010fba7
+# print $rsp=
+
+# x/40xg $rsp
+# break *$rdi

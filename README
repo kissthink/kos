@@ -1,0 +1,89 @@
+Cross Compilation Environment
+=============================
+
+To prepare the cross compilation environment, adjust the first few lines of
+'setup_crossenv.sh' and 'config'.  You will need to download the appropriate
+source packages from your friendly neighbourhood mirror.
+
+IMPORTANT: To build the cross compiler, you must have the *development*
+versions (i.e., libraries *and* headers) of the following packages installed
+that are appropriate for your host compiler:
+- GNU Multiple Precision Arithmetic Library - gmp
+- GNU MPC - mpc or libmpc
+- GNU MPFR - mpfr
+- CLooG Code Generator - cloog, and dependencies:
+  . Integer Set Library - isl, or
+  . Parma Polyhedra Library - ppl
+
+Building the cross compiler requires other packages, such as flex, bison,
+gtk, ncurses (for gdb), but these should typically be present on systems
+configured for software development.
+
+The output of the cross compilation script should contain the following
+(among other output; grep for SUCCESS):
+
+SUCCESS: gcc-4.7.2 install
+SUCCESS: libelf-0.8.13 install
+SUCCESS: gdb-7.5 install
+SUCCESS: grub-2.00 install
+
+
+Hardware Emulation
+==================
+
+The script setup_crossenv.sh also contains suggested configurations for
+bochs and qemu and will build and install those in $TOOLSDIR (default is
+/usr/local) when invoked with the corresponding command-line argument.
+
+
+Other Tools
+===========
+
+You need to have a recent version of xorriso installed for grub2 iso image
+making.  I am currently using version 1.2.4.
+
+
+Building KOS
+============
+
+To prepare the KOS source code (starting from the main directory):
+
+cd src/extern
+
+# download acpica-unix-20121018.tar.gz from https://www.acpica.org/downloads
+tar xzvf acpica-unix-20121018.tar.gz
+cd acpica-unix-20121018
+patch -p1 < ../../../patches/acpica.patch
+cd ..
+mv acpica-unix-20121018 acpica
+cd ../..
+
+You should be back in the main directory. Type 'make' to get a list of build
+targets. These targets should also work from within the src/ directry.
+
+
+Running KOS
+===========
+
+When executing KOS, the system should show a number of messages and then get
+into a split-screen mode, where the first 20 lines are showing output from 7
+threads running on 2 cores and the bottom 5 lines show keycodes when keys
+are pressed and released.  Running KOS in qemu creates several log files
+that can be used to diagnose problems:
+
+/tmp/KOS.serial
+/tmp/KOS.dbg
+/tmp/qemu.log
+
+KOS.dbg and KOS.serial are two different output channels internally, but
+currently contain excatly the same information.
+
+
+Please send feedback to mkarsten@uwaterloo.ca.
+
+
+Contributors
+============
+
+- Alex Szlavik converted the bootstrap assembly code from Intel syntax
+  (nasm) to AT&T syntax (gas) - to reduce tool dependencies.

@@ -1,0 +1,5 @@
+GCCDIR=/usr/local/crossgcc
+CROSSDIR=/usr/local/cross
+TOOLSDIR=/usr/local
+TARGET=x86_64-pc-elf
+GCCVER=4.7.2
