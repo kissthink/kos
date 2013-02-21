@@ -64,23 +64,5 @@ Hg-1:       All other future operations should apply to all threads.
 Hg0:        ???
             Return OK
 
-
-Command Flow
-------------
-target remote:
-qSupported ->
-           <- PacketSize=3E8
-?          ->
-           <- S05
-Hc-1       ->
-           <- OK
-qC         ->
-           <-
-qOffsets   ->
-           <- Text=0;Data=0;Bss=0
-Hg-1       ->
-           <- OK
-g          ->
-           <- 0000 ... 
-qSymbol::  ->
-           <- OK
+LINK to GDB REMOTE SERIAL PROTOCOL
+www.embecosm.com/appnotes/ean4/embecosm-howto-rsp-server-ean4-issue-2.html
