@@ -34,6 +34,23 @@ RIP   +8
 ErrorCode       <-- RSP points to here in interrupt handler
 ---------
 
+GDB Commands Supported
+----------------------
+breakpoint
+continue
+step
+stepi
+next
+disassemble
+list
+info registers
+,etc ...
+
+GDB Commands NOT Supported
+--------------------------
+info threads
+trace
+
 Commands Supported
 ------------------
 qSupported: Report the features supported by the RSP (remote serial protocol) server.
