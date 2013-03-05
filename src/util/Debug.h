@@ -30,6 +30,7 @@ public:
     Devices,
     Error,
     Frame,
+    GDB,
     Paging,
     PCI,
     Scheduler,
@@ -69,6 +70,10 @@ public:
     out(c, a...);
     out(c, kendl);
     lk.release();
+  }
+
+  static bool test( Level c ) {
+    return levels.test(c);
   }
 };
 

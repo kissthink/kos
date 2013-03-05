@@ -137,6 +137,9 @@ namespace CPU {
   static void disableInterrupts() {
     asm volatile( "cli" ::: "memory" );
   }
+  static void invTLB( mword val ) {
+    asm volatile( "invlpg %0" :: "g"(val) : "memory" );
+  }
 };
 
 struct MSR {

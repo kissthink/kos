@@ -27,7 +27,7 @@
 
 template<typename T> class KernelAllocator;
 
-// allocations of less than cacheSize are routed through a caching heap
+// allocations of less than cacheSize are routed through an array of BlockCacheHeap
 class KernelHeap {
   static const size_t dpl = 2;
   static const size_t cacheLimit = pagesizebits<1>();
@@ -43,10 +43,12 @@ class KernelHeap {
   struct State {
     BlockCacheHeap<BlockHelper,cacheSize,SpinLock> cacheHeaps[cacheLimit];
     BuddyMap<cacheLimit,pageLimit+1,InPlaceSet<vaddr>,KernelAllocator<vaddr>> buddyMap;
+    size_t buddyMapSize;
     volatile SpinLock buddyMapLock;
+    State() : buddyMapSize(0) {}
   };
   static char mem[sizeof(State)];
-  static constexpr State* state() { return (State*)mem; }
+  static constexpr State* state = (State*)mem;
 
   static vaddr allocInternal(size_t size);
   static void releaseInternal(vaddr p, size_t size);
@@ -61,7 +63,7 @@ public:
   static vaddr alloc(size_t size) {
     if likely(size < cacheSize) {
       size_t index = ceilinglog2(size);
-      return state()->cacheHeaps[index].alloc(pow2(index));
+      return state->cacheHeaps[index].alloc(pow2(index));
     } else {
       return allocInternal(size);
     }
@@ -70,19 +72,15 @@ public:
   static void release(vaddr p, size_t size) {
     if likely(size < cacheSize) {
       size_t index = ceilinglog2(size);
-      state()->cacheHeaps[index].release(p, pow2(index));
+      state->cacheHeaps[index].release(p, pow2(index));
     } else {
       releaseInternal(p, size);
     }
   }
 
-  typedef BackedCacheHeap<KernelHeap> Cache;
+  typedef FixedCacheHeap<KernelHeap> Cache;
   static Cache* createCache(size_t s) { return new Cache(s); }
   static void destroyCache(Cache* c) { delete c; }
-
-  static ptr_t malloc(size_t size) { return (ptr_t)alloc(size); }
-  static void free(ptr_t p, size_t size) { release(vaddr(p),size); }
-
 };
 
 template<typename T> class KernelAllocator : public std::allocator<T> {
@@ -93,10 +91,10 @@ public:
   template<typename U> KernelAllocator (const KernelAllocator<U>& x) : std::allocator<T>(x) {}
   ~KernelAllocator() = default;
   T* allocate(size_t n, const void* = 0) {
-    return static_cast<T*>(KernelHeap::malloc(n * sizeof(T)));
+    return static_cast<T*>(ptr_t(KernelHeap::alloc(n * sizeof(T))));
   }
   void deallocate(T* p, size_t s) {
-    KernelHeap::free(p, s * sizeof(T));
+    KernelHeap::release(vaddr(p), s * sizeof(T));
   }
 };
 

@@ -22,36 +22,41 @@
 char KernelHeap::mem[sizeof(KernelHeap::State)];
 
 void KernelHeap::init(mword start, mword end) {
-  // need one cache block for address space cache
   KASSERT( end >= start + 2 * cacheSize, end - start );
   new (mem) State;
-  state()->buddyMap.insert(start, end - start);
-  // TODO: preload AddressSpace cache, one element per buddyLevel
+  state->buddyMap.insert(start, end - start);
+  state->buddyMapSize += end - start;
 }
 
 vaddr KernelHeap::allocInternal(size_t size) {
   KASSERT( aligned(size, cacheSize), size );
-  LockObject<SpinLock> lo(state()->buddyMapLock);
-  for (;;) {
-    vaddr addr = state()->buddyMap.retrieve(size);
-  if (addr != illaddr) return addr;
-    addr = kernelSpace.allocPages<dpl>(size);
-    KASSERT( addr != illaddr, "out of memory?" );
-    bool check = state()->buddyMap.insert(addr, align_up(size, pageSize));
-    KASSERT( check, addr );
-    // TODO: check AddressSpace cache; if necessary allocate another page.
+  LockObject<SpinLock> lo(state->buddyMapLock);
+  // low watermark: keep one cacheSize block available
+  if (state->buddyMapSize < cacheSize + size) {
+    vaddr newmem = kernelSpace.mapPages<dpl,true>(align_up(size, pageSize));
+    KASSERT( newmem != illaddr, "out of memory?" );
+    bool check = state->buddyMap.insert(newmem, align_up(size, pageSize));
+    KASSERT( check, newmem );
+    state->buddyMapSize += align_up(size, pageSize);
   }
+  vaddr addr = state->buddyMap.retrieve(size);
+  KASSERT( addr != illaddr, "internal error" );
+  state->buddyMapSize -= size;
+  return addr;
 }
 
 void KernelHeap::releaseInternal(vaddr p, size_t size) {
   KASSERT( aligned(size, cacheSize), size );
-  LockObject<SpinLock> lo(state()->buddyMapLock);
-  state()->buddyMap.insert(p, size);
-  // TODO: check AddressSpace cache before releasing pages
-  for (;;) {
-    vaddr addr = state()->buddyMap.retrieve(pageSize);
+  LockObject<SpinLock> lo(state->buddyMapLock);
+  state->buddyMap.insert(p, size);
+  state->buddyMapSize += size;
+  // high watermark: keep one pageSize block available
+  vaddr freeSize = size < pageSize ? pageSize : align_down(size, pageSize);
+  while (state->buddyMapSize >= pageSize + freeSize) {
+    vaddr addr = state->buddyMap.retrieve(freeSize);
     if (addr == illaddr) break;
-    bool check = kernelSpace.releasePages<dpl>(p, size);
-    KASSERT(check, p);
+    state->buddyMapSize -= freeSize;
+    bool check = kernelSpace.unmapPages<dpl,true>(addr, freeSize);
+    KASSERT( check, addr );
   }
 }

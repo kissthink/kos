@@ -111,7 +111,7 @@ void Machine::initAP(funcvoid_t func) {
   kernelSpace.activate();
   loadIDT(idt, sizeof(idt));
 
-  // configure local processor
+  // configure local processor with idle thread
   processorTable[apIndex].install();
   Thread* idleThread = Thread::create(pagesize<1>());
   processorTable[apIndex].initThread(*idleThread);
@@ -131,7 +131,9 @@ void Machine::initAP2() {
 
   // enable interrupts, sync with BSP, then halt
   processorTable[apIndex].startInterrupts();
+  LoadBarrier();
   apIndex = bspIndex;
+  StoreBarrier();
   Halt();
 }
 
@@ -139,6 +141,11 @@ void Machine::initAP2() {
 void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // initialize bss
   memset((char*)&__KernelBss, 0, &__KernelBssEnd - &__KernelBss);
+
+  // initialize basic video output: no screen output before this point
+  Screen::init();
+  // update screen's virtual address, because identity mapping disappears later
+  Screen::setAddress( Screen::getAddress() + kernelBase );
 
   // initialize debugging: no debug output before this point!
   initDebug(mbiAddr,false);
@@ -148,13 +155,8 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   dummyProcessor.install();
 
   // bootstrap kernel heap with pre-allocated memory -> uses locking
-  vaddr mbiEnd = align_up(mbiAddr + *(uint32_t*)mbiAddr, pagesize<1>());
-  vaddr kernelEnd = KERNBASE + BOOTMEM;
-  KernelHeap::init(mbiEnd, kernelEnd);
-
-  // initialize basic video output: no screen output before this point
-  laddr videoMemory = Screen::init(kernelBase);
-  if (videoMemory == 0) Reboot();
+  vaddr modEnd = align_up(findModEnd(mbiAddr), pagesize<1>());
+  KernelHeap::init(modEnd, kernelEnd);
 
   // call global constructors: %rbx is callee-saved, thus safe to use
   // some dynamoc memory is fine, as long as it fits in pre-allocation
@@ -201,13 +203,15 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::out(DBG::Basic, kendl);
 
   // print boot memory information
-  DBG::outln(DBG::Basic, "MB info:     ", (ptr_t)&_loadStart, ',', (ptr_t)&_loadEnd, ',', (ptr_t)&_bssEnd);
-  DBG::outln(DBG::Basic, "Kernel Boot: ", (ptr_t)&__KernelBoot, '-', (ptr_t)&__KernelBootEnd);
-  DBG::outln(DBG::Basic, "Kernel Code: ", (ptr_t)&__KernelCode, '-', (ptr_t)&__KernelCodeEnd);
-  DBG::outln(DBG::Basic, "Kernel RO:   ", (ptr_t)&__KernelRO  , '-', (ptr_t)&__KernelRO_End);
-  DBG::outln(DBG::Basic, "Kernel Data: ", (ptr_t)&__KernelData, '-', (ptr_t)&__KernelDataEnd);
-  DBG::outln(DBG::Basic, "Kernel Bss:  ", (ptr_t)&__KernelBss , '-', (ptr_t)&__KernelBssEnd);
-  DBG::outln(DBG::Basic, "boot16:      ", (ptr_t)&boot16Begin , '-', (ptr_t)&boot16End);
+  DBG::outln(DBG::Basic, "Multiboot:   ", (ptr_t)&_loadStart, ',', (ptr_t)&_loadEnd, ',', (ptr_t)&_bssEnd, ',', (ptr_t)(modEnd - kernelBase));
+  DBG::outln(DBG::Basic, "Boot16 Code: ", (ptr_t)&boot16Begin , '-', (ptr_t)&boot16End);
+  DBG::outln(DBG::Basic, "Kernel:      ", (ptr_t)kernelBase, '-', (ptr_t)kernelEnd, ',', (ptr_t)lapicAddr);
+  DBG::outln(DBG::Basic, "Page Table:  ", (ptr_t)PageManager::ptp<1>(), '-', (ptr_t)PageManager::ptpend());
+  DBG::outln(DBG::Basic, "Boot Seg:    ", (ptr_t)&__KernelBoot, '-', (ptr_t)&__KernelBootEnd);
+  DBG::outln(DBG::Basic, "Code Seg:    ", (ptr_t)&__KernelCode, '-', (ptr_t)&__KernelCodeEnd);
+  DBG::outln(DBG::Basic, "RO Seg:      ", (ptr_t)&__KernelRO  , '-', (ptr_t)&__KernelRO_End);
+  DBG::outln(DBG::Basic, "Data Seg:    ", (ptr_t)&__KernelData, '-', (ptr_t)&__KernelDataEnd);
+  DBG::outln(DBG::Basic, "Bss Seg:     ", (ptr_t)&__KernelBss , '-', (ptr_t)&__KernelBssEnd);
 
   // parse multiboot information -> stores memory info in frameManager
   KASSERT(magic == MULTIBOOT2_BOOTLOADER_MAGIC, magic);
@@ -217,12 +221,12 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // initialize frame manager with initial allocation for kernel
   DBG::outln(DBG::Basic, "FM/init: ", frameManager);
   vaddr kernelBoot = vaddr(&__KernelBoot);
-  bool check = frameManager.alloc( kernelBoot - kernelBase, kernelEnd - kernelBoot );
+  bool check = frameManager.reserve( kernelBoot - kernelBase, kernelEnd - kernelBoot );
   KASSERT( check, "cannot allocate static kernel memory" );
   DBG::outln(DBG::Basic, "FM/alloc: ", frameManager);
 
   // prepare boot code for APs
-  check = frameManager.alloc( BOOT16, pagesize<1>() );
+  check = frameManager.reserve( BOOT16, pagesize<1>() );
   KASSERT( check, "cannot allocate AP boot memory" );
   memcpy((ptr_t)BOOT16, &boot16Begin, &boot16End - &boot16Begin);
   DBG::outln(DBG::Basic, "FM/boot16: ", frameManager);
@@ -232,16 +236,14 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   vaddr kernelRO_End = align_up(vaddr(&__KernelRO_End), pagesize<2>());
   mword kernelCodePages = (kernelRO_End - kernelBase) >> pagesizebits<2>();
   mword kernelDataPages = (kernelEnd  - kernelBase) >> pagesizebits<2>();
-  laddr pml4addr = PageManager::bootstrap( frameManager, kernelBase, kernelCodePages, pagesize<2>(), kernelDataPages, pagesize<2>(), kernelBoot - kernelBase );
-  DBG::outln(DBG::Basic, "FM/paging: ", frameManager);
+  laddr pml4addr = PageManager::bootstrap( frameManager, kernelBase, kernelBoot,
+    kernelCodePages, pagesize<2>(), kernelDataPages, pagesize<2>() );
+  DBG::outln(DBG::Basic, "FM/bootstrap: ", frameManager);
 
   // initial kernel address space -> no identity mapping afterwards
-  kernelSpace.init(pml4addr, kernelLow, kernelBase);
+  kernelSpace.init(pml4addr, kernelEnd, lapicAddr);
   kernelSpace.activate();
-
-  // remap screen's virtual address, before kernel boot memory disappears
-  PageManager::map<1>(videoAddr, videoMemory, PageManager::Kernel, PageManager::Data, true);
-  Screen::remap(videoAddr);
+  DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(acpiRSDP);
@@ -250,12 +252,12 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
   for (Device* dev : deviceInitList) dev->init();
   deviceInitList.clear();
 
-  // install BSP info; needed to initialize thread below
+  // configure BSP processor with main thread 
   processorTable[bspIndex].install();
-
-  // create main thread and leave init stack -> func will call init2
   Thread* mainThread = Thread::create();
   processorTable[bspIndex].initThread(*mainThread);
+
+  // leave init stack; invoke to main thread direct -> func will call init2
   mainThread->runDirect(func);
 }
 
@@ -263,6 +265,9 @@ void Machine::init(mword magic, vaddr mbiAddr, funcvoid_t func) {
 void Machine::init2() {
   // find additional devices, need "current thread" for ACPI subsystem init
   parseACPI();
+//  kernelSpace.unmapPages<1>(lapicAddr, pagesize<1>()); // debugging only
+  DBG::outln(DBG::Basic, "FM/acpi: ", frameManager);
+  DBG::outln(DBG::Basic, "AS/acpi: ", kernelSpace);
 
   // find PCI devices
   probePCI();
@@ -277,6 +282,7 @@ void Machine::init2() {
   DBG::out(DBG::Basic, "AP init:");
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
     if ( i != bspIndex ) {
+      LoadBarrier();
       apIndex = i;                          // prepare sync variable
       StoreBarrier();	                      // sync memory before starting AP
       processorTable[i].sendInitIPI();
@@ -287,20 +293,26 @@ void Machine::init2() {
   }
   DBG::out(DBG::Basic, kendl);
 
+  // update screen's virtual address, before boot memory disappears
+  vaddr videoAddr = kernelSpace.mapPages<1>(pagesize<1>(), PageManager::vtol<4>(Screen::getAddress()) );
+  Screen::setAddress(videoAddr);
+
   // free kernel boot memory
   vaddr kernelBoot = vaddr(&__KernelBoot);
-  vaddr kernelCode = align_down(vaddr(&__KernelCode), pagesize<2>());
+  vaddr kernelCode = vaddr(&__KernelCode);
   for ( vaddr x = kernelBase; x < kernelCode; x += pagesize<2>() ) {
-    PageManager::unmap<2>(x, true);
+    PageManager::unmap<2>(x);
   }
   bool check = frameManager.release(kernelBoot - kernelBase, kernelCode - kernelBoot);
   KASSERT( check, "cannot free kernel boot memory" );
   DBG::outln(DBG::Basic, "FM/free: ", frameManager);
+  DBG::outln(DBG::Basic, "AS/free: ", kernelSpace);
 
   // free AP boot code
   check = frameManager.release(BOOT16, pagesize<1>());
   KASSERT( check, "cannot free AP boot memory" );
   DBG::outln(DBG::Basic, "FM/free16: ", frameManager);
+  DBG::outln(DBG::Basic, "AS/free16: ", kernelSpace);
 
   // wake up APs
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
@@ -319,10 +331,9 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
   KASSERT( irqnum < PIC::Max, irqnum );
   irqnum = irqOverrideTable[irqnum].global;
   // TODO: handle irq override flags
-  kernelSpace.mapPages<1>(ioapicAddr, irqTable[irqnum].ioApicAddr, pagesize<1>(), true);
-  volatile IOAPIC* ioapic = (IOAPIC*)ioapicAddr;
+  volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>( pagesize<1>(), irqTable[irqnum].ioApicAddr);
   ioapic->mapIRQ( irqTable[irqnum].ioapicIrq, idtnum, bspApicID );
-  kernelSpace.unmapPages<1>(ioapicAddr, pagesize<1>(), true);
+  kernelSpace.unmapPages<1>((vaddr)ioapic, pagesize<1>());
 }
 
 inline Processor& Machine::getProcessor(uint32_t idx) {
@@ -333,14 +344,29 @@ void Machine::initDebug( vaddr mbi, bool msg ) {
   vaddr mbiEnd = mbi + *(uint32_t*)mbi;
   mbi += sizeof(multiboot_header_tag);
   for (;;) {
-    multiboot_tag* tag = (multiboot_tag*)mbi;
+    multiboot_tag_string* tag = (multiboot_tag_string*)mbi;
   if (tag->type == MULTIBOOT_TAG_TYPE_END || mbi >= mbiEnd) break;
     if (tag->type == MULTIBOOT_TAG_TYPE_CMDLINE) {
-      DBG::init( ((multiboot_tag_string*)tag)->string, msg );
+      DBG::init( tag->string, msg );
   return;
     }
     mbi += (tag->size + 7) & ~7;
   }
+}
+
+vaddr Machine::findModEnd( vaddr mbi ) {
+  vaddr mbiEnd = mbi + *(uint32_t*)mbi;
+  vaddr modEnd = mbiEnd - kernelBase;
+  mbi += sizeof(multiboot_header_tag);
+  for (;;) {
+    multiboot_tag_module* tag = (multiboot_tag_module*)mbi;
+  if (tag->type == MULTIBOOT_TAG_TYPE_END || mbi >= mbiEnd) break;
+    if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
+      if (uintptr_t(tag->mod_end) > modEnd) modEnd = uintptr_t(tag->mod_end);
+    }
+    mbi += (tag->size + 7) & ~7;
+  }
+  return modEnd + kernelBase;
 }
 
 void Machine::parseMBI( vaddr mbi, vaddr& rsdp ) {
@@ -365,7 +391,8 @@ void Machine::parseMBI( vaddr mbi, vaddr& rsdp ) {
       DBG::out(DBG::Boot, "module at ", (ptr_t)uintptr_t(tm->mod_start),
         '-', (ptr_t)uintptr_t(tm->mod_end), ": ", tm->cmdline);
       Elf* e = elf_memory((char*)uintptr_t(tm->mod_start), tm->mod_end - tm->mod_start);
-      Elf_Kind ek = elf_kind (e);
+      KASSERT( e != nullptr, elf_errmsg(-1) );
+      Elf_Kind ek = elf_kind(e);
       switch (ek) {
         case ELF_K_AR: DBG::out(DBG::Boot, " ar"); break;
         case ELF_K_ELF: DBG::out(DBG::Boot, " elf"); break;
@@ -373,6 +400,7 @@ void Machine::parseMBI( vaddr mbi, vaddr& rsdp ) {
         default: DBG::out(DBG::Boot, " unknown"); break;
       }
       DBG::out(DBG::Boot, kendl);
+      elf_end(e);
     } break;
     case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO: {
       multiboot_tag_basic_meminfo* tm = (multiboot_tag_basic_meminfo*)tag;
@@ -525,7 +553,7 @@ extern "C" void isr_handler_gen_err(mword num, mword errcode) {
   Reboot();
 }
 
-inline void Machine::setupIDT(unsigned int number, vaddr address) {
+void Machine::setupIDT(unsigned int number, vaddr address) {
   KASSERT(number < maxIDT, number);
   idt[number].Offset00 = (address & 0x000000000000FFFF);
   idt[number].Offset16 = (address & 0x00000000FFFF0000) >> 16;

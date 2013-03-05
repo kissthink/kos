@@ -39,30 +39,24 @@ class BuddyMap {
   friend ostream& operator<< <>( ostream&, const BuddyMap& );
 
 private:
-  // use only when it is guaranteed that no merging will be possible!
-  bool reinsert( vaddr start, size_t length ) {
-    return region<InsertDirect>(start, length);
-  }
-
-  bool insertDirect( vaddr addr, size_t logsize ) {
-    buddyLevel[logsize].insert(addr);
-    bitmask.set(logsize);
-    return true;
-  }
-
-  void insertDirect( iterator it, vaddr addr, size_t logsize ) {
-    buddyLevel[logsize].insert(it, addr);
-  }
-
   void removeDirect( iterator it, size_t logsize ) {
     buddyLevel[logsize].erase( it );
     bitmask.clear(logsize, buddyLevel[logsize].empty());
   }
 
+  void insertDirect( vaddr addr, size_t logsize ) {
+    buddyLevel[logsize].insert(addr);
+    bitmask.set(logsize);
+  }
+
+  void addToLevel( iterator it, vaddr addr, size_t logsize ) {
+    buddyLevel[logsize].insert(it, addr);
+  }
+
   // insert region and merge memory regions, if possible
-  bool insertAuto( vaddr addr, size_t logsize ) {
+  size_t insertAuto( vaddr addr, size_t logsize ) {
     KASSERT( logsize >= min && logsize < max, logsize );
-    KASSERT( bitaligned(addr, logsize), (ptr_t)addr );
+    KASSERT( aligned(addr, pow2(logsize)), (ptr_t)addr );
     for (;;) {
       // set least relevant bit to zero to search for buddy
       vaddr search = addr & ~pow2(logsize);
@@ -71,10 +65,10 @@ private:
       if ( it == buddyLevel[logsize].end() ) {
         // empty set or all regions at lower addresses -> insert and return
         insertDirect( addr, logsize );
-        return true;
+        return logsize;
       } else if ( *it == addr ) {
         // region already present
-        return false;
+        return max;
       }
 
       // if at last level (max - 1), don't merge
@@ -87,20 +81,20 @@ private:
         // buddy not found -> insert (possibly merged) region and return
         // 'lower_bound' finds equal or next / 'insert' suggests insert after
         // bitmask is already set
-        insertDirect( --it, addr, logsize );
-        return true;
+        addToLevel( --it, addr, logsize );
+        return logsize;
       }
     }
   }
 
   // allocate region and reinsert leftover memory, if necessary
-  bool removeAuto( vaddr addr, size_t logsize ) {
+  size_t removeAuto( vaddr addr, size_t logsize ) {
     KASSERT( logsize >= min && logsize < max, logsize );
-    KASSERT( bitaligned(addr, logsize), (ptr_t)addr );
+    KASSERT( aligned(addr, pow2(logsize)), (ptr_t)addr );
     // go through all levels to find region that covers request
     for ( size_t idx = logsize; ; idx += 1 ) {
       idx = bitmask.lsbc( idx, max );
-      if ( idx >= max ) return false;
+      if ( idx >= max ) return max;
       vaddr search = addr & ~maskbits(idx);
       iterator it = buddyLevel[idx].find(search);
       if ( it != buddyLevel[idx].end() ) {
@@ -110,45 +104,39 @@ private:
         if ( prerange > 0 ) reinsert( search, prerange );
         size_t postrange = search + pow2(idx) - (addr + pow2(logsize));
         if ( postrange > 0 ) reinsert( addr + pow2(logsize), postrange );
-        return true;
+        return idx;
       }
     }
   }
 
   // test, if region is available
-  bool testAuto( vaddr addr, size_t logsize ) {
+  size_t testAuto( vaddr addr, size_t logsize ) {
     KASSERT( logsize >= min && logsize < max, logsize );
-    KASSERT( bitaligned(addr, logsize), (ptr_t)addr );
+    KASSERT( aligned(addr, pow2(logsize)), (ptr_t)addr );
     for ( size_t idx = logsize; ; idx += 1 ) {
       idx = bitmask.lsbc( idx, max );
-      if ( idx >= max ) return false;
+      if ( idx >= max ) return max;
       vaddr search = addr & ~maskbits(idx);
       iterator it = buddyLevel[idx].find(search);
-      if ( it != buddyLevel[idx].end() ) return true;
+      if ( it != buddyLevel[idx].end() ) return idx;
     }
   }
 
   struct InsertAuto {
     inline bool operator()( BuddyMap& bm, vaddr addr, size_t logsize ) {
-      return bm.insertAuto( addr, logsize );
+      return bm.insertAuto( addr, logsize ) < max;
     }
   };
 
   struct RemoveAuto {
     inline bool operator()( BuddyMap& bm, vaddr addr, size_t logsize ) {
-      return bm.removeAuto( addr, logsize );
-    }
-  };
-
-  struct InsertDirect {
-    inline bool operator()( BuddyMap& bm, vaddr addr, size_t logsize ) {
-      return bm.insertDirect( addr, logsize );
+      return bm.removeAuto( addr, logsize ) < max;
     }
   };
 
   struct TestAuto {
     inline bool operator()( BuddyMap& bm, vaddr addr, size_t logsize ) {
-      return bm.test( addr, logsize );
+      return bm.testAuto( addr, logsize ) < max;
     }
   };
 
@@ -157,20 +145,46 @@ private:
     Action action;
     bool retcode = true;
     while ( length > 0 ) {
-      KASSERT( bitaligned(start, min), (ptr_t)start );
-      KASSERT( bitaligned(length, min), (ptr_t)length );
+      KASSERT( aligned(start, pow2(min)), (ptr_t)start );
+      KASSERT( aligned(length, pow2(min)), (ptr_t)length );
       size_t logsize = std::min( bitalignment(start), floorlog2(length) );
-      bool success = action( *this, start, logsize );
-      retcode = retcode && success;
+      retcode = action( *this, start, logsize ) && retcode;
       start += pow2(logsize);
       length -= pow2(logsize);
     }
     return retcode;
   }
 
+  struct InsertDirect {
+    inline bool operator()( BuddyMap& bm, vaddr addr, size_t logsize ) {
+      bm.insertDirect( addr, logsize );
+      return true;
+    }
+  };
+
+  bool reinsert( vaddr start, size_t length ) {
+    return region<InsertDirect>(start, length);
+  }
 
 public:
-  vaddr retrieve( size_t length, vaddr limit = mwordlimit ) {
+  bool remove( vaddr start, size_t length ) {
+    return region<RemoveAuto>(start, length);
+  }
+
+  bool insert( vaddr start, size_t length ) {
+    return region<InsertAuto>(start, length);
+  }
+
+  bool test( vaddr start, size_t length ) {
+    return region<TestAuto>(start, length);
+  }
+
+  size_t insert2( vaddr start, size_t logsize ) {
+    return insertAuto( start, logsize );
+  }
+
+  template<bool limit = false>
+  vaddr retrieve( size_t length, vaddr upperlimit = mwordlimit ) {
     size_t logsize = ceilinglog2( length );
     KASSERT( logsize >= min && logsize < max, length );
 
@@ -186,7 +200,7 @@ public:
       vaddr addr = *it;
 
       // test for upper limit
-      if (addr < limit ) {
+      if (!limit || addr < upperlimit ) {
         // remove region from map
         removeDirect( it, index );
         // reinsert leftover regions -> no merging possible in this case
@@ -195,18 +209,6 @@ public:
       }
       logsize = index + 1;
     }
-  }
-
-  bool remove( vaddr start, size_t length ) {
-    return region<RemoveAuto>(start, length);
-  }
-
-  bool insert( vaddr start, size_t length ) {
-    return region<InsertAuto>(start, length);
-  }
-
-  bool test( vaddr start, size_t length ) {
-    return region<TestAuto>(start, length);
   }
 };
 
@@ -218,7 +220,7 @@ extern inline ostream& operator<<(ostream& os, const BuddyMap<min,max,Set,DumpAl
     KASSERT( bm.bitmask.test(idx) == !bm.buddyLevel[idx].empty(), idx );
     for ( vaddr b : bm.buddyLevel[idx] ) dumpMap.insert( {b, pow2(idx)} );
   }
-  // print continuous regions as compact representation
+  // print continuous regions in compact representation
   vaddr end = mwordlimit;
   for ( const std::pair<vaddr,size_t>& d : dumpMap ) {
     if ( d.first != end ) {

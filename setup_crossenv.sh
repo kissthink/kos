@@ -7,19 +7,18 @@
 # note: use 'make info' and 'make pdf' to build GNU docs
 
 TMPDIR=/spare/tmp
-DLDIR=~/kos/download
-PTDIR=~/kos/patches
+DLDIR=~mkarsten/work/kos/download
+PTDIR=~mkarsten/work/kos/patches
 source $(dirname $0)/config
 
 BINUTILS=binutils-2.22  # GNU mirror
 BOCHS=bochs-2.6         # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER         # GNU mirror
 GDB=gdb-7.5             # GNU mirror
-GDBSERVER=gdb-7.5/gdb/gdbserver
 GRUB=grub-2.00          # GNU mirror
 LIBELF=libelf-0.8.13    # http://www.mr511.de/software/english.html
 NEWLIB=newlib-1.20.0    # http://sourceware.org/newlib/
-QEMU=qemu-1.3.0         # http://www.qemu.org/
+QEMU=qemu-1.2.0         # http://www.qemu.org/
 
 mkdir -p $TMPDIR
 
@@ -103,12 +102,6 @@ function build_gdb() {
 	build $GDB
 }
 
-function build_gdbserver() {
-    cd $TMPDIR/$GDB
-	../$GDBSERVER/configure --target=$TARGET --prefix=$CROSSDIR || error "$GDBSERVER configure"
-	build $GDBSERVER
-}
-
 function build_grub() {
 	unpack $GRUB tar.xz
 	prebuild $GRUB
@@ -145,8 +138,6 @@ gcc)
 	build_gcc && install $GCC;;
 gdb)
 	build_gdb && install $GDB;;
-gdbserver)
-	build_gdbserver && install $GDBSERVER;;
 grub)
 	build_grub && install $GRUB;;
 libelf)

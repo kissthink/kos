@@ -53,15 +53,16 @@ class Machine {
   };
   static IrqOverrideInfo* irqOverrideTable;
 
-  static void parseMBI( vaddr mbi, vaddr& rsdp )       __section(".kernel.init");
   static void initDebug( vaddr mbi, bool msg )         __section(".kernel.init");
+  static vaddr findModEnd( vaddr mbi )                 __section(".kernel.init");
+  static void parseMBI( vaddr mbi, vaddr& rsdp )       __section(".kernel.init");
   static void probePCI()                               __section(".kernel.init");
 
   // code in mach/ACPI,.cc
   static void initACPI( vaddr rsdp )                   __section(".kernel.init");
   static void parseACPI()                              __section(".kernel.init");
 
-  static inline void setupIDT( unsigned int number, vaddr address );
+  static void setupIDT( unsigned int number, vaddr address );
   static inline void setupGDT( unsigned int number, unsigned int dpl, uint32_t address, bool code = false );
   static inline void setupTSS( unsigned int number, uint64_t tssAddress);
   static void setupAllIDTs();                          __section(".kernel.init");

@@ -30,27 +30,31 @@ class FrameManager {
   friend ostream& operator<<(ostream&, const FrameManager&);
 
   using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
-  BuddyMap<pageoffsetbits,framebits,BuddySet> bmap;
+  BuddyMap<pagesizebits<1>(),framebits,BuddySet> availPM;
 
-  laddr allocPow2( size_t logsize, vaddr limit = mwordlimit ) {
-    vaddr addr = bmap.retrieve( pow2(logsize), limit );
-    DBG::outln(DBG::Frame, "FM alloc: ", (ptr_t)pow2(logsize), " -> ", (ptr_t)addr);
+  template<bool limit = false>
+  laddr alloc( size_t size, vaddr upperlimit = mwordlimit ) {
+    KASSERT( aligned(size, pagesize<1>()), size );
+    vaddr addr = availPM.retrieve<limit>(size, upperlimit);
+    DBG::outln(DBG::Frame, "FM alloc: ", (ptr_t)size, " -> ", (ptr_t)addr);
     return addr;
   }
 
-  bool alloc( laddr addr, size_t length ) {
-    DBG::outln(DBG::Frame, "FM alloc: ", (ptr_t)addr, '/', (ptr_t)length);
-    return bmap.remove(addr,length);
+  bool reserve( laddr addr, size_t size ) {
+    DBG::outln(DBG::Frame, "FM reserve: ", (ptr_t)addr, '/', (ptr_t)size);
+    KASSERT( aligned(size, pagesize<1>()), size );
+    return availPM.remove(addr,size);
   }
 
-  bool release( laddr addr, size_t length ) {
-    DBG::outln(DBG::Frame, "FM release: ", (ptr_t)addr, '/', (ptr_t)length);
-    return bmap.insert(addr, length);
+  bool release( laddr addr, size_t size ) {
+    DBG::outln(DBG::Frame, "FM release: ", (ptr_t)addr, '/', (ptr_t)size);
+    KASSERT( aligned(size, pagesize<1>()), size );
+    return availPM.insert(addr, size);
   }
 };
 
 extern inline ostream& operator<<(ostream& os, const FrameManager& fm) {
-  os << fm.bmap;
+  os << fm.availPM;
   return os;
 }
 

@@ -23,11 +23,22 @@
 #include <cstring>
 
 class Screen {
+	friend class Machine;
 private:
 	static const int xmax = 160;
 	static const int ymax = 25;
 	static char  buffer[xmax * ymax] __aligned(0x1000);
 	static char* video;
+
+	static void init() {
+		// monochrome screen would be at 0xb0000, increment by 1 byte
+		if (((*(uint16_t*)0x410) & 0x30) == 0x30) Reboot();
+		video = (char*)0xb8000;
+		memcpy(buffer, video, ymax * xmax);
+	}
+
+	static vaddr getAddress() { return vaddr(video); }
+	static void setAddress( vaddr vma ) { video = (char*)vma; }
 
 	static void scroll( int offset, int length ) {
 		memmove(buffer + offset, buffer + offset + xmax, length - xmax);
@@ -54,18 +65,6 @@ public:
 
 	static int length( int firstline, int lastline ) {
 		return (1 + lastline - firstline) * xmax;
-	}
-
-	static laddr init( vaddr displacement ) {
-		// monochrome screen would be at 0xb0000, increment by 1
-		if (((*(uint16_t*)0x410) & 0x30) == 0x30) return 0;
-		video = (char*)0xb8000 + displacement;
-		memcpy(buffer, video, ymax * xmax);
-		return 0xb8000;
-	}
-
-	static void remap( vaddr vma ) {
-		video = (char*)vma;
 	}
 
 	static void cls( int offset, int length ) {

@@ -55,13 +55,6 @@ static constexpr size_t offset(mword vma) {
   return (pow2(pagesizebits<N>()) - 1) & vma;
 }
 
-static const vaddr kernelBase = KERNBASE;
-static const vaddr kernelLow  = kernelBase & ~maskbits(pagebits-1);
-static const vaddr deviceAddr = align_up(kernelBase + BOOTMEM, pagesize<3>()) - pagesize<2>();
-static const vaddr videoAddr  = deviceAddr + 0 * pagesize<1>();
-static const vaddr lapicAddr  = deviceAddr + 1 * pagesize<1>();
-static const vaddr ioapicAddr = deviceAddr + 2 * pagesize<1>();
-
 class VAddr {
   static const mword canonical = mwordlimit - maskbits(pagebits);
   mword addr;
@@ -74,12 +67,17 @@ public:
   template<unsigned int N> constexpr mword seg() const {
     return addr & (maskbits(pagetablebits) << pagesizebits<N>());
   }
-  template<unsigned int N> constexpr mword val() const {
+  template<unsigned int N> constexpr mword segval() const {
     return seg<N>() >> pagesizebits<N>();
   }
   constexpr ptr_t ptr() const { return ptr_t(addr); }
   constexpr operator mword() const { return addr; }
 };
+
+static const vaddr kernelBase = KERNBASE;
+static const vaddr kernelEnd  = kernelBase + BOOTMEM;
+static const vaddr lapicAddr  = VAddr(pow2(pagebits) - pagesize<1>());
+static_assert(sizeof(LAPIC) <= pagesize<1>(), "sizeof(LAPIC) <= pagesize<1>()" );
 
 union PageEntry { // see Intel Vol 3, Section 4.5 "IA-32E Paging"
   uint64_t c;     // compact representation

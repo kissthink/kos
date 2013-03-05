@@ -31,9 +31,8 @@ extern "C" {
 
 static vaddr rsdp = 0;
 
-// these lists keep track of memory allocations and mappings from acpica
 static std::map<vaddr,mword,std::less<vaddr>,KernelAllocator<std::pair<vaddr,mword>>> allocations;
-static std::map<vaddr,mword,std::less<vaddr>,KernelAllocator<std::pair<vaddr,mword>>> mappings;
+static std::map<vaddr,size_t,std::less<vaddr>,KernelAllocator<std::pair<vaddr,size_t>>> mappings;
 
 static ACPI_OSD_HANDLER sciHandler = nullptr;
 static void* sciContext = nullptr;
@@ -94,8 +93,7 @@ void Machine::initACPI(vaddr r) {
     case ACPI_MADT_TYPE_IO_APIC: {
       acpi_madt_io_apic* io = (acpi_madt_io_apic*)subtable;
       // map IO APIC into virtual address space
-      kernelSpace.mapPages<1>(ioapicAddr, io->Address, pagesize<1>(), true);
-      volatile IOAPIC* ioapic = (IOAPIC*)ioapicAddr;
+      volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>(pagesize<1>(), laddr(io->Address));
       // get number of redirect entries, adjust irqCount
       uint8_t rdr = ioapic->getRedirects() + 1;
       if ( io->GlobalIrqBase + rdr > irqCount ) irqCount = io->GlobalIrqBase + rdr;
@@ -105,7 +103,7 @@ void Machine::initACPI(vaddr r) {
         irqMap.insert( {io->GlobalIrqBase + x, {io->Address, x}} );
       }
       // unmap IO APIC
-      kernelSpace.unmapPages<1>(ioapicAddr, pagesize<1>(), true);
+      kernelSpace.unmapPages<1>( (vaddr)ioapic, pagesize<1>() );
     } break;
     case ACPI_MADT_TYPE_INTERRUPT_OVERRIDE: {
       acpi_madt_interrupt_override* io = (acpi_madt_interrupt_override*)subtable;
@@ -116,7 +114,7 @@ void Machine::initACPI(vaddr r) {
     case ACPI_MADT_TYPE_LOCAL_APIC_NMI: {
       DBG::out(DBG::ACPI, " LOCAL_APIC_NMI");
       acpi_madt_local_apic_nmi* ln = (acpi_madt_local_apic_nmi*)subtable;
-      DBG::out(DBG::ACPI, '/', int(ln->ProcessorId), '/', int(ln->IntiFlags), '/', ln->Lint );
+      DBG::out(DBG::ACPI, '/', int(ln->ProcessorId), '/', int(ln->IntiFlags), '/', int(ln->Lint) );
     } break;
     case ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE: {
       acpi_madt_local_apic_override* ao = (acpi_madt_local_apic_override*)subtable;
@@ -147,12 +145,11 @@ void Machine::initACPI(vaddr r) {
 
   // map APIC page and enable local APIC
   MSR::enableAPIC();                // should be enabled by default
-  kernelSpace.mapPages<1>(lapicAddr, apicPhysAddr, pagesize<1>(), true);
-  volatile LAPIC* lapic = (LAPIC*)lapicAddr;
-  lapic->enable(0xf8);               // confirm spurious vector at 0xf8
+  PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data);
+  Processor::lapic()->enable(0xf8);               // confirm spurious vector at 0xf8
 
   // determine bspApicID, cpuCount, bspIndex, and create processorTable
-  bspApicID = lapic->getLAPIC_ID();
+  bspApicID = Processor::lapic()->getLAPIC_ID();
   cpuCount = apicMap.size();
   processorTable = new Processor[cpuCount];
   int idx = 0;
@@ -231,13 +228,15 @@ void Machine::parseACPI() {
   status = AcpiTerminate();
   KASSERT( status == AE_OK, status );
 
-  // clean up ACPI leftover memory allocations and mappings
+  // clean up ACPI leftover memory allocations
   for (std::pair<vaddr,mword> a : allocations ) {
-    AcpiOsFree( ptr_t(a.first) );
+    BlindHeap<KernelHeap>::release(a.first);
   }
-  for (std::pair<vaddr,mword> m : mappings ) {
-    AcpiOsUnmapMemory( ptr_t(m.first), m.second );
+  allocations.clear();
+  for (std::pair<vaddr,size_t> m : mappings ) {
+    kernelSpace.unmapPages<1>(m.first, m.second);
   }
+  mappings.clear();
 }
 
 ACPI_STATUS AcpiOsInitialize(void) { return AE_OK; }
@@ -340,24 +339,26 @@ void AcpiOsFree(void* Memory) {
 }
 
 void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS Where, ACPI_SIZE Length) {
-  DBG::outln(DBG::ACPI, "acpi map: ", (ptr_t)Where, '/', (ptr_t)Length);
-  laddr lma = align_down(Where, pagesize<1>());
-  kernelSpace.mapPages<1>(lma, lma, align_up(Length + Where - lma, pagesize<1>()), false);
-  mappings.insert( {lma,Length} );
-  return (void*)Where;
+  DBG::out(DBG::ACPI, "acpi map: ", (ptr_t)Where, '/', (ptr_t)Length);
+  laddr lma = align_down(laddr(Where), pagesize<1>());
+  size_t size = align_up(Length + laddr(Where) - lma, pagesize<1>());
+  vaddr vma = kernelSpace.mapPages<1>(size, lma);
+  mappings.insert( std::pair<vaddr,size_t>(vma,size) );
+  DBG::outln(DBG::ACPI, " -> ", (ptr_t)vma);
+  return (void*)(vma + Where - lma);
 }
 
 void AcpiOsUnmapMemory(void* LogicalAddress, ACPI_SIZE Size) {
   DBG::outln(DBG::ACPI, "acpi unmap: ", LogicalAddress, '/', (ptr_t)Size);
   vaddr vma = align_down(vaddr(LogicalAddress), pagesize<1>());
-  kernelSpace.unmapPages<1>(vma, align_up(Size + vaddr(LogicalAddress) - vma, pagesize<1>()), false);
+  size_t size = align_up(Size + vaddr(LogicalAddress) - vma, pagesize<1>());
+  kernelSpace.unmapPages<1>(vma, size);
   mappings.erase(vma);
 }
 
 ACPI_STATUS AcpiOsGetPhysicalAddress(void* LogicalAddress,
   ACPI_PHYSICAL_ADDRESS* PhysicalAddress) {
-
-  *PhysicalAddress = PageManager::vtol<1>(vaddr(LogicalAddress));
+  *PhysicalAddress = PageManager::vtol<4>(vaddr(LogicalAddress));
   return AE_OK;
 }
 

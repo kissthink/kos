@@ -27,12 +27,12 @@ AddressSpace kernelSpace;
 Scheduler kernelScheduler;
 
 // declared in globals.h
-void globaldelete(ptr_t ptr, size_t size) { KernelHeap::free(ptr,size); }
+void globaldelete(ptr_t p, size_t s) { KernelHeap::release(vaddr(p),s); }
 
-ptr_t operator new(size_t size) { return KernelHeap::malloc(size); }
-ptr_t operator new[](size_t size) { return KernelHeap::malloc(size); }
-void operator delete(ptr_t ptr) { KASSERT(false, "delete" ); }
-void operator delete[](ptr_t ptr) { KASSERT(false, "delete[]" ); }
+ptr_t operator new(size_t s) { return ptr_t(KernelHeap::alloc(s)); }
+ptr_t operator new[](size_t s) { return ptr_t(KernelHeap::alloc(s)); }
+void operator delete(ptr_t p) { KASSERT(false, "delete" ); }
+void operator delete[](ptr_t p) { KASSERT(false, "delete[]" ); }
 
 static char A = 'A';
 static char B = 'B';
@@ -60,10 +60,9 @@ extern "C" void kmain(mword magic, mword addr) {
 };
 
 void idleLoop() {
-  startGdb();
+  if (DBG::test(DBG::GDB)) startGdb();
   Machine::init2();
   kcout << "Welcome to KOS!\n";
-  kcout << "Running GDB!\n";
   Thread::create(mainLoop, &M);
   for (;;) Pause();
 }

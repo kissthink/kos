@@ -31,118 +31,66 @@
  * ro, data, etc.  Also, page fault handling could be redirected here to
  * implement memory overcommit per address space.  */
 
-class AddressSpace {
+class AddressSpace : public PageManager {
   friend ostream& operator<<(ostream&, const AddressSpace&);
 
   SpinLock lock;
   laddr pml4;
-  vaddr heapStart;
-  vaddr heapEnd;
   using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
   BuddyMap<pagesizebits<1>(),pagebits,BuddySet> availVM;
 
 public:
-  void init( laddr pml4, vaddr heapStart, vaddr heapEnd ) {
+  void init( laddr pml4, vaddr start, vaddr end ) {
     this->pml4 = pml4;
-    this->heapStart = heapStart;
-    this->heapEnd = heapEnd;
-    availVM.insert(heapStart, heapEnd - heapStart);
+    availVM.insert(start, end - start);
   }
 
   void activate() {
     PageManager::installAddressSpace(pml4);
   }
 
-  template<size_t N>
-  vaddr allocPages( size_t size ) {
-    static_assert( N < pagelevels, "page level template violation" );
-    KASSERT( aligned(size, pagesize<N>()), size );
-    LockObject<SpinLock> lo(lock);
-    vaddr vma = availVM.retrieve(size);
-    KASSERT(vma != illaddr, size);
-    size_t count = (size >> pagesizebits<N>());
-    for ( ;count > 0; count -= 1 ) {
-      laddr lma = Processor::getFrameManager()->allocPow2(pagesizebits<N>());
-      PageManager::map<N>(vma, lma, PageManager::Kernel, PageManager::Data, true);
-      vma += pagesize<N>();
-    }
-    return vma;
-  }
-
-  template<size_t N>
-  bool allocPages( vaddr vma, size_t size ) {
+  template<size_t N, bool alloc = false, bool virt = false>
+  vaddr mapPages( size_t size, vaddr lma = 0, vaddr vma = 0 ) {
     static_assert( N < pagelevels, "page level template violation" );
     KASSERT( aligned(vma, pagesize<N>()), vma );
     KASSERT( aligned(size, pagesize<N>()), size );
     LockObject<SpinLock> lo(lock);
-    bool check = availVM.remove(vma, size);
-    KASSERT(check, (ptr_t)vma);
-    size_t count = (size >> pagesizebits<N>());
-    for ( ;count > 0; count -= 1 ) {
-      laddr lma = Processor::getFrameManager()->allocPow2(pagesizebits<N>());
-      PageManager::map<N>(vma, lma, PageManager::Kernel, PageManager::Data, true);
-      vma += pagesize<N>();
-    }
-    return true;
-  }
-
-  template<size_t N>
-  bool releasePages( vaddr vma, size_t size ) {
-    static_assert( N < pagelevels, "page level template violation" );
-    KASSERT( aligned(vma, pagesize<N>()), vma );
-    KASSERT( aligned(size, pagesize<N>()), size );
-    LockObject<SpinLock> lo(lock);
-    bool check = availVM.insert(vma, size);
-    KASSERT(check, (ptr_t)vma)
-    size_t count = (size >> pagesizebits<N>());
-    for ( ;count > 0; count -= 1 ) {
-      laddr lma = PageManager::unmap<N>(vma, true);
-      Processor::getFrameManager()->release(lma, pagesize<N>());
-      vma += pagesize<N>();
-    }
-    // TODO: check if higher-level mappings can also be removed
-    return true;
-  }
-
-  // NOTE: no locking - only used during bootstrap
-  template<size_t N>
-  void mapPages( vaddr vma, laddr lma, size_t size, bool strict = true ) {
-    static_assert( N < pagelevels, "page level template violation" );
-    KASSERT( aligned(vma, pagesize<N>()), vma );
-    KASSERT( aligned(size, pagesize<N>()), size );
-    if ( vma >= heapStart && vma < heapEnd ) {
+    if (virt) {
       bool check = availVM.remove(vma, size);
       KASSERT(check, (ptr_t)vma);
+    } else {
+      vma = availVM.retrieve(size);
+      KASSERT(vma != illaddr, size);
     }
-    size_t count = (size >> pagesizebits<N>());
-    for ( ;count > 0; count -= 1 ) {
-      PageManager::map<N>(vma, lma, PageManager::Kernel, PageManager::Data, strict);
+    vaddr ret = vma;
+    for (; size > 0; size -= pagesize<N>()) {
+      if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
+      PageManager::map<N>(vma, lma, PageManager::Kernel, PageManager::Data);
       vma += pagesize<N>();
-      lma += pagesize<N>();
+      if (!alloc) lma += pagesize<N>();
     }
+    return ret;
   }
 
-  // NOTE: no locking - only used during bootstrap
-  template<size_t N>
-  void unmapPages( vaddr vma, size_t size, bool strict = true ) {
+  template<size_t N, bool alloc = false>
+  bool unmapPages( vaddr vma, size_t size ) {
     static_assert( N < pagelevels, "page level template violation" );
     KASSERT( aligned(vma, pagesize<N>()), vma );
     KASSERT( aligned(size, pagesize<N>()), size );
-    if ( vma >= heapStart && vma < heapEnd ) {
-      bool check = availVM.insert(vma, size);
-      KASSERT(check, (ptr_t)vma);
-    }
-    size_t count = (size >> pagesizebits<N>());
-    for ( ;count > 0; count -= 1 ) {
-      PageManager::unmap<N>(vma, strict);
+    LockObject<SpinLock> lo(lock);
+    for (; size > 0; size -= pagesize<N>()) {
+      size_t idx = availVM.insert2(vma, pagesizebits<N>());
+      KASSERT( (idx >= pagesizebits<N>() && idx < pagebits), (ptr_t)vma)
+      laddr lma = PageManager::unmap<N>(vma, (idx - pagesizebits<N>()) / pagetablebits);
+      if (alloc) Processor::getFrameManager()->release(lma, pagesize<N>());
       vma += pagesize<N>();
     }
-    // TODO: check if higher-level mappings can also be removed
+    return true;
   }
 };
 
 extern inline ostream& operator<<(ostream& os, const AddressSpace& as) {
-  os << "AS: " << as.availVM;
+  os << as.availVM;
   return os;
 }
 

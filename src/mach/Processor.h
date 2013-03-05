@@ -36,12 +36,9 @@ class Processor {
   FrameManager* frameManager;
   mword					lockCount;
 
-  static volatile LAPIC* lapic() {
-    return (LAPIC*)lapicAddr;
-  }
+  friend class Machine;
 
-public:
-  // lockCount must not reach 0 -> interrupts disabled during bootstrap
+  // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), thread(nullptr), idleThread(nullptr),
     frameManager(nullptr), lockCount(mwordlimit / 2) {}
   Processor(const Processor&) = delete;            // no copy
@@ -53,11 +50,16 @@ public:
     frameManager = &fm;
   }
   void install() {
-    MSR::write(MSR::FS_BASE, mword(this));
+   MSR::write(MSR::FS_BASE, mword(this));
   }
   void initThread(Thread& t) {
-    thread = idleThread = &t;
+   thread = idleThread = &t;
   }
+  static constexpr volatile LAPIC* lapic() {
+   return (LAPIC*)lapicAddr;
+  }
+
+public:
   static mword getApicID() {
     mword x; asm("mov %%fs:0, %0" : "=r"(x)); return x;
   }

@@ -45,23 +45,8 @@ static inline constexpr T pow2( T x ) {
 }
 
 template <typename T>
-static inline constexpr T maskbits( T b ) {
-  return pow2<T>(b) - 1;
-}
-
-template <typename T>
-static inline constexpr T maskbits( T b, T start, T end ) {
-  return b & maskbits<T>(end) & ~maskbits<T>(start);
-}
-
-template <typename T>
 static inline constexpr T align_up( T x, T a ) {
   return (x + a - 1) & (~(a - 1));  
-}
-
-template <typename T>
-static inline constexpr T bitalign_up( T x, T b ) {
-  return align_up<T>( x, pow2(b) );
 }
 
 template <typename T>
@@ -70,25 +55,31 @@ static inline constexpr T align_down( T x, T a ) {
 }
 
 template <typename T>
-static inline constexpr T bitalign_down( T x, T b ) {
-  return align_down<T>( x, pow2(b) );
-}
-
-template <typename T>
 static inline constexpr bool aligned( T x, T a ) {
   return (x & (a - 1)) == 0;  
 }
 
 template <typename T>
-static inline constexpr bool bitaligned( T x, T b ) {
-  return aligned<T>( x, pow2(b) );
+static inline constexpr T maskbits( T b ) {
+  return pow2<T>(b) - 1;
+}
+
+template <typename T>
+static inline constexpr T maskbits( T start, T end ) {
+  return maskbits<T>(end) & ~maskbits<T>(start);
 }
 
 template <typename T, unsigned int position, unsigned int width> struct BitSeg  {
   static_assert( position + width <= 8*sizeof(T), "illegal position/width parameters" );
-  constexpr T operator() (T f = maskbits<T>(width)) volatile const {
+  // bitmask at right position
+  constexpr T operator() () volatile const {
+    return maskbits<T>(width) << position;
+  }
+  // value at right position
+  constexpr T operator() (T f) volatile const {
     return (f & maskbits<T>(width)) << position;
   }
+  // obtain normalized value
   constexpr T get(T f) volatile const { 
     return (f >> position) & maskbits<T>(width);
   }

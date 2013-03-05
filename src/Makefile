@@ -1,4 +1,5 @@
 include Makefile.config
+-include Makefile.rgdb
 
 SOURCEDIRS=util dev mach kern gdb
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
@@ -12,7 +13,7 @@ BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
 LIBS=extern/acpica/libacpica.a
 
-.PHONY: all run debug bochs image iso usbtest usb pxe libs tests defines dep depend echo clean vclean
+.PHONY: all image run debug rgdb bochs usbtest usb pxe libs tests defines dep depend echo clean vclean
 
 vpath %.cc $(SOURCEDIRS)
 vpath %.S mach boot
@@ -24,19 +25,27 @@ all: kernel.sys
 user/built:
 	$(MAKE) -I $(CURDIR) -C user
 
-run: $(IMAGE)
+image:
+ifneq ($(RGDB),$(RGDBSAVE))
+	rm -f $(IMAGE)
+endif
+	echo "RGDBSAVE=$(RGDB)" > Makefile.rgdb
+	$(MAKE) $(IMAGE)
+
+run: image
 	$(QEMU)
 
-debug: $(IMAGE)
+debug: image
 	$(QEMU) -s -S & sleep 1
 	$(GDB) -x gdbinit kernel.sys.debug
 
+rgdb:
+	$(MAKE) RGDB=gdb image
+	$(QEMURGDB) & sleep 1
+	$(GDB) -x rgdbinit kernel.sys.debug
+
 bochs: $(IMAGE)
 	bochs -f bochsrc -rc bochsrc.dbg -q
-
-image: $(VDISK)
-
-iso: $(ISO)
 
 usbtest:
 	@test -b $(USBDEV)1 || { echo USE device at $(USBDEV)1 not found && false; }
@@ -56,7 +65,7 @@ $(VDISK): kernel.sys setup_img.sh
 
 $(ISO): kernel.sys user/built setup_iso.sh
 	rm -rf iso
-	./setup_iso.sh $(ISO) kernel.sys user/exec/*
+	./setup_iso.sh $(ISO) kernel.sys $(RGDB) user/exec/*
 
 kernel.sys: kernel.sys.debug
 	$(STRIP) $^ -o $@
@@ -89,7 +98,7 @@ extern/acpica/libacpica.a: extern/acpica/Makefile
 defines:
 	$(CXX) -dM -E - < /dev/null
 	
-dep depend: # include order: extern, util, mach, dep, kern
+dep depend Makefile.dep: # include order: extern, util, mach, dep, kern
 	$(CXX) -MM $(CXXFLAGS) $(SOURCES) > Makefile.o.dep
 	cat Makefile.o.dep | sed -e "/.o:/s//.s:/" > Makefile.s.dep
 	cat Makefile.o.dep | sed -e "/.o:/s//.e:/" > Makefile.e.dep
@@ -113,6 +122,6 @@ vclean: clean
 	$(MAKE) -I $(CURDIR) -C extern/acpica $@
 
 distclean: clean
-	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep Makefile.dep
+	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep Makefile.dep Makefile.rgdb
 
 -include Makefile.dep

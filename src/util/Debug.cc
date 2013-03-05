@@ -26,6 +26,7 @@ static const char* options[] = {
   "devices",
   "error",
   "frame",
+  "gdb",
   "paging",
   "pci",
   "scheduler",
