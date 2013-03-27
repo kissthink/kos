@@ -94,6 +94,8 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+#include "GdbCpu.h"
+#include "Gdb_functions.h"
 
 // function stubs for GDB remote serial protocol
 extern void putDebugChar(unsigned char ch);         // write a single character
@@ -107,6 +109,7 @@ int remote_debug;           //  debug > 0 prints ill-formed commands in valid pa
 
 static const char hexchars[]="0123456789abcdef";
 
+/*
 static const int NUM64BITREGS = 17;     // number of 64-bit registers
 static const int NUM32BITREGS = 7;      // EFLAGS, CS, SS, DS, ES, FS, GS
 
@@ -133,13 +136,25 @@ uint32_t registers_32[NUM32BITREGS];
 static const int STACKSIZE = 10000;
 static uint64_t remcomStack[STACKSIZE/sizeof(uint64_t)];
 uint64_t* stackPtr = &remcomStack[STACKSIZE/sizeof(uint64_t) - 1];
+*/
+struct regs64 {
+    enum { RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP,
+           R8, R9, R10, R11, R12, R13, R14, R15, RIP };
+};
 
+struct regs32 {
+    enum { EFLAGS, CS, SS, DS, ES, FS, GS };
+};
+
+gdb::GdbCpuState mainCpu;
+gdb::GdbCpuState* currentCpu = &mainCpu;
 
 // Restore the program's registers (including the stack pointer, which
 // means we get the right stack and don't have to worry about popping our
 // return address and any stack frames and so on) and return.
 // NOTE: CS, RIP, SS, RSP, EFLAGS registers are restored by IRETQ call
 //       FS, GS registers are not modifed by GDB and must be set by wrmsr instruction
+#if 0
 extern "C" void
 return_to_prog ();
 asm(".text");
@@ -184,15 +199,15 @@ asm("       movq registers_64,      %rax");
 // CS
 // RIP         <-- top of stack
 asm("        iretq");
+#endif
 
 #define BREAKPOINT() asm("int $3");
 
-// Put the error code here just in case the user cares
-int64_t gdb_errcode;
 // Likewise, the vector number here (since GDB only gets the signal
 // number through the usual means, and that's not very specific)
 static int64_t gdb_vector = -1;
 
+#if 0
 // Saves RAX, RBX, RCX, RDX, RSI, RDI, RBP, R8-R15, DS, ES, FS, GS
 #define SAVE_REGISTERS1() \
   asm ("movq %rax, registers_64");                         \
@@ -249,7 +264,9 @@ static int64_t gdb_vector = -1;
   /* ss register */                                     \
   asm("popq %rbx");                                     \
   asm("movl %ebx, registers_32+8");
+#endif
 
+#if 0
 // See if mem_fault_routine is set, if so just IRET to that address
 #define CHECK_FAULT() \
   asm ("cmpl $0, mem_fault_routine");                   \
@@ -286,6 +303,8 @@ asm ("     movq %rax, mem_fault_routine");
 
 asm ("iret");
 
+#endif
+
 #define CALL_HOOK() asm("call _remcomHandler");
 
 /* This function is called when a x86_64 exception occurs.  It saves
@@ -300,166 +319,8 @@ asm ("iret");
  *   old rip
  *
  */
-extern "C" void catchException3();
-asm(".text");
-asm(".globl catchException3");
-asm("catchException3:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $3");
-CALL_HOOK();
 
-/* Same thing for exception 1.  */
-extern "C" void catchException1();
-asm(".text");
-asm(".globl catchException1");
-asm("catchException1:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $1");
-CALL_HOOK();
-
-/* Same thing for exception 0.  */
-extern "C" void catchException0();
-asm(".text");
-asm(".globl catchException0");
-asm("catchException0:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $0");
-CALL_HOOK();
-
-/* Same thing for exception 4.  */
-extern "C" void catchException4();
-asm(".text");
-asm(".globl catchException4");
-asm("catchException4:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $4");
-CALL_HOOK();
-
-/* Same thing for exception 5.  */
-extern "C" void catchException5();
-asm(".text");
-asm(".globl catchException5");
-asm("catchException5:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $5");
-CALL_HOOK();
-
-/* Same thing for exception 6.  */
-extern "C" void catchException6();
-asm(".text");
-asm(".globl catchException6");
-asm("catchException6:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $6");
-CALL_HOOK();
-
-/* Same thing for exception 7.  */
-extern "C" void catchException7();
-asm(".text");
-asm(".globl catchException7");
-asm("catchException7:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $7");
-CALL_HOOK();
-
-/* Same thing for exception 8.  */
-extern "C" void catchException8();
-asm(".text");
-asm(".globl catchException8");
-asm("catchException8:");
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $8");
-CALL_HOOK();
-
-/* Same thing for exception 9.  */
-extern "C" void catchException9();
-asm(".text");
-asm(".globl catchException9");
-asm("catchException9:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $9");
-CALL_HOOK();
-
-/* Same thing for exception 10.  */
-extern "C" void catchException10();
-asm(".text");
-asm(".globl catchException10");
-asm("catchException10:");
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $10");
-CALL_HOOK();
-
-/* Same thing for exception 12.  */
-extern "C" void catchException12();
-asm(".text");
-asm(".globl catchException12");
-asm("catchException12:");
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $12");
-CALL_HOOK();
-
-/* Same thing for exception 16.  */
-extern "C" void catchException16();
-asm(".text");
-asm(".globl catchException16");
-asm("catchException16:");
-SAVE_REGISTERS1();
-SAVE_REGISTERS2();
-asm ("pushq $16");
-CALL_HOOK();
-
-/* For 13, 11, and 14 we have to deal with the CHECK_FAULT stuff.  */
-
-/* Same thing for exception 13.  */
-extern "C" void catchException13 ();
-asm (".text");
-asm (".globl catchException13");
-asm ("catchException13:");
-CHECK_FAULT();
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $13");
-CALL_HOOK();
-
-/* Same thing for exception 11.  */
-extern "C" void catchException11 ();
-asm (".text");
-asm (".globl catchException11");
-asm ("catchException11:");
-CHECK_FAULT();
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $11");
-CALL_HOOK();
-
-/* Same thing for exception 14.  */
-extern "C" void catchException14 ();
-asm (".text");
-asm (".globl catchException14");
-asm ("catchException14:");
-CHECK_FAULT();
-SAVE_REGISTERS1();
-SAVE_ERRCODE();
-SAVE_REGISTERS2();
-asm ("pushq $14");
-CALL_HOOK();
-
+#if 0
 /*
  * remcomHandler is a front end for handle_exception.  It moves the
  * stack pointer into an area reserved for debugger use.
@@ -471,10 +332,12 @@ asm("       movq stackPtr, %rsp");      /* move to remcom stack area  */
 asm("       movq %rax, %rdi");          /* pass exception as argument */
 asm("       call  handle_exception");   /* this never returns */
 
+#endif
+
 void
 _returnFromException()
 {
-    return_to_prog();
+    currentCpu->restoreRegisters();
 }
 
 int
@@ -756,13 +619,13 @@ handle_exception (int64_t exceptionVector)
     int sigval, stepping;
     long addr, length;
     char *ptr;
-    uint64_t newPC;
+    //uint64_t newPC;
 
     gdb_vector = exceptionVector;
 
     if (remote_debug) {
-        printf ("vector=%ld, sr=0x%x, pc=0x%lx\n",
-            exceptionVector, registers_32[regs32::EFLAGS], registers_64[regs64::RIP]);
+        printf ("vector=%ld, sr=0x%lx, pc=0x%lx\n",
+            exceptionVector, currentCpu->getEFLAGS(), currentCpu->getRIP());
     }
 
     sigval = computeSignal(exceptionVector);
@@ -811,7 +674,8 @@ handle_exception (int64_t exceptionVector)
                     } else if (strncmp(ptr, "ThreadExtraInfo", strlen("ThreadExtraInfo")) == 0) {
                         // TODO: incomplete yet
                         char* ptr = outputBuffer;
-                        mem2hex("CPU#1 [running]", ptr, sizeof("CPU#1 [running]"), 0);
+                        char str[] = "CPU#1 [running]";
+                        mem2hex(str, ptr, strlen(str), 0);
                         break;
                     }
                     strcpy(outputBuffer, "qUnimplemented");     // catches unimplemented commands
@@ -847,13 +711,21 @@ handle_exception (int64_t exceptionVector)
             case 'g':       // return the value of the CPU registers
                 {
                     char* ptr = outputBuffer;
-                    ptr = mem2hex((char *) registers_64, ptr, NUM64BITREGBYTES, 0);
-                    ptr = mem2hex((char *) registers_32, ptr, NUM32BITREGBYTES, 0);
+                    ptr = mem2hex((char *)currentCpu->getBuffer64(),
+                                  ptr,
+                                  currentCpu->getNum64Registers() * sizeof(gdb::reg64),
+                                  0);
+                    ptr = mem2hex((char *)currentCpu->getBuffer32(),
+                                  ptr,
+                                  currentCpu->getNum32Registers() * sizeof(gdb::reg32),
+                                  0);
                 }
                 break;
             case 'G':       // set the value of the CPU registers - return OK
-                hex2mem(ptr, (char *) registers_64, NUM64BITREGBYTES, 0);
-                hex2mem(ptr+NUM64BITREGBYTES, (char *) registers_32, NUM32BITREGBYTES, 0);
+                hex2mem(ptr, (char *) currentCpu->getBuffer64(),
+                    currentCpu->getNum64Registers() * sizeof(gdb::reg64), 0);
+                hex2mem(ptr+currentCpu->getNum64Registers(), (char *) currentCpu->getBuffer32(),
+                    currentCpu->getNum32Registers() * sizeof(gdb::reg32), 0);
                 strcpy (outputBuffer, "OK");
                 break;
             case 'P':       // set the value of a single CPU register - return OK
@@ -861,12 +733,16 @@ handle_exception (int64_t exceptionVector)
                 long regno;
 
                 if (hexToInt (&ptr, &regno) && *ptr++ == '=') {
-                    if (regno >= 0 && regno < NUM64BITREGS) {
-                        hex2mem (ptr, (char *) &registers_64[regno], 8, 0);
+                    if (regno >= 0 && regno < currentCpu->getNum64Registers()) {
+                        hex2mem (ptr, (char *) currentCpu->getRegisterPtr64(regno), sizeof(gdb::reg64), 0);
                         strcpy (outputBuffer, "OK");
                         break;
-                    } else if (regno >= NUM64BITREGS && regno < NUM64BITREGS+NUM32BITREGS) {
-                        hex2mem(ptr, (char *) &registers_32[regno-NUM64BITREGS], 4, 0);
+                    } else if (regno >= currentCpu->getNum64Registers()
+                            && regno <
+                            currentCpu->getNum64Registers()+currentCpu->getNum32Registers()) {
+                        hex2mem(ptr, (char *) currentCpu->getRegisterPtr32(
+                            regno-currentCpu->getNum64Registers()
+                        ), sizeof(gdb::reg32), 0);
                         strcpy(outputBuffer, "OK");
                         break;
                     }
@@ -929,19 +805,27 @@ handle_exception (int64_t exceptionVector)
             // sAA..AA   Step one instruction from AA..AA(optional)
             case 's': stepping = 1;
             case 'c':
+            {
             // try to read optional parameter, pc unchanged if no parm
                 if (hexToInt (&ptr, &addr)) {
-                    registers_64[regs64::RIP] = addr;
+                    //registers_64[regs64::RIP] = addr;
+                    currentCpu->setRegister64(gdb::registers::RIP, addr);
                 }
 
                 // clear the trace bit
-                registers_32[regs32::EFLAGS] &= 0xfffffeff;
+                //registers_32[regs32::EFLAGS] &= 0xfffffeff;
+                uint32_t val = *(currentCpu->getRegisterPtr32(gdb::registers::EFLAGS));
+                val &= 0xfffffeff;
+                currentCpu->setRegister32(gdb::registers::EFLAGS, val);
 
                 // set the trace bit if we're stepping
                 if (stepping) {
-                    registers_32[regs32::EFLAGS] |= 0x100;      // TF (bit 8) set to single-step mode
+                    //registers_32[regs32::EFLAGS] |= 0x100;      // TF (bit 8) set to single-step mode
+                    val |= 0x100;
+                    currentCpu->setRegister32(gdb::registers::EFLAGS, val);
                 }
                 _returnFromException();
+            }
                 break;
 
             // kill the program
@@ -959,8 +843,6 @@ handle_exception (int64_t exceptionVector)
 void
 set_debug_traps()
 {
-  stackPtr = &remcomStack[STACKSIZE / sizeof (uint64_t) - 1];
-
   exceptionHandler (0, catchException0);
   exceptionHandler (1, catchException1);
   exceptionHandler (3, catchException3);
