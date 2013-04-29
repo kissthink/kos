@@ -1,0 +1,23 @@
+--- /usr/include/c++/4.7.1/bits/stl_set.h	2012-07-21 22:29:56.000000000 -0400
++++ mod_stl_set.h	2012-08-13 17:14:08.758713418 -0400
+@@ -54,15 +54,17 @@
+  *  Do not attempt to use it directly. @headername{set}
+  */
+ 
+-#ifndef _STL_SET_H
+-#define _STL_SET_H 1
++#ifndef _MOD_STL_SET_H
++#define _MOD_STL_SET_H 1
+ 
+ #include <bits/concept_check.h>
+ #ifdef __GXX_EXPERIMENTAL_CXX0X__
+ #include <initializer_list>
+ #endif
+ 
+-namespace std _GLIBCXX_VISIBILITY(default)
++using namespace std;
++
++namespace modstd _GLIBCXX_VISIBILITY(default)
+ {
+ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
+ 

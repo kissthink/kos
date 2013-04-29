@@ -1,0 +1,13 @@
+define refault
+up
+break *ia
+step
+cont
+end
+
+break Breakpoint2
+cont # startup breakpoint
+
+# x/40xg $rsp   # print stack
+# break *$rdi   # breakpoint at register address
+# set $rip=1    # change register value

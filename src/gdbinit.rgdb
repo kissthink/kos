@@ -1,0 +1,5 @@
+set remotebaud 38400
+set remotetimeout 10
+target remote :2345
+
+source gdbinit

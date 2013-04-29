@@ -1,0 +1,95 @@
+Cross Compilation Environment
+=============================
+
+To prepare the cross compilation environment, adjust the first few lines of
+'setup_crossenv.sh' and 'config'.  You will need to download the appropriate
+source packages from your friendly neighbourhood mirror.
+
+IMPORTANT: To build the cross compiler, you must have the *development*
+versions (i.e., libraries *and* headers) of the following packages installed
+that are appropriate for your host compiler:
+- GNU Multiple Precision Arithmetic Library 'gmp' (http://gmplib.org/)
+- GNU MPC 'mpc' or 'libmpc' (http://www.multiprecision.org/)
+- GNU MPFR 'mpfr' (http://www.mpfr.org/)
+- CLooG Code Generator 'cloog' (http://www.cloog.org/) and dependencies:
+  . Integer Set Library 'isl' (http://garage.kotnet.org/~skimo/isl/), or
+  . Parma Polyhedra Library 'ppl' (http://bugseng.com/products/ppl/)
+
+Building the cross compiler requires several other packages, such as flex,
+bison, gtk, ncurses (for gdb), but these should typically be present on
+systems configured for software development.
+
+The output of the cross compilation script should contain the following
+(among other output; grep for SUCCESS):
+
+SUCCESS: gcc-4.7.2 install
+SUCCESS: grub-2.00 install
+SUCCESS: gdb-7.5.1 install
+SUCCESS: libelf-0.8.13 install
+
+
+Hardware Emulation
+==================
+
+The script setup_crossenv.sh also contains suggested configurations for
+bochs and qemu and will build and install those in $TOOLSDIR (default is
+/usr/local) when invoked with the corresponding command-line argument.
+
+
+Other Tools
+===========
+
+You need to have a somewhat recent version of xorriso (>-1.0.0) installed
+for grub2 iso image making using grub-mkrescue. The package might also be
+called 'libisoburn'.
+
+
+Building KOS
+============
+
+To prepare the KOS source code (starting from the main directory):
+
+cd src/extern
+
+# download acpica-unix-20130328.tar.gz from https://www.acpica.org/downloads
+tar xzvf acpica-unix-20130328.tar.gz
+cd acpica-unix-20130328
+patch -p1 < ../../../patches/acpica.patch
+cd ..
+mv acpica-unix-20130328 acpica
+cd ../..
+
+You should be back in the main directory. Type 'make' to get a list of build
+targets. These targets should also work from within the src/ directry.
+
+Make sure to *not* have any of gcc's or ld's PATH environment variables set,
+such as C_INCLUDE_PATH or LD_LIBRARY_PATH, since those might interfere with
+the cross compiler setup.
+
+
+Running KOS
+===========
+
+When executing KOS, the system should show a number of messages and then get
+into a split-screen mode, where the first 20 lines are showing output from 7
+threads running on 2 cores and the bottom 5 lines show keycodes when keys
+are pressed and released.  Running KOS in qemu creates several log files
+that can be used to diagnose problems:
+
+/tmp/KOS.serial
+/tmp/KOS.dbg
+/tmp/qemu.log - disabled in Makefile.config (-d option to qemu)
+
+KOS.dbg and KOS.serial are two different output channels internally, but
+currently contain essentially the same information.
+
+
+Please send feedback to mkarsten@uwaterloo.ca.
+
+
+Contributors (in alphabetical order)
+============
+- Sukown Oh (GDB support)
+- Behrooz Shafiee (keyboard, pit drivers)
+- Alex Szlavik (bootstrap code)
+- Cameron White (clang support)

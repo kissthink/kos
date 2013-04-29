@@ -1,0 +1,85 @@
+GDB Stub Documentation
+======================
+
+Intel Vol1: 6.4.6 Interrupt and Exception Behaviour in 64-bit Mode
+------------------------------------------------------------
+- all interrupt handlers pointed by IDT is 64-bit code
+- size of interrupt stack pushes is fixed at 64-bit
+- stack pointer (SS:RSP) is pushed unconditionally on interrupts
+- new SS is set to NULL if CPL changes
+- IRET behaviour changed
+- interrupt stack-switch mechanism changed
+- alignment of interrupt stack frame is changed
+
+Intel Vol3: 6.14.3 IRET in IA-32e mode
+-------------------------------------- 
+- IRET pops SS:RSP unconditionally off the interrupt stack frame only when executed in 64-bit mode
+- if in 64-bit mode and target CPL for IRET is <> 3, SS is allowed to be set to NULL
+
+Intel Vol3: 6.14.4 Stack switching in IA-32e mode
+-------------------------------------------------
+- a stack switch in IA-32e mode works like the legacy stack switch, except new SS selector is set to NULL
+- old SS and RSP are saved on the new stack and restored on subsequent IRET
+---------
+SS    +40
+---------
+RSP   +32
+---------
+RFLAGS+24
+---------
+CS    +16
+---------
+RIP   +8
+---------
+ErrorCode       <-- RSP points to here in interrupt handler
+---------
+
+GDB Commands Supported
+----------------------
+breakpoint
+continue
+step
+stepi
+next
+disassemble
+list
+info registers
+,etc ...
+
+GDB Commands NOT Supported
+--------------------------
+info threads
+trace
+
+Commands Supported
+------------------
+qSupported: Report the features supported by the RSP (remote serial protocol) server.
+            As a minimum, just the packet size can be reported.
+
+qC:         Report the current thread. (return an empty response for this barebone implementation)
+
+qAttached:  Not used.
+
+qOffsets:   Report the offsets to use when relocating downloaded code.
+            As a minimum, return "Text=0;Data=0;Bss=0"
+
+qSymbol::   Request any symbol table data.
+            A minimum implementation should return no data. (return "OK")
+
+qTStatus    Ask the stub if there is a trace experiement running right now.
+            Return 'T0' for not running (from documentation) But, empty response works actually.
+
+Hc-1:       Do future step/continue operations work on all threads?
+            As a minimum, return "OK"
+
+Hc0:        ???
+            Return OK
+
+Hg-1:       All other future operations should apply to all threads.
+            As a minimum, return "OK"
+
+Hg0:        ???
+            Return OK
+
+LINK to GDB REMOTE SERIAL PROTOCOL
+www.embecosm.com/appnotes/ean4/embecosm-howto-rsp-server-ean4-issue-2.html

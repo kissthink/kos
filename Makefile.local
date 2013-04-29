@@ -1,0 +1,4 @@
+i10 kalli:
+	$(MAKE) clean
+	rsync -e /usr/bin/ssh -lprtuvzog $(CURDIR)/ $@:$(CURDIR)/ --delete
+	ssh $@ $(MAKE) $(MAKEFLAGS) -C $(CURDIR) pxe

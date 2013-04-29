@@ -1,0 +1,117 @@
+diff -ruN acpica-unix-20120816/Makefile acpica/Makefile
+--- acpica-unix-20120816/Makefile	2012-08-16 11:51:15.000000000 -0400
++++ acpica/Makefile	2012-09-04 10:37:49.351888110 -0400
+@@ -1,16 +1,48 @@
+-#
+-# Common make for acpica tools and utilities
+-#
+-
+-#
+-# Note: This makefile is intended to be used from within the native
+-# ACPICA directory structure, from under top level acpica directory.
+-# It specifically places all the object files for each tool in separate
+-# generate/unix subdirectories, not within the various ACPICA source
+-# code directories. This prevents collisions between different
+-# compilations of the same source file with different compile options.
+-#
+-BUILD_DIRECTORY_PATH = "generate/unix"
++SRCDIR:=$(CURDIR)/../..
++include $(SRCDIR)/Makefile.config
+ 
+-include generate/unix/Makefile.config
+-include generate/unix/Makefile.common
++ACPICA_SRC =            source
++ACPICA_COMMON =         $(ACPICA_SRC)/common
++ACPICA_TOOLS =          $(ACPICA_SRC)/tools
++ACPICA_OSL =            $(ACPICA_SRC)/os_specific/service_layers
++ACPICA_CORE =           $(ACPICA_SRC)/components
++ACPICA_INCLUDE =        $(ACPICA_SRC)/include
++ACPICA_DEBUGGER =       $(ACPICA_CORE)/debugger
++ACPICA_DISASSEMBLER =   $(ACPICA_CORE)/disassembler
++ACPICA_DISPATCHER =     $(ACPICA_CORE)/dispatcher
++ACPICA_EVENTS =         $(ACPICA_CORE)/events
++ACPICA_EXECUTER =       $(ACPICA_CORE)/executer
++ACPICA_HARDWARE =       $(ACPICA_CORE)/hardware
++ACPICA_NAMESPACE =      $(ACPICA_CORE)/namespace
++ACPICA_PARSER =         $(ACPICA_CORE)/parser
++ACPICA_RESOURCES =      $(ACPICA_CORE)/resources
++ACPICA_TABLES =         $(ACPICA_CORE)/tables
++ACPICA_UTILITIES =      $(ACPICA_CORE)/utilities
++
++ACPICA=$(ACPICA_DISPATCHER)\
++	$(ACPICA_EVENTS)\
++	$(ACPICA_EXECUTER)\
++	$(ACPICA_HARDWARE)\
++	$(ACPICA_NAMESPACE)\
++	$(ACPICA_PARSER)\
++	$(ACPICA_RESOURCES)\
++	$(ACPICA_TABLES)\
++	$(ACPICA_UTILITIES)
++
++SOURCES=$(wildcard $(addsuffix /*.c,$(ACPICA)))
++
++OBJECTS=$(subst .c,.o,$(notdir $(SOURCES)))
++
++CFLAGS += -I$(ACPICA_INCLUDE) -D__KOS__ -Wstrict-aliasing=0 $(OPTFLAGS)
++
++vpath %.c $(ACPICA)
++
++libacpica.a: $(OBJECTS)
++	$(AR) r $@ $^
++	$(RANLIB) $@
++	rm -rf $(OBJECTS)
++
++clean:
++
++vclean:
++	rm -rf libacpica.a $(OBJECTS)
+diff -ruN acpica-unix-20120816/source/include/platform/acenv.h acpica/source/include/platform/acenv.h
+--- acpica-unix-20120816/source/include/platform/acenv.h	2012-08-16 11:51:24.000000000 -0400
++++ acpica/source/include/platform/acenv.h	2012-09-04 10:37:49.351888110 -0400
+@@ -255,6 +255,9 @@
+ #elif defined(__HAIKU__)
+ #include "achaiku.h"
+ 
++#elif defined(__KOS__)
++#include "ackos.h"
++
+ #else
+ 
+ /* Unknown environment */
+diff -ruN acpica-unix-20120816/source/include/platform/ackos.h acpica/source/include/platform/ackos.h
+--- acpica-unix-20120816/source/include/platform/ackos.h	1969-12-31 19:00:00.000000000 -0500
++++ acpica/source/include/platform/ackos.h	2012-09-04 10:37:49.351888110 -0400
+@@ -0,0 +1,33 @@
++#ifndef __ACKOS_H__
++#define __ACKOS_H__
++
++/*
++ * ACPICA configuration
++ */
++//#define ACPI_USE_SYSTEM_CLIBRARY
++//#define ACPI_FLUSH_CPU_CACHE()
++
++#define ACPI_USE_DO_WHILE_0
++#define ACPI_USE_LOCAL_CACHE
++
++#include <stdarg.h>
++#include <string.h>
++#include <stdlib.h>
++#include <ctype.h>
++#include <unistd.h>
++
++#if defined(__ia64__) || defined(__x86_64__)
++#define ACPI_MACHINE_WIDTH          64
++#define COMPILER_DEPENDENT_INT64    long
++#define COMPILER_DEPENDENT_UINT64   unsigned long
++#else
++#error unsupported architecture: only __x86_64__ supported at this time
++#endif
++
++#ifndef __cdecl
++#define __cdecl
++#endif
++
++#include "acgcc.h"
++
++#endif /* __ACKOS_H__ */
