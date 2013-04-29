@@ -78,7 +78,7 @@ that can be used to diagnose problems:
 
 /tmp/KOS.serial
 /tmp/KOS.dbg
-/tmp/qemu.log - disabled in Makefile.config (-d option to qemu)
+/tmp/qemu.log - disabled in Makefile.config (see -d option to qemu)
 
 KOS.dbg and KOS.serial are two different output channels internally, but
 currently contain essentially the same information.
