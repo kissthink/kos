@@ -21,8 +21,15 @@
 #include "kern/KernelVM.h"
 #include "kern/Scheduler.h"
 
+#include <map>
+#include <string>
+
 extern AddressSpace kernelSpace;
 extern KernelVM kernelVM;
 extern Scheduler kernelScheduler;
+
+class File;
+typedef basic_string<char,char_traits<char>,KernelAllocator<char>> kstring;
+extern map<kstring,File*,std::less<kstring>,KernelAllocator<kstring>> kernelFS;
 
 #endif /* _Kernel_h_ */

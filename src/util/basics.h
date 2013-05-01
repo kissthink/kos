@@ -46,6 +46,11 @@ static inline constexpr T pow2( T x ) {
 }
 
 template <typename T>
+static inline constexpr T powN( T x, T y ) {
+  return y == 0 ? 1 : powN(x,y-1);
+}
+
+template <typename T>
 static inline constexpr T align_up( T x, T a ) {
   return (x + a - 1) & (~(a - 1));  
 }
@@ -68,6 +73,11 @@ static inline constexpr T maskbits( T b ) {
 template <typename T>
 static inline constexpr T maskbits( T start, T end ) {
   return maskbits<T>(end) & ~maskbits<T>(start);
+}
+
+template <typename T>
+static inline constexpr T divup( T n, T d ) {
+  return 1 + (n - 1) / d;
 }
 
 template <typename T, unsigned int position, unsigned int width> struct BitSeg  {

@@ -84,8 +84,7 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
-// check various assumptions about data types and sizes
-static_assert(mword(true) == mword(1), "true != mword(1)");
+// check various assumptions about data type sizes
 static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
 static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
 static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
@@ -179,7 +178,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
     asm volatile( "call *(%0)" : : "b"(x) : "memory" );
   }
 
-  // initialize debugging again, but this time with messages
+  // re-initialize debugging, but this time with messages
   DBG::outln(DBG::Basic, "********** BOOT **********");
   multiboot.initDebug(true);
 
@@ -232,13 +231,13 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   clearLDT();
 
   // get memory information from multiboot -> store in frameManager
-  multiboot.parseAll();
-  multiboot.getMemory(frameManager);                // get free memory
+  laddr modStart, modEnd;
+  multiboot.parseAll(modStart, modEnd);
+  multiboot.getMemory(frameManager);                 // get free memory
   DBG::outln(DBG::Basic, "FM/init: ", frameManager);
-  std::list<std::pair<vaddr,size_t>> modList;
-  multiboot.getModules(frameManager,pagesize<2>(),modList); // reserve module memory
+  multiboot.getModules(frameManager, pagesize<2>()); // reserve module memory
   DBG::outln(DBG::Basic, "FM/modules: ", frameManager);
-  vaddr rsdp = multiboot.getRSDP() - kernelBase;
+  vaddr rsdp = multiboot.getRSDP() - kernelBase;     // get RSDP
 
   // reserve initial kernel memory
   bool check = frameManager.reserve(vaddr(&__Boot) - kernelBase, kernelEnd - vaddr(&__Boot));
@@ -258,9 +257,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
     pagesize<2>() );
   DBG::outln(DBG::Basic, "FM/bootstrap: ", frameManager);
 
-  // release all mapped memory (incl. multiboot) to heap
-  DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelVM);
-  kernelVM.addMemory(vaddr(&__BootHeapEnd), kernelEnd);
+  // release all mapped memory (excl. multiboot) to heap
+  kernelVM.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
   DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelVM);
 
   // init AddressSpace
@@ -268,10 +266,23 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   kernelSpace.setMemoryRange(vaddr(&__KernelCode), vaddr(&__BootHeap), vaddr(&__BootHeap), kernelEnd, topkernel, topkernel, PageManager::Kernel);
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
-  // activate new page tables -> have dynamic memory, but no identity mapping
+  // activate new page tables -> proper dynamic memory, but no identity mapping
   kernelSpace.activate();
 
-  // TODO: map modules, store/init in object store...
+  // initialize kernel FS with boot modules
+  modStart = align_down(modStart, pagesize<2>());
+  modEnd = align_up(modEnd, pagesize<2>());
+  vaddr modMapped = kernelSpace.mapPages<2>(modEnd - modStart, modStart);
+  KASSERT(modMapped != topaddr, "internal memory error");
+  multiboot.readModules(modMapped - modStart, frameManager, pagesize<2>());
+  check = kernelSpace.unmapPages<2>(modMapped, modEnd - modStart);
+  KASSERT(check, "internal memory error");
+  DBG::outln(DBG::Basic, "FM/modules: ", kernelSpace);
+  DBG::outln(DBG::Basic, "AS/modules: ", kernelSpace);
+
+  // release multiboot memory to heap
+  kernelVM.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
+  DBG::outln(DBG::Basic, "VM/mbi: ", kernelVM);
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);

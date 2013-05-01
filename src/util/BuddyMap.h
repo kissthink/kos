@@ -86,8 +86,8 @@ private:
     KASSERT( aligned(addr, pow2(logsize)), FmtHex(addr) );
     // go through all levels to find region that covers request
     for ( size_t idx = logsize; ; idx += 1 ) {
-      idx = bitmask.lsbc( idx, max-min );
-      if ( idx >= max-min ) return max;
+      idx = bitmask.find(idx);
+      if unlikely( idx >= max-min ) return max;
       vaddr search = addr & ~maskbits(idx);
       iterator it = buddyLevel[idx].find(search);
       if ( it != buddyLevel[idx].end() ) {
@@ -107,8 +107,8 @@ private:
     KASSERT( logsize < max-min, logsize );
     KASSERT( aligned(addr, pow2(logsize)), FmtHex(addr) );
     for ( size_t idx = logsize; ; idx += 1 ) {
-      idx = bitmask.lsbc( idx, max-min );
-      if ( idx >= max-min ) return max;
+      idx = bitmask.find(idx);
+      if unlikely( idx >= max-min ) return max;
       vaddr search = addr & ~maskbits(idx);
       iterator it = buddyLevel[idx].find(search);
       if ( it != buddyLevel[idx].end() ) return idx;
@@ -183,8 +183,8 @@ public:
 
     for (;;) {
       // find closest region with available space
-      size_t index = bitmask.lsbc( logsize, max-min );
-      if unlikely(index == max-min) return topaddr;
+      size_t index = bitmask.find(logsize);
+      if unlikely(index >= max-min) return topaddr;
       KASSERT( index < max-min, index );
 
       // pick first available region
@@ -204,9 +204,11 @@ public:
     }
   }
 
-  bool checkWatermark( size_t logsize ) {
-    size_t idx = bitmask.lsbc( (logsize - min) + 1, max-min );
-    return idx != max-min || buddyLevel[logsize-min].size() > 1;
+  bool check( size_t length ) {
+    length = length >> min;
+    size_t logsize = ceilinglog2( length );
+    size_t idx = bitmask.find(logsize);
+    return idx <= max-min;
   }
 
   template<typename PrintAllocator = typename Set::allocator_type>

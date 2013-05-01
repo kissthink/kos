@@ -32,7 +32,7 @@ extern "C" void __assert_func( const char* const file, const char* const line,
   kcdbg << file << ':' << line << ' ' << func << ' ' << expr << kendl;
 }
 
-#if 1
+#if 0
 extern "C" void free(void* p) {
   DBG::outln(DBG::Libc, "LIBC/free: ", FmtHex(p));
   kernelVM.free(p);
@@ -47,8 +47,6 @@ extern "C" void* malloc(size_t s) {
 #endif
 
 /******* dummy functions *******/
-
-int __errno = 0;
 
 extern "C" int close(int) {
   KASSERT(false, "close"); return -1;

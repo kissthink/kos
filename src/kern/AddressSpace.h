@@ -95,6 +95,7 @@ public:
     vaddr ret = vma;
     for (; size > 0; size -= pagesize<N>()) {
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
+      KASSERT(lma != topaddr, size);
       PageManager::map<N>(vma, lma, owner, PageManager::Data);
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();

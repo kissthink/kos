@@ -141,20 +141,19 @@ while [ $# -gt 0 ]; do case "$1" in
 bochs)
 	build_bochs && install $BOCHS;;
 gcc)
-	build_gcc && install $GCC;;
+	build_gcc && install $GCC
+	build_libelf && install $LIBELF;;
 gdb)
 	build_gdb && install $GDB;;
 grub)
 	build_grub && install $GRUB;;
-libelf)
-	build_libelf && install $LIBELF;;
 qemu)
 	build_qemu && install $QEMU;;
 allcross)
 	build_gcc && install $GCC
+	build_libelf && install $LIBELF
 	build_gdb && install $GDB
-	build_grub && install $GRUB
-	build_libelf && install $LIBELF;;
+	build_grub && install $GRUB;;
 *)
 	echo unknown argument: $1;;
 esac; shift; done

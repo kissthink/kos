@@ -92,8 +92,83 @@ static inline void MemoryBarrier() {
   asm volatile("mfence" ::: "memory");
 }
 
+static inline mword lsbcond(mword x, mword alt = mwordbits) {
+  mword ret;
+  asm volatile("bsfq %1, %0" : "=a"(ret) : "r"(x));
+// WITCHCRAFT ALERT: It's unclear why only those assembly constraints work...
+#ifdef  __OPTIMIZE__
+  asm volatile("cmovzq %1, %0" : "=a"(ret) : "d"(alt));
 #else
+  asm volatile("cmovzq %1, %0" : "=g"(ret) : "g"(alt));
+#endif
+  return ret;
+}
+
+static inline mword msbcond(mword x, mword alt = mwordbits) {
+  mword ret;
+  asm volatile("bsrq %1, %0" : "=a"(ret) : "r"(x));
+// WITCHCRAFT ALERT: It's unclear why only those assembly constraints work...
+#ifdef  __OPTIMIZE__
+  asm volatile("cmovzq %1, %0" : "=a"(ret) : "d"(alt));
+#else
+  asm volatile("cmovzq %1, %0" : "=g"(ret) : "g"(alt));
+#endif
+  return ret;
+}
+
+static inline mword floorlog2( mword x ) {
+  return msbcond(x, mwordbits);
+}
+
+static inline mword ceilinglog2( mword x ) {
+  return msbcond(x - 1, -1) + 1; // x = 1 -> msb = -1 (alt) -> result is 0
+}
+
+static inline mword bitalignment( mword x ) {
+  return lsbcond(x, mwordbits);
+}
+
+static inline constexpr mword floorlog2_c( mword x ) {
+  return x == 0 ? mwordbits : (mwordbits - __builtin_clzll(x)) - 1;
+}
+
+static inline constexpr mword ceilinglog2_c( mword x ) {
+  return x == 1 ? 0 : (mwordbits - __builtin_clzll(x - 1));
+}
+
+static inline constexpr mword bitalignment_c( mword x ) {
+  return x == 0 ? mwordbits : __builtin_ctzll(x);
+}
+
+template<size_t N, bool free = false>
+static inline mword multiscan(mword* data) { // assume loop unroll; no branch
+  static_assert( N < mwordbits / ceilinglog2_c(mwordbits), "template parameter N too large" );
+  mword result = 0;
+  mword mask = ~0;
+  for (size_t i = 0; i < N; i++) {
+    mword scan = free ? ~data[i] : data[i];
+    mword found;
+#if 1
+    asm volatile("bsfq %1, %0" : "=a"(scan) : "r"(scan));
+    asm volatile("setnz %%dl" ::: "rdx");
+    asm volatile("movzbq %%dl, %0" : "=d"(found));
+    result += (scan & mask);
+    mask = mask & (found - 1);
+    result += (mwordbits & mask);
+#else
+    scan = lsbcond(scan, mwordbits);
+    found = bool(scan ^ mwordbits);
+    result += (scan & mask);
+    mask = mask & (found - 1);
+#endif
+  }
+  return result;
+}
+
+#else
+
 #error unsupported architecture: only __x86_64__ supported at this time
+
 #endif
 
 #endif /* _platform_h_ */

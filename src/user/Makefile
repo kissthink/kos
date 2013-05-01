@@ -11,7 +11,7 @@ SRC=$(wildcard *.cc)
 OBJ=$(SRC:%.cc=%.o)
 EXE=$(SRC:%.cc=exec/%)
 
-all: $(EXE)
+all: $(EXE) exec/motd
 
 $(OBJ): %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -21,7 +21,17 @@ $(EXE): exec/%: %.o
 	$(CXX) $(LDFLAGS) $< -o $@
 #	strip $@
 
-built: $(EXE)
+exec/motd:
+	@echo creating $@
+	@mkdir -p exec
+	@echo > $@
+	@echo "Hello everybody! So glad to see you..." >> $@
+	@echo >> $@
+	@echo -n "Build Date: " >> $@
+	@date >> $@
+	@echo >> $@
+
+built: $(EXE) exec/motd
 	touch built
 
 echo:
@@ -30,7 +40,7 @@ echo:
 	@echo EXE: $(EXE)
 
 clean:
-	rm -f $(OBJ) $(EXE) built
+	rm -f $(OBJ) $(EXE) exec/motd built
 	rm -rf exec
 	rm -f Makefile.dep
 

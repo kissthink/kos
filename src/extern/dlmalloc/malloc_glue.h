@@ -14,7 +14,7 @@
 
 // mman.h
 
-#define MAP_ANONYMOUS 0            // avoids call to 'open'
+#define MAP_ANONYMOUS 0            // avoid call to 'open'
 #define PROT_READ 0
 #define PROT_WRITE 0
 #define MAP_PRIVATE 0

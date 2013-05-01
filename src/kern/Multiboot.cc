@@ -17,6 +17,8 @@
 #include "extern/multiboot/multiboot2.h"
 #include "kern/FrameManager.h"
 #include "kern/Multiboot.h"
+#include "kern/Kernel.h"
+#include "world/File.h"
 
 #include <libelf.h>
 
@@ -43,9 +45,13 @@ void Multiboot::initDebug( bool msg ) {
 }
 
 // cf. 'multiboot_mmap_entry' in extern/multiboot/multiboot2.h
-static const char* memtype[] __section(".boot.data") = { "unknown", "free", "resv", "acpi", "nvs", "bad" };
+static const char* memtype[] __section(".boot.data") = {
+  "unknown", "free", "resv", "acpi", "nvs", "bad"
+};
 
-void Multiboot::parseAll() {
+void Multiboot::parseAll(laddr& modStart, laddr& modEnd) {
+  modStart = topaddr;
+  modEnd = 0;
   FORALLTAGS(tag,mbiStart,mbiEnd) {
     switch (tag->type) {
     case MULTIBOOT_TAG_TYPE_CMDLINE:
@@ -58,6 +64,8 @@ void Multiboot::parseAll() {
       multiboot_tag_module* tm = (multiboot_tag_module*)tag;
       DBG::outln(DBG::Boot, "module at ", FmtHex(tm->mod_start),
         '-', FmtHex(tm->mod_end), ": ", tm->cmdline);
+      if (tm->mod_start < modStart) modStart = tm->mod_start;
+      if (tm->mod_end > modEnd) modEnd = tm->mod_end;
     } break;
     case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO: {
       multiboot_tag_basic_meminfo* tm = (multiboot_tag_basic_meminfo*)tag;
@@ -146,17 +154,32 @@ void Multiboot::getMemory(FrameManager& fm) {
   }
 }
 
-void Multiboot::getModules(FrameManager& fm, size_t alignment, std::list<std::pair<vaddr,size_t>>& modList) {
+void Multiboot::getModules(FrameManager& fm, size_t alignment) {
   FORALLTAGS(tag,mbiStart,mbiEnd) {
     if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
       multiboot_tag_module* tm = (multiboot_tag_module*)tag;
       laddr start = align_down(laddr(tm->mod_start), alignment);
       laddr end = align_up(laddr(tm->mod_end), alignment);
       fm.reserve(start, end - start);
-      modList.push_back( {start, end - start} );
     }
   }
 }
+
+void Multiboot::readModules(vaddr disp, FrameManager& fm, size_t alignment) {
+  FORALLTAGS(tag,mbiStart,mbiEnd) {
+    if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
+      multiboot_tag_module* tm = (multiboot_tag_module*)tag;
+      kstring cmd = tm->cmdline;
+      kstring name = cmd.substr(0, cmd.find_first_of(' '));
+      File* file = new File(tm->mod_start + disp, tm->mod_end - tm->mod_start);
+      kernelFS.insert( {name, file} );
+      laddr start = align_down(laddr(tm->mod_start), alignment);
+      laddr end = align_up(laddr(tm->mod_end), alignment);
+      fm.release(start, end - start);
+    }
+  }
+}
+
 
 #if 0
 // cf. Elf_Kind in include/libelf/libelf.h

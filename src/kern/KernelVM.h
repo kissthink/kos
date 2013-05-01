@@ -30,7 +30,7 @@ class KernelVM {
   friend std::ostream& operator<<(std::ostream&, const KernelVM&);
 
   static const mword min = pagesizebits<1>();
-  static const mword max = builtin_clog2(kernelRange);
+  static const mword max = ceilinglog2_c(kernelRange);
   static const mword dpl = 2;
   using BuddySet = InPlaceSet<vaddr,min,kernelBase>;
   BuddyMap<min,max,BuddySet> availableMemory;
@@ -42,6 +42,8 @@ class KernelVM {
 
   KernelVM(const KernelVM&) = delete;                  // no copy
   const KernelVM& operator=(const KernelVM&) = delete; // no assignment
+
+  inline void checkExpand(size_t size);
 
 public:
   KernelVM() {} // don't do anything, since constructor is called *after* init

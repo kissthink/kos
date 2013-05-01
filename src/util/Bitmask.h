@@ -18,13 +18,13 @@
 #define _Bitmask_h_ 1
 
 #include "util/basics.h"
-#include "mach/bitstrops.h"
+#include "mach/platform.h"
 
 class Bitmask {
+  static_assert(mword(true) == mword(1), "true != mword(1)");
   mword bits;
 public:
   constexpr Bitmask( mword b = 0 ) : bits(b) {}
-  void init() { bits = 0; }
   void set( mword n, bool doit = true ) {
     bits |= (mword(doit) << n);
   }
@@ -37,11 +37,8 @@ public:
   constexpr bool test( mword n ) const {
     return bits & pow2(n);
   }
-  mword lsbc( mword n, mword a ) {
-    return find_lsb_cond( bits & ~maskbits(n), a );
-  }
-  mword msbc( mword n, mword a ) {
-    return find_msb_cond( bits & maskbits(n), a );
+  mword find( mword n = 0 ) {
+    return lsbcond( bits & ~maskbits(n) );
   }
 };
 

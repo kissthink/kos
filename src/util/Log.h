@@ -18,7 +18,6 @@
 #define _Log_h_ 1
 
 #include "util/basics.h"
-#include "util/Bitmask.h"
 #include "kern/globals.h"
 
 #include <ostream>

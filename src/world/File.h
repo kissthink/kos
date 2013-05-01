@@ -17,17 +17,45 @@
 #ifndef _File_h_
 #define _File_h_ 1
 
-#include <sys/stat.h>
+#include "util/Log.h"
+#include "mach/platform.h"
+
+#include <errno.h>
+#include <unistd.h>
 
 class File {
-  vaddr start;
+  static const size_t BlockSize = pagesize<1>();
+
+  bufptr_t start;
+  size_t length;
   size_t offset;
+
 public:
-  ~File() { close(); }
-  bool stat(struct stat* buf) { return false; }
-  size_t read(char* buf, size_t len) { return 0; }
-  size_t write(char* buf, size_t len) { return 0; }
-  size_t seek(size_t offset, int whence) { return 0; }
+  File(vaddr s, size_t l) : length(l), offset(0) {
+    start = new char[align_up(l, BlockSize)];
+    KASSERT( vaddr(start) != topaddr && start != nullptr, "out of memory" );
+    kcout << FmtHex(start) << kendl;
+    memcpy(start, bufptr_t(s), l);
+  }
+
+  size_t read(bufptr_t buf, size_t len) {
+    if (offset + len > length) len = length - offset;
+    memcpy( buf, start + offset, len );
+    offset += len;
+    return len;
+  }
+
+  off_t lseek(off_t o, int whence) {
+    switch (whence) {
+      case SEEK_SET: offset = o; break;
+      case SEEK_CUR: offset += o; break;
+      case SEEK_END: *__errno() = EINVAL; return -1;
+      default: *__errno() = EINVAL; return -1;
+    }
+    if (offset > length) offset = length;
+    return offset;
+  }
+
 };
 
 #endif /* _File_h_ */

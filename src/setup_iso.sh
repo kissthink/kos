@@ -30,7 +30,7 @@ echo >> iso/boot/grub/grub.cfg
 [ $# -gt 0 ] && cp $* iso/boot && for i in $* ; do
 	echo -n "  module2 /boot/" >> iso/boot/grub/grub.cfg
 	echo -n "$(basename $i)" >> iso/boot/grub/grub.cfg
-	echo " sample args" >> iso/boot/grub/grub.cfg
+	echo " $(basename $i) sample args" >> iso/boot/grub/grub.cfg
 done
 echo "  boot" >> iso/boot/grub/grub.cfg
 echo "}" >> iso/boot/grub/grub.cfg

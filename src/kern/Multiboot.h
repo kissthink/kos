@@ -19,9 +19,8 @@
 
 #include "mach/platform.h"
 
-#include <list>
-
 class FrameManager;
+class KernelVM;
 
 class Multiboot {
   vaddr mbiStart;
@@ -29,10 +28,11 @@ class Multiboot {
 public:
   vaddr init(mword magic, vaddr mbi)               __section(".boot.text");
   void initDebug(bool msg)                         __section(".boot.text");
-  void parseAll()                                  __section(".boot.text");
+  void parseAll(laddr& modStart, laddr& modEnd)    __section(".boot.text");
   vaddr getRSDP()                                  __section(".boot.text");
   void getMemory(FrameManager& fm)                 __section(".boot.text");
-  void getModules(FrameManager& fm, size_t align, std::list<std::pair<vaddr,size_t>>&)  __section(".boot.text");
+  void getModules(FrameManager& fm, size_t align)  __section(".boot.text");
+  void readModules(vaddr, FrameManager&, size_t)   __section(".boot.text");
 };
 
 #endif /* _Multiboot_h_ */

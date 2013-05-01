@@ -20,11 +20,12 @@
 #include "kern/AddressSpace.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
-#include "world/Objects.h"
+#include "world/File.h"
 
 AddressSpace kernelSpace;
 KernelVM kernelVM;
 Scheduler kernelScheduler;
+map<kstring,File*,std::less<kstring>,KernelAllocator<kstring>> kernelFS;
 
 static void mainLoop(ptr_t); // forward declaration
 static void task(ptr_t);     // forward declaration
@@ -48,38 +49,45 @@ extern "C" void kmain(mword magic, mword addr) {
     Machine::initAP(apIdleLoop);
   } else {
     // start up BSP: low-level machine-dependent initialization
-  	Machine::initBSP(magic, addr, bspIdleLoop);
+    Machine::initBSP(magic, addr, bspIdleLoop);
   }
 };
 
 void mainLoop(ptr_t) {
+  File* f = kernelFS.find("motd")->second;
+  for (;;) {
+    char c;
+    if (f->read( &c, 1 ) == 0) break;
+    kcout << c;
+    kcdbg << c;
+  }
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace)->setName("A");
-	Thread::create(task, nullptr, kernelSpace)->setName("B");
-	Thread::create(task, nullptr, kernelSpace)->setName("C");
-	Thread::create(task, nullptr, kernelSpace)->setName("D");
-	Thread::create(task, nullptr, kernelSpace)->setName("E");
-	Thread::create(task, nullptr, kernelSpace)->setName("F");
+  Thread::create(task, nullptr, kernelSpace)->setName("B");
+  Thread::create(task, nullptr, kernelSpace)->setName("C");
+  Thread::create(task, nullptr, kernelSpace)->setName("D");
+  Thread::create(task, nullptr, kernelSpace)->setName("E");
+  Thread::create(task, nullptr, kernelSpace)->setName("F");
   Thread::create(task, nullptr, kernelSpace)->setName("G");
-	Thread::create(task, nullptr, kernelSpace)->setName("H");
-	Thread::create(task, nullptr, kernelSpace)->setName("I");
-	Thread::create(task, nullptr, kernelSpace)->setName("J");
-	Thread::create(task, nullptr, kernelSpace)->setName("K");
-	Thread::create(task, nullptr, kernelSpace)->setName("L");
+  Thread::create(task, nullptr, kernelSpace)->setName("H");
+  Thread::create(task, nullptr, kernelSpace)->setName("I");
+  Thread::create(task, nullptr, kernelSpace)->setName("J");
+  Thread::create(task, nullptr, kernelSpace)->setName("K");
+  Thread::create(task, nullptr, kernelSpace)->setName("L");
   Thread::create(task, nullptr, kernelSpace)->setName("M");
-	Thread::create(task, nullptr, kernelSpace)->setName("N");
-	Thread::create(task, nullptr, kernelSpace)->setName("O");
-	Thread::create(task, nullptr, kernelSpace)->setName("P");
-	Thread::create(task, nullptr, kernelSpace)->setName("Q");
-	Thread::create(task, nullptr, kernelSpace)->setName("R");
+  Thread::create(task, nullptr, kernelSpace)->setName("N");
+  Thread::create(task, nullptr, kernelSpace)->setName("O");
+  Thread::create(task, nullptr, kernelSpace)->setName("P");
+  Thread::create(task, nullptr, kernelSpace)->setName("Q");
+  Thread::create(task, nullptr, kernelSpace)->setName("R");
   Thread::create(task, nullptr, kernelSpace)->setName("S");
-	Thread::create(task, nullptr, kernelSpace)->setName("T");
-	Thread::create(task, nullptr, kernelSpace)->setName("U");
-	Thread::create(task, nullptr, kernelSpace)->setName("V");
-	Thread::create(task, nullptr, kernelSpace)->setName("W");
-	Thread::create(task, nullptr, kernelSpace)->setName("X");
-	task(nullptr);
+  Thread::create(task, nullptr, kernelSpace)->setName("T");
+  Thread::create(task, nullptr, kernelSpace)->setName("U");
+  Thread::create(task, nullptr, kernelSpace)->setName("V");
+  Thread::create(task, nullptr, kernelSpace)->setName("W");
+  Thread::create(task, nullptr, kernelSpace)->setName("X");
+  task(nullptr);
 }
 
 static SpinLock lk;

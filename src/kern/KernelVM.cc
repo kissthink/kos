@@ -45,18 +45,24 @@ extern "C" int munmap(void* addr, size_t len) {
   return 0;
 }
 
+void KernelVM::checkExpand(size_t size) {
+  if (availableMemory.check(size)) return;
+  size = pow2(ceilinglog2(size));
+  vaddr newmem = kernelSpace.mapPages<dpl,true>(align_up(size, pagesize<dpl>()));
+  KASSERT( newmem != topaddr, "out of memory?" );
+  bool check = availableMemory.insert(newmem - kernelBase, align_up(size, pagesize<dpl>()));
+  KASSERT( check, newmem );
+}
+
 vaddr KernelVM::allocInternal(size_t size) {
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
-  if ( !availableMemory.checkWatermark(builtin_clog2(DEFAULT_GRANULARITY)) ) {
-    vaddr newmem = kernelSpace.mapPages<dpl,true>(align_up(size, pagesize<dpl>()));
-    KASSERT( newmem != topaddr, "out of memory?" );
-    bool check = availableMemory.insert(newmem - kernelBase, align_up(size, pagesize<dpl>()));
-    KASSERT( check, newmem );
-  }
-  vaddr addr = availableMemory.retrieve(size) + kernelBase;
-  KASSERT( addr != topaddr, "out of memory" );
-  return addr;
+  // TODO: problem, if size is pow2 and one chunk is all that's left?
+  // -> could request larger chunk
+  checkExpand(std::max(size, 2 * size_t(DEFAULT_GRANULARITY)));
+  vaddr addr = availableMemory.retrieve(size);
+  KASSERT( addr != topaddr, *this );
+  return addr + kernelBase;
 }
 
 void KernelVM::releaseInternal(vaddr p, size_t size) {
@@ -64,8 +70,8 @@ void KernelVM::releaseInternal(vaddr p, size_t size) {
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
   availableMemory.insert(p - kernelBase, size);
-  // TODO: implement retrieveMax in BuddyMap
-  while ( availableMemory.checkWatermark(pagesizebits<dpl>()) ) {
+  // TODO: would be nice to have retrieveMax in BuddyMap
+  while ( availableMemory.check(pagesize<dpl>()) ) {
     vaddr addr = availableMemory.retrieve(pagesize<dpl>()) + kernelBase;
     KASSERT(addr != topaddr, "internal error");
     bool check = kernelSpace.unmapPages<dpl,true>(addr, pagesize<dpl>());
