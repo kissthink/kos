@@ -263,7 +263,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // init AddressSpace
   kernelSpace.setPagetable(pml4addr);
-  kernelSpace.setMemoryRange(vaddr(&__KernelCode), vaddr(&__BootHeap), vaddr(&__BootHeap), kernelEnd, topkernel, topkernel, PageManager::Kernel);
+  kernelSpace.setMemoryRange(vaddr(&__KernelCode), vaddr(&__BootHeap), vaddr(&__BootHeap), kernelEnd, topkernel, topkernel);
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
   // activate new page tables -> proper dynamic memory, but no identity mapping

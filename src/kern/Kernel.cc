@@ -22,7 +22,7 @@
 #include "kern/Thread.h"
 #include "world/File.h"
 
-AddressSpace kernelSpace;
+AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelVM kernelVM;
 Scheduler kernelScheduler;
 map<kstring,File*,std::less<kstring>,KernelAllocator<kstring>> kernelFS;

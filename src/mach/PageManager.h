@@ -50,8 +50,8 @@ class PageManager {
   static const BitSeg<uint64_t,12,40> ADDR;
   static const BitSeg<uint64_t,63, 1> XD;
 
-protected:
-  enum PageOwner : uint64_t {
+public:
+  enum Owner : uint64_t {
     Kernel    = P() | G(),
     User      = P() | US()
   };
@@ -153,7 +153,7 @@ private:
   }
 
   template <unsigned int N>
-  static void relabel( vaddr vma, PageOwner owner, PageType type ) {
+  static void relabel( vaddr vma, Owner owner, PageType type ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
     KASSERT( pe->P, FmtHex(vma) );
@@ -168,7 +168,7 @@ protected:
 
   // specialization for <pagelevels> below (must be outside of class scope)
   template <unsigned int N>
-  static inline void maprecursive( mword vma, PageOwner owner ) {
+  static inline void maprecursive( mword vma, Owner owner ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     maprecursive<N+1>(vma,owner);
     PageEntry* pe = getEntry<N+1>(vma);
@@ -183,7 +183,7 @@ protected:
   }
 
   template <unsigned int N>
-  static inline void map( mword vma, mword lma, PageOwner owner, PageType type ) {
+  static inline void map( mword vma, mword lma, Owner owner, PageType type ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     KASSERT( aligned(vma, pagesize<N>()), FmtHex(vma) );
     KASSERT( (lma & ~ADDR()) == 0, FmtHex(lma) );
@@ -238,11 +238,11 @@ template<> inline mword PageManager::ptp<1>() {
   return VAddr(pml4entry << pagesizebits<pagelevels>());
 }
 
-template<> inline void PageManager::maprecursive<pagelevels>( mword, PageManager::PageOwner ) {}
+template<> inline void PageManager::maprecursive<pagelevels>( mword, PageManager::Owner ) {}
 
 template<> inline void PageManager::unmaprecursive<pagelevels-1>( mword, size_t ) {}
 
-template<> inline void PageManager::relabel<pagelevels+1>( vaddr, PageManager::PageOwner, PageManager::PageType ) {}
+template<> inline void PageManager::relabel<pagelevels+1>( vaddr, PageManager::Owner, PageManager::PageType ) {}
 
 template<> inline mword PageManager::vtol<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);

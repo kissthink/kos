@@ -27,6 +27,10 @@
 #include <set>
 
 class AddressSpace : public PageManager {
+public:
+  using Owner = PageManager::Owner;
+
+private:
   friend std::ostream& operator<<(std::ostream&, const AddressSpace&);
 
   SpinLock lock;
@@ -39,7 +43,7 @@ class AddressSpace : public PageManager {
   vaddr mapEnd;     // end of map segment
   vaddr vmEnd;      // end of virtual memory address range
 
-  PageManager::PageOwner owner;
+  Owner owner;
 
   using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
   BuddyMap<pagesizebits<1>(),pagebits,BuddySet> availableMemory;
@@ -48,21 +52,20 @@ class AddressSpace : public PageManager {
   const AddressSpace& operator=(const AddressSpace&) = delete; // no assignment
 
 public:
-  AddressSpace() : pagetable(topaddr) {}
+  AddressSpace(Owner o) : pagetable(topaddr), owner(o) {}
   ~AddressSpace() {
     if (pagetable != topaddr) {
       // TODO: cleanup!
     }
   }
 
-  void setMemoryRange(vaddr vs, vaddr hs, vaddr ae, vaddr ms, vaddr me, vaddr ve, PageManager::PageOwner o) {
+  void setMemoryRange(vaddr vs, vaddr hs, vaddr ae, vaddr ms, vaddr me, vaddr ve) {
     vmStart = vs;
     heapStart = heapEnd = hs;
     allocEnd = ae;
     mapStart = ms;
     mapEnd = me;
     vmEnd = ve;
-    owner = o;
     availableMemory.insert(ms, me-ms);
   }
 
