@@ -14,6 +14,7 @@ BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
 LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
+STAGE=stage
 
 .PHONY: all run debug rgdb bochs pxe fpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
 
@@ -61,8 +62,8 @@ bochs: $(IMAGE)
 	$(TOOLSDIR)/bin/bochs -f bochsrc -rc bochsrc.dbg -q
 
 $(ISO) pxe fpxe rpxe: kernel.sys user/built setup_iso.sh
-	rm -rf iso
-	./setup_iso.sh $@ kernel.sys $(RGDB) user/exec/*
+	rm -rf $(STAGE)
+	./setup_iso.sh $(STAGE) $@ kernel.sys $(RGDB) user/exec/*
 
 qpxe: pxe
 	$(QEMUPXE)
@@ -130,7 +131,7 @@ clean:
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\
 		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS)
-	rm -rf iso pxegrub.0 core.img
+	rm -rf $(STAGE)
 	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep
 
 distclean: clean
