@@ -56,6 +56,9 @@ public:
     return offset;
   }
 
+  bufptr_t startptr() { return start; }
+  size_t size() { return length; }
+
 };
 
 #endif /* _File_h_ */
