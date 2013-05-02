@@ -26,7 +26,7 @@
 class FileCache {
   friend std::ostream& operator<<(std::ostream&, const FileCache&);
   static const mword min = pagesizebits<1>();
-  using BuddySet = InPlaceSet<vaddr,min,kernelBase>;
+  using BuddySet = InPlaceSet<vaddr,min>;
   BuddyMap<min,framebits,BuddySet> availableMemory;
 public:
   laddr reclaim( size_t size ) { return topaddr; }

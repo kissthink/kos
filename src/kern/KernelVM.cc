@@ -50,7 +50,7 @@ void KernelVM::checkExpand(size_t size) {
   size = pow2(ceilinglog2(size));
   vaddr newmem = kernelSpace.mapPages<dpl,true>(align_up(size, pagesize<dpl>()));
   KASSERT( newmem != topaddr, "out of memory?" );
-  bool check = availableMemory.insert(newmem - kernelBase, align_up(size, pagesize<dpl>()));
+  bool check = availableMemory.insert(newmem, align_up(size, pagesize<dpl>()));
   KASSERT( check, newmem );
 }
 
@@ -58,21 +58,21 @@ vaddr KernelVM::allocInternal(size_t size) {
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
   // TODO: problem, if size is pow2 and one chunk is all that's left?
-  // -> could request larger chunk
+  // -> could request larger chunk, but more fragementation?
   checkExpand(std::max(size, 2 * size_t(DEFAULT_GRANULARITY)));
   vaddr addr = availableMemory.retrieve(size);
   KASSERT( addr != topaddr, *this );
-  return addr + kernelBase;
+  return addr;
 }
 
 void KernelVM::releaseInternal(vaddr p, size_t size) {
   KASSERT( aligned(p, pow2(min)), p );
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
-  availableMemory.insert(p - kernelBase, size);
+  availableMemory.insert(p, size);
   // TODO: would be nice to have retrieveMax in BuddyMap
   while ( availableMemory.check(pagesize<dpl>()) ) {
-    vaddr addr = availableMemory.retrieve(pagesize<dpl>()) + kernelBase;
+    vaddr addr = availableMemory.retrieve(pagesize<dpl>());
     KASSERT(addr != topaddr, "internal error");
     bool check = kernelSpace.unmapPages<dpl,true>(addr, pagesize<dpl>());
     KASSERT( check, addr );
@@ -87,7 +87,7 @@ void KernelVM::init(vaddr start, vaddr end) {
 
 // memory is marked as available
 void KernelVM::addMemory(vaddr start, vaddr end) {
-  availableMemory.insert(start - kernelBase, (end - start));
+  availableMemory.insert(start, (end - start));
 }
 
 ptr_t KernelVM::malloc(size_t s) {
@@ -99,6 +99,6 @@ void KernelVM::free(ptr_t p) {
 }
 
 std::ostream& operator<<(std::ostream& os, const KernelVM& vm ) {
-  vm.availableMemory.print<KernelAllocator<vaddr>>(os,kernelBase);
+  vm.availableMemory.print<KernelAllocator<vaddr>>(os);
   return os;
 }

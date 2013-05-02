@@ -5,23 +5,23 @@
 #include "mod_stl_tree.h"  
 #include "mod_stl_set.h"  
 
-template<typename T,size_t shift, size_t disp> class InPlaceAllocator : public std::allocator<T> {
+template<typename T,size_t shift> class InPlaceAllocator : public std::allocator<T> {
 public:
-  template<typename U> struct rebind { typedef InPlaceAllocator<U,shift,disp> other; };
+  template<typename U> struct rebind { typedef InPlaceAllocator<U,shift> other; };
   InPlaceAllocator() = default;
   InPlaceAllocator(const InPlaceAllocator& x) = default;
-  template<typename U> InPlaceAllocator (const InPlaceAllocator<U,shift,disp>& x) : std::allocator<T>(x) {}
+  template<typename U> InPlaceAllocator (const InPlaceAllocator<U,shift>& x) : std::allocator<T>(x) {}
   ~InPlaceAllocator() = default;
   template<typename V>
   T* allocate(const V& val) {
 		uintptr_t addr = (uintptr_t)(void*)(const_cast<V&>(val));
-		addr = (addr << shift) + disp;
+		addr = addr << shift;
 		return reinterpret_cast<T*>(addr);
 	}
   void deallocate(T*, size_t) {}
 };
 
-template <typename _Key, size_t shift, size_t disp, typename _Compare = std::less<_Key>>
-using InPlaceSet = modstd::set<_Key,_Compare,InPlaceAllocator<_Key,shift,disp>>;
+template <typename _Key, size_t shift, typename _Compare = std::less<_Key>>
+using InPlaceSet = modstd::set<_Key,_Compare,InPlaceAllocator<_Key,shift>>;
 
 #endif /* _mod_set_ */

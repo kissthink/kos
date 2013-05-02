@@ -212,7 +212,7 @@ public:
   }
 
   template<typename PrintAllocator = typename Set::allocator_type>
-  void print(std::ostream& os, vaddr disp = 0) const {
+  void print(std::ostream& os) const {
     std::map<vaddr,size_t,std::less<vaddr>,PrintAllocator> printMap;
     // store all memory regions in single printMap, sorted by start
     for ( size_t idx = 0; idx < max-min; ++idx ) {
@@ -225,12 +225,12 @@ public:
     vaddr end = mwordlimit;
     for ( const std::pair<vaddr,size_t>& d : printMap ) {
       if ( d.first != end ) {
-        if ( end != mwordlimit ) os << FmtHex(end + disp) << ' ';
-        os << FmtHex(d.first + disp) << '-';
+        if ( end != mwordlimit ) os << FmtHex(end) << ' ';
+        os << FmtHex(d.first) << '-';
       }
       end = d.first + d.second;
     }
-    os << FmtHex(end + disp);
+    os << FmtHex(end);
   }
 };
 

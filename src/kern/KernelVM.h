@@ -32,7 +32,7 @@ class KernelVM {
   static const mword min = pagesizebits<1>();
   static const mword max = ceilinglog2_c(kernelRange);
   static const mword dpl = 2;
-  using BuddySet = InPlaceSet<vaddr,min,kernelBase>;
+  using BuddySet = InPlaceSet<vaddr,min>;
   BuddyMap<min,max,BuddySet> availableMemory;
   SpinLock lock;
   void* kmspace;
