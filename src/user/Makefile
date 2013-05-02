@@ -3,7 +3,7 @@ include $(SRCDIR)/Makefile.config
 
 CXXFLAGS=$(OPTFLAGS) $(DBGFLAGS) $(LANGFLAGS)
 ifeq ($(CC),clang)
-CXXFLAGS+=-target x86_64-pc-kos
+CXXFLAGS+=$(CLANGFLAGS)
 endif
 LDFLAGS=-static ../ulib/libKOS.o
 

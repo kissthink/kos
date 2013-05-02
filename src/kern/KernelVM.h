@@ -43,6 +43,7 @@ class KernelVM {
   KernelVM(const KernelVM&) = delete;                  // no copy
   const KernelVM& operator=(const KernelVM&) = delete; // no assignment
 
+  inline void expand(size_t size);
   inline void checkExpand(size_t size);
 
 public:

@@ -92,6 +92,50 @@ static inline void MemoryBarrier() {
   asm volatile("mfence" ::: "memory");
 }
 
+#if defined(__clang__)
+
+static inline constexpr mword msb_r( mword x ) {
+  return x == 1 ? 0 : 1 + msb_r(x >> 1);
+}
+
+static inline constexpr mword lsb_r( mword x ) {
+  return x & 1 ? 0 : 1 + lsb_r(x >> 1);
+}
+
+static inline constexpr mword floorlog2_c( mword x ) {
+  return x == 0 ? mwordbits : msb_r(x);
+}
+
+static inline constexpr mword ceilinglog2_c( mword x ) {
+  return x == 1 ? 0 : msb_r(x - 1) + 1;
+}
+
+static inline constexpr mword bitalignment_c( mword x ) {
+  return x == 0 ? mwordbits : lsb_r(x);
+}
+
+static inline constexpr mword lsbcond(mword x, mword alt = mwordbits) {
+  return x == 0 ? alt : lsb_r(x);
+}
+
+static inline constexpr mword msbcond(mword x, mword alt = mwordbits) {
+  return x == 0 ? alt : msb_r(x);
+}
+
+#else /* assume gcc */
+
+static inline constexpr mword floorlog2_c( mword x ) {
+  return x == 0 ? mwordbits : (mwordbits - __builtin_clzll(x)) - 1;
+}
+
+static inline constexpr mword ceilinglog2_c( mword x ) {
+  return x == 1 ? 0 : (mwordbits - __builtin_clzll(x - 1));
+}
+
+static inline constexpr mword bitalignment_c( mword x ) {
+  return x == 0 ? mwordbits : __builtin_ctzll(x);
+}
+
 static inline mword lsbcond(mword x, mword alt = mwordbits) {
   mword ret;
   asm volatile("bsfq %1, %0" : "=a"(ret) : "rm"(x));
@@ -116,6 +160,8 @@ static inline mword msbcond(mword x, mword alt = mwordbits) {
   return ret;
 }
 
+#endif
+
 static inline mword floorlog2( mword x ) {
   return msbcond(x, mwordbits);
 }
@@ -126,18 +172,6 @@ static inline mword ceilinglog2( mword x ) {
 
 static inline mword bitalignment( mword x ) {
   return lsbcond(x, mwordbits);
-}
-
-static inline constexpr mword floorlog2_c( mword x ) {
-  return x == 0 ? mwordbits : (mwordbits - __builtin_clzll(x)) - 1;
-}
-
-static inline constexpr mword ceilinglog2_c( mword x ) {
-  return x == 1 ? 0 : (mwordbits - __builtin_clzll(x - 1));
-}
-
-static inline constexpr mword bitalignment_c( mword x ) {
-  return x == 0 ? mwordbits : __builtin_ctzll(x);
 }
 
 template<size_t N, bool free = false>

@@ -205,10 +205,16 @@ public:
   }
 
   bool check( size_t length ) {
-    length = length >> min;
-    size_t logsize = ceilinglog2(length);
-    size_t idx = bitmask.find(logsize);
-    return idx <= max-min;
+    return bitmask.find(ceilinglog2(length >> min)) < max-min;
+  }
+
+  bool checkCond( size_t length, size_t baselength ) {
+    KASSERT(check(baselength), "checkCond assumes that baselength is available");
+    size_t baseidx = bitmask.find(ceilinglog2(baselength >> min));
+    size_t idx = bitmask.find(ceilinglog2(length >> min));
+    if (idx >= max-min) return false;
+    if (idx != baseidx || buddyLevel[idx].size() > 1) return true;
+    return bitmask.find(idx + 1) < max-min;
   }
 
   template<typename PrintAllocator = typename Set::allocator_type>

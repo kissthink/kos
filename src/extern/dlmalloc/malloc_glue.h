@@ -11,6 +11,9 @@
 #define MMAP_CLEARS 0
 #define malloc_getpagesize 4096    // avoid call to 'sysconf'
 #define DEFAULT_GRANULARITY 8192
+#if defined(__clang__)
+#define NO_MALLINFO 1
+#endif
 
 // mman.h
 

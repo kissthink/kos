@@ -45,20 +45,28 @@ extern "C" int munmap(void* addr, size_t len) {
   return 0;
 }
 
-void KernelVM::checkExpand(size_t size) {
-  if (availableMemory.check(size)) return;
-  size = pow2(ceilinglog2(size));
-  vaddr newmem = kernelSpace.mapPages<dpl,true>(align_up(size, pagesize<dpl>()));
+void KernelVM::expand(size_t size) {
+  // allocate/insert pow2-aligned chunk of at least default page size
+  size = std::max(pow2(ceilinglog2(size)), pagesize<dpl>());
+  vaddr newmem = kernelSpace.mapPages<dpl,true>(size);
   KASSERT( newmem != topaddr, "out of memory?" );
-  bool check = availableMemory.insert(newmem, align_up(size, pagesize<dpl>()));
+  bool check = availableMemory.insert(newmem, size);
   KASSERT( check, newmem );
+}
+
+void KernelVM::checkExpand(size_t size) {
+  if (!availableMemory.check(DEFAULT_GRANULARITY)) {
+    expand(DEFAULT_GRANULARITY);
+  }
+  if (!availableMemory.checkCond(size, DEFAULT_GRANULARITY)) {
+    expand(size);
+  }
 }
 
 vaddr KernelVM::allocInternal(size_t size) {
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
-  // TODO: somewhat conservative - checks for contiguous space
-  checkExpand(size + size_t(DEFAULT_GRANULARITY));
+  checkExpand(size);
   vaddr addr = availableMemory.retrieve(size);
   KASSERT( addr != topaddr, *this );
   return addr;
