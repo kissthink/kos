@@ -94,24 +94,24 @@ static inline void MemoryBarrier() {
 
 static inline mword lsbcond(mword x, mword alt = mwordbits) {
   mword ret;
-  asm volatile("bsfq %1, %0" : "=a"(ret) : "r"(x));
-// WITCHCRAFT ALERT: It's unclear why only those assembly constraints work...
+  asm volatile("bsfq %1, %0" : "=a"(ret) : "rm"(x));
 #ifdef  __OPTIMIZE__
+  // WITCHCRAFT ALERT: Unclear why "d" resp. "rm" are specifically needed here
   asm volatile("cmovzq %1, %0" : "=a"(ret) : "d"(alt));
 #else
-  asm volatile("cmovzq %1, %0" : "=g"(ret) : "g"(alt));
+  asm volatile("cmovzq %1, %0" : "=a"(ret) : "rm"(alt));
 #endif
   return ret;
 }
 
 static inline mword msbcond(mword x, mword alt = mwordbits) {
   mword ret;
-  asm volatile("bsrq %1, %0" : "=a"(ret) : "r"(x));
-// WITCHCRAFT ALERT: It's unclear why only those assembly constraints work...
+  asm volatile("bsrq %1, %0" : "=a"(ret) : "rm"(x));
 #ifdef  __OPTIMIZE__
+  // WITCHCRAFT ALERT: Unclear why "d" resp. "rm" are specifically needed here
   asm volatile("cmovzq %1, %0" : "=a"(ret) : "d"(alt));
 #else
-  asm volatile("cmovzq %1, %0" : "=g"(ret) : "g"(alt));
+  asm volatile("cmovzq %1, %0" : "=a"(ret) : "rm"(alt));
 #endif
   return ret;
 }
@@ -149,7 +149,7 @@ static inline mword multiscan(mword* data) { // assume loop unroll; no branch
     mword scan = free ? ~data[i] : data[i];
     mword found;
 #if 1
-    asm volatile("bsfq %1, %0" : "=a"(scan) : "r"(scan));
+    asm volatile("bsfq %1, %0" : "=a"(scan) : "rm"(scan));
     asm volatile("setnz %%dl" ::: "rdx");
     asm volatile("movzbq %%dl, %0" : "=d"(found));
     result += (scan & mask);
