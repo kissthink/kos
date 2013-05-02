@@ -206,7 +206,7 @@ public:
 
   bool check( size_t length ) {
     length = length >> min;
-    size_t logsize = ceilinglog2( length );
+    size_t logsize = ceilinglog2(length);
     size_t idx = bitmask.find(logsize);
     return idx <= max-min;
   }

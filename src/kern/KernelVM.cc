@@ -57,9 +57,8 @@ void KernelVM::checkExpand(size_t size) {
 vaddr KernelVM::allocInternal(size_t size) {
   KASSERT( aligned(size, pow2(min)), size );
   ScopedLock<> so(lock);
-  // TODO: problem, if size is pow2 and one chunk is all that's left?
-  // -> could request larger chunk, but more fragementation?
-  checkExpand(std::max(size, 2 * size_t(DEFAULT_GRANULARITY)));
+  // TODO: somewhat conservative - checks for contiguous space
+  checkExpand(size + size_t(DEFAULT_GRANULARITY));
   vaddr addr = availableMemory.retrieve(size);
   KASSERT( addr != topaddr, *this );
   return addr;
