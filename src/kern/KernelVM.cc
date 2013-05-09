@@ -22,13 +22,13 @@
 #include "kern/Kernel.h"
 #include "kern/KernelVM.h"
 
-ptr_t operator new(size_t s) { return (ptr_t)kernelVM.alloc(s); }  
-ptr_t operator new[](size_t s) { return (ptr_t)kernelVM.alloc(s); }
+ptr_t operator new(size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }  
+ptr_t operator new[](size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }
 void operator delete(ptr_t p) noexcept { KASSERT(false, "delete" ); }
 void operator delete[](ptr_t p) noexcept { KASSERT(false, "delete[]" ); }
 
 void globaldelete(ptr_t addr, size_t size) {
-  kernelVM.release((vaddr)addr, size);
+  kernelVM.release<false>((vaddr)addr, size);
 }
 
 extern "C" void* mmap(void* addr, size_t len, int, int, int, _off64_t) {
@@ -48,7 +48,7 @@ extern "C" int munmap(void* addr, size_t len) {
 void KernelVM::expand(size_t size) {
   // allocate/insert pow2-aligned chunk of at least default page size
   size = std::max(pow2(ceilinglog2(size)), pagesize<dpl>());
-  vaddr newmem = kernelSpace.mapPages<dpl,true>(size);
+  vaddr newmem = kernelSpace.allocPages<dpl>(size, AddressSpace::Data);
   KASSERT( newmem != topaddr, "out of memory?" );
   bool check = availableMemory.insert(newmem, size);
   KASSERT( check, newmem );
@@ -81,7 +81,7 @@ void KernelVM::releaseInternal(vaddr p, size_t size) {
   while ( availableMemory.check(pagesize<dpl>()) ) {
     vaddr addr = availableMemory.retrieve(pagesize<dpl>());
     KASSERT(addr != topaddr, "internal error");
-    bool check = kernelSpace.unmapPages<dpl,true>(addr, pagesize<dpl>());
+    bool check = kernelSpace.releasePages<dpl>(addr, pagesize<dpl>());
     KASSERT( check, addr );
   }
 }

@@ -50,17 +50,21 @@ public:
   KernelVM() {} // don't do anything, since constructor is called *after* init
   void init(vaddr start, vaddr end);
   void addMemory(vaddr start, vaddr end);
+  template<bool aligned=true>
   vaddr alloc(size_t size) {
     if likely(size < pow2(min)) {
       return (vaddr)malloc(size);
     } else {
+      if (!aligned) size = align_up(size, pow2(min));
       return allocInternal(size);
     }
   }
+  template<bool aligned=true>
   void release(vaddr p, size_t size) {
     if likely(size < pow2(min)) {
       return free((ptr_t)p);
     } else {
+      if (!aligned) size = align_up(size, pow2(min));
       releaseInternal(p,size);
     }
   }

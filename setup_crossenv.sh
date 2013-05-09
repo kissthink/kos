@@ -62,10 +62,10 @@ function build_gcc() {
 # for 4.8.0 only:
 #	sed -i -e 's/@colophon/@@colophon/' \
 #	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
-	sed -ie 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure
-	sed -ie 's/thread_local/thread_localX/' gcc/tree.h
+	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure
+	sed -i 's/thread_local/thread_localX/' gcc/tree.h
 	cp $PTDIR/crt0.S libgloss/libnosys || error "crt0.S copy"
-	sed -ie "/OUTPUTS = /s//OUTPUTS = crt0.o /" libgloss/libnosys/Makefile.in
+	sed -i 's/OUTPUTS = /OUTPUTS = crt0.o /' libgloss/libnosys/Makefile.in
 	cd libgloss; autoconf || error "libgloss autoconf" ; cd ..
 	prebuild $GCC
 	../$GCC/configure --target=$TARGET --prefix=$GCCDIR\
@@ -75,12 +75,12 @@ function build_gcc() {
 	nice -10 make -j $cpucount all || error "$GCC first pass failed"
 	cd $TMPDIR/$GCC-build/$TARGET
 	# recompile newlib with -mcmodel=kernel
-	sed -ie "/CFLAGS = -g -O2/s//CFLAGS = -g -O2 -mcmodel=kernel/" newlib/Makefile
+	sed -i 's/CFLAGS = -g -O2/CFLAGS = -g -O2 -mcmodel=kernel/' newlib/Makefile
 	make -C newlib clean
 	nice -10 make -C newlib -j $cpucount all || error "newlib recompile failed"
 	# recompile libstdc++-v3 with -mcmodel=kernel
-	sed -ie "/CFLAGS = -g -O2/s//CFLAGS = -g -O2 -mcmodel=kernel/" libstdc++-v3/Makefile
-	sed -ie "/CXXFLAGS = -g -O2/s//CXXFLAGS = -g -O2 -mcmodel=kernel/" libstdc++-v3/Makefile
+	sed -i 's/CFLAGS = -g -O2/CFLAGS = -g -O2 -mcmodel=kernel/' libstdc++-v3/Makefile
+	sed -i 's/CXXFLAGS = -g -O2/CXXFLAGS = -g -O2 -mcmodel=kernel/' libstdc++-v3/Makefile
 	make -C libstdc++-v3 clean
 	nice -10 make -C libstdc++-v3 -j $cpucount all || error "libstdc++-v3 recompile failed"
 	# recompile gcc with new libraries
@@ -90,8 +90,8 @@ function build_gcc() {
 function build_libelf() {
 	unpack $LIBELF tar.gz
 	cd $TMPDIR/$LIBELF
-	sed -ie "/long long,0/s//long long,8/" configure.in
-#	sed -ie "/__int64,0/s//__int64,8/" configure.in
+	sed -i 's/long long,0/long long,8/' configure.in
+#	sed -i 's/__int64,0/__int64,8/' configure.in
 	autoconf
 	prebuild $LIBELF
 #	cp $PTDIR/elf.h $GCCDIR/$TARGET/include
@@ -125,7 +125,7 @@ function build_bochs() {
 		--enable-iodebug --enable-sb16=dummy --enable-cdrom --enable-x86-debugger\
 		--disable-plugins --disable-docbook --with-x --with-x11 --with-term\
 		--prefix=$TOOLSDIR || error "$BOCHS configure"
-	sed -ie "/LIBS =  -lm/s//LIBS = -pthread -lm/" Makefile
+	sed -i 's/LIBS =  -lm/LIBS = -pthread -lm/' Makefile
 	build $BOCHS
 }
 

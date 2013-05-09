@@ -17,8 +17,6 @@
 #include "kern/AddressSpace.h"
 
 std::ostream& operator<<(std::ostream& os, const AddressSpace& as) {
-  os << FmtHex(as.heapStart) << '-' << FmtHex(as.heapEnd) << '/' << FmtHex(as.allocEnd) << kendl;
-  os << ' ';
   as.availableMemory.print(os);
   return os;
 }

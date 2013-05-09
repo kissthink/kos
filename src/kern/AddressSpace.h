@@ -26,23 +26,17 @@
 
 #include <set>
 
+// TODO: no support for memory overcommit and traditional [s]brk-based heap
 class AddressSpace : public PageManager {
 public:
   using Owner = PageManager::Owner;
+  using Type  = PageManager::PageType;
 
 private:
   friend std::ostream& operator<<(std::ostream&, const AddressSpace&);
 
   SpinLock lock;
   laddr pagetable;  // page table address (physical)
-  vaddr vmStart;    // start of virtual memory (text,ro,data,bss)
-  vaddr heapStart;  // start of heap
-  vaddr heapEnd;    // end of heap
-  vaddr allocEnd;   // end of allocated range (page-aligned)
-  vaddr mapStart;   // start of map segment
-  vaddr mapEnd;     // end of map segment
-  vaddr vmEnd;      // end of virtual memory address range
-
   Owner owner;
 
   using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
@@ -51,39 +45,8 @@ private:
   AddressSpace(const AddressSpace&) = delete;                  // no copy
   const AddressSpace& operator=(const AddressSpace&) = delete; // no assignment
 
-public:
-  AddressSpace(Owner o) : pagetable(topaddr), owner(o) {}
-  ~AddressSpace() {
-    if (pagetable != topaddr) {
-      // TODO: cleanup!
-    }
-  }
-
-  void setMemoryRange(vaddr vs, vaddr hs, vaddr ae, vaddr ms, vaddr me, vaddr ve) {
-    vmStart = vs;
-    heapStart = heapEnd = hs;
-    allocEnd = ae;
-    mapStart = ms;
-    mapEnd = me;
-    vmEnd = ve;
-    availableMemory.insert(ms, me-ms);
-  }
-
-  void setPagetable(laddr pt) { pagetable = pt; }
-
-  void clonePagetable(AddressSpace& as) {
-    pagetable = Processor::getFrameManager()->alloc(pagetablesize());
-    vaddr vpt = as.mapPages<1>(pagetablesize(), pagetable);
-    vaddr vptorig = as.mapPages<1>(pagetablesize(), as.pagetable);
-    memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
-    as.unmapPages<1>(vptorig, pagetablesize());
-    as.unmapPages<1>(vpt, pagetablesize());
-  }
-
-  void activate() { PageManager::installAddressSpace(pagetable); }
-
-  template<size_t N, bool alloc = false, bool virt = false>
-  vaddr mapPages( size_t size, vaddr lma = 0, vaddr vma = 0 ) {
+  template<size_t N, bool alloc, bool virt>
+  vaddr mapPagesInternal( size_t size, Type t, vaddr lma, vaddr vma ) {
     static_assert( N < pagelevels, "page level template violation" );
     KASSERT( aligned(vma, pagesize<N>()), vma );
     KASSERT( aligned(size, pagesize<N>()), size );
@@ -99,15 +62,15 @@ public:
     for (; size > 0; size -= pagesize<N>()) {
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
       KASSERT(lma != topaddr, size);
-      PageManager::map<N>(vma, lma, owner, PageManager::Data);
+      PageManager::map<N>(vma, lma, owner, t);
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();
     }
     return ret;
   }
 
-  template<size_t N, bool alloc = false>
-  bool unmapPages( vaddr vma, size_t size ) {
+  template<size_t N, bool alloc>
+  bool unmapPagesInternal( vaddr vma, size_t size ) {
     static_assert( N < pagelevels, "page level template violation" );
     KASSERT( aligned(vma, pagesize<N>()), vma );
     KASSERT( aligned(size, pagesize<N>()), size );
@@ -122,6 +85,61 @@ public:
     return true;
   }
       
+public:
+  AddressSpace(Owner o) : pagetable(topaddr), owner(o) {}
+  ~AddressSpace() {
+    if (pagetable != topaddr) {
+      // TODO: cleanup!
+    }
+  }
+
+  void setMemoryRange(vaddr start, size_t length) {
+    availableMemory.insert(start, length);
+  }
+
+  void setPagetable(laddr pt) { pagetable = pt; }
+
+  void clonePagetable(AddressSpace& as) {
+    pagetable = Processor::getFrameManager()->alloc(pagetablesize());
+    vaddr vpt = as.allocPages<1>(pagetable, pagetablesize(), PageTable);
+    vaddr vptorig = as.mapPages<1>(as.pagetable, pagetablesize(), PageTable);
+    memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
+    as.unmapPages<1>(vptorig, pagetablesize());
+    as.unmapPages<1>(vpt, pagetablesize());
+  }
+
+  void activate() { PageManager::installAddressSpace(pagetable); }
+
+  template<size_t N> // allocate memory and map to any virtual address
+  vaddr allocPages( size_t size, Type t ) { 
+    return mapPagesInternal<N,true,false>(size, t, 0, 0);
+  }
+
+  template<size_t N> // allocate memory and map to specific virtual address
+  vaddr allocPages( vaddr vma, size_t size, Type t ) {
+    return mapPagesInternal<N,true,true>(size, t, 0, vma);
+  }
+
+  template<size_t N> // map memory to any virtual address
+  vaddr mapPages( vaddr lma, size_t size, Type t ) {
+    return mapPagesInternal<N,false,false>(size, t, lma, 0);
+  }
+
+  template<size_t N> // map memory to specific virtual address
+  vaddr mapPages( vaddr lma, vaddr vma, size_t size, Type t ) {
+    return mapPagesInternal<N,false,true>(size, t, lma, vma);
+  }
+
+  template<size_t N> // free allocated memory
+  bool releasePages( vaddr vma, size_t size ) {
+    return unmapPagesInternal<N,true>(vma, size);
+  }
+
+  template<size_t N> // unmap memory
+  bool unmapPages( vaddr vma, size_t size ) {
+    return unmapPagesInternal<N,false>(vma, size);
+  }
+
 };
 
 #endif /* _AddressSpace_h_ */

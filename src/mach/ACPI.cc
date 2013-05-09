@@ -94,7 +94,7 @@ void Machine::initACPI(vaddr r) {
     case ACPI_MADT_TYPE_IO_APIC: {
       acpi_madt_io_apic* io = (acpi_madt_io_apic*)subtable;
       // map IO APIC into virtual address space
-      volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>(pagesize<1>(), laddr(io->Address));
+      volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>(laddr(io->Address), pagesize<1>(), AddressSpace::Data );
       // get number of redirect entries, adjust irqCount
       uint8_t rdr = ioapic->getRedirects() + 1;
       if ( io->GlobalIrqBase + rdr > irqCount ) irqCount = io->GlobalIrqBase + rdr;
@@ -349,11 +349,11 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS Where, ACPI_SIZE Length) {
   if (Length == uint32_t(-1)) { // bochs quirk
     lma = align_down(laddr(Where), pagesize<2>());
     size = align_up(1 + laddr(Where) - lma, pagesize<2>());
-    vma = kernelSpace.mapPages<2>(size, lma);
+    vma = kernelSpace.mapPages<2>(lma, size, AddressSpace::Data);
   } else {
     lma = align_down(laddr(Where), pagesize<1>());
     size = align_up(Length + laddr(Where) - lma, pagesize<1>());
-    vma = kernelSpace.mapPages<1>(size, lma);
+    vma = kernelSpace.mapPages<1>(lma, size, AddressSpace::Data);
   }
   mappings.insert( std::pair<vaddr,size_t>(vma,size) );
   DBG::outln(DBG::MemAcpi, " -> ", FmtHex(vma));

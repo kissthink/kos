@@ -263,7 +263,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // init AddressSpace
   kernelSpace.setPagetable(pml4addr);
-  kernelSpace.setMemoryRange(vaddr(&__KernelCode), vaddr(&__BootHeap), vaddr(&__BootHeap), kernelEnd, topkernel, topkernel);
+  kernelSpace.setMemoryRange(kernelEnd, kernelRange - (kernelEnd - kernelBase));
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
   // activate new page tables -> proper dynamic memory, but no identity mapping
@@ -272,7 +272,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // initialize kernel FS with boot modules
   modStart = align_down(modStart, pagesize<2>());
   modEnd = align_up(modEnd, pagesize<2>());
-  vaddr modMapped = kernelSpace.mapPages<2>(modEnd - modStart, modStart);
+  vaddr modMapped = kernelSpace.mapPages<2>(modStart, modEnd - modStart, AddressSpace::Data);
   KASSERT(modMapped != topaddr, "internal memory error");
   multiboot.readModules(modMapped - modStart, frameManager, pagesize<2>());
   check = kernelSpace.unmapPages<2>(modMapped, modEnd - modStart);
@@ -383,10 +383,10 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
   KASSERT( irqnum < PIC::Max, irqnum );
   irqnum = irqOverrideTable[irqnum].global;
   // TODO: handle irq override flags
-  volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>( pagesize<1>(), irqTable[irqnum].ioApicAddr);
+  volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>( irqTable[irqnum].ioApicAddr, pagesize<1>(), AddressSpace::Data );
   DBG::outln(DBG::Basic, "IRQ: ", FmtHex(irqTable[irqnum].ioapicIrq), " -> ", FmtHex(idtnum) );
   ioapic->mapIRQ( irqTable[irqnum].ioapicIrq, idtnum, bspApicID );
-  kernelSpace.unmapPages<1>((vaddr)ioapic, pagesize<1>());
+  kernelSpace.unmapPages<1>( (vaddr)ioapic, pagesize<1>() );
 }
 
 inline void Machine::timerInterrupt(mword counter) {
