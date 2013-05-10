@@ -45,7 +45,7 @@ class FrameManager {
   BuddyMap<pagesizebits<1>(),framebits,BuddySet> availableMemory;
 
   template<bool limit = false>
-  laddr alloc( size_t size, vaddr upperlimit = mwordlimit ) {
+  laddr alloc( size_t size, vaddr upperlimit = topaddr ) {
     KASSERT( aligned(size, pagesize<1>()), size );
     vaddr addr = availableMemory.retrieve<limit>(size, upperlimit);
     if (!limit && likely(addr == topaddr)) addr = fc.reclaim(size);

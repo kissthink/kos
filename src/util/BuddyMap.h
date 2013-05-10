@@ -175,7 +175,7 @@ public:
   }
 
   template<bool limit = false>
-  vaddr retrieve( size_t length, vaddr upperlimit = mwordlimit ) {
+  vaddr retrieve( size_t length, vaddr upperlimit = topaddr ) {
     length = length >> min;
     upperlimit = upperlimit >> min;
     size_t logsize = ceilinglog2( length );
@@ -220,7 +220,7 @@ public:
   template<typename PrintAllocator = typename Set::allocator_type>
   void print(std::ostream& os) const {
     std::map<vaddr,size_t,std::less<vaddr>,PrintAllocator> printMap;
-    // store all memory regions in single printMap, sorted by start
+    // store all memory regions in printMap, sorted by start
     for ( size_t idx = 0; idx < max-min; ++idx ) {
       KASSERT( bitmask.test(idx) == !buddyLevel[idx].empty(), idx );
       for ( vaddr b : buddyLevel[idx] ) {
@@ -228,10 +228,10 @@ public:
       }
     }
     // print continuous regions in compact representation
-    vaddr end = mwordlimit;
+    vaddr end = topaddr;
     for ( const std::pair<vaddr,size_t>& d : printMap ) {
       if ( d.first != end ) {
-        if ( end != mwordlimit ) os << FmtHex(end) << ' ';
+        if ( end != topaddr ) os << FmtHex(end) << ' ';
         os << FmtHex(d.first) << '-';
       }
       end = d.first + d.second;

@@ -378,7 +378,7 @@ void AcpiOsUnmapMemory(void* LogicalAddress, ACPI_SIZE Size) {
 
 ACPI_STATUS AcpiOsGetPhysicalAddress(void* LogicalAddress,
   ACPI_PHYSICAL_ADDRESS* PhysicalAddress) {
-  *PhysicalAddress = PageManager::vtol<4>(vaddr(LogicalAddress));
+  *PhysicalAddress = PageManager::vtol(vaddr(LogicalAddress));
   return AE_OK;
 }
 

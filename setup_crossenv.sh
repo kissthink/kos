@@ -143,6 +143,8 @@ bochs)
 gcc)
 	build_gcc && install $GCC
 	build_libelf && install $LIBELF;;
+libelf)
+	build_libelf && install $LIBELF;;
 gdb)
 	build_gdb && install $GDB;;
 grub)

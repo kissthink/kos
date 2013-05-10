@@ -152,6 +152,15 @@ private:
     return laddr(pml4);
   }
 
+  template<unsigned int N>
+  static inline mword vtolInternal( mword vma ) {
+    static_assert( N > 0 && N <= pagelevels, "page level template violation" );
+    PageEntry* pe = getEntry<N>(vma);
+    KASSERT(pe->P, FmtHex(vma));
+    if (pe->PS) return (pe->ADDR << pageoffsetbits) + offset<N>(vma);
+    else return vtolInternal<N-1>(vma);
+  }
+
   template <unsigned int N>
   static void relabel( vaddr vma, Owner owner, PageType type ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
@@ -223,13 +232,8 @@ public:
   PageManager(const PageManager&) = delete;            // no copy
   PageManager& operator=(const PageManager&) = delete; // no assignment
 
-  template<unsigned int N>
   static inline mword vtol( mword vma ) {
-    static_assert( N > 0 && N <= pagelevels, "page level template violation" );
-    PageEntry* pe = getEntry<N>(vma);
-    KASSERT(pe->P, FmtHex(vma));
-    if (pe->PS) return (pe->ADDR << pageoffsetbits) + offset<N>(vma);
-    else return vtol<N-1>(vma);
+    return vtolInternal<pagelevels>(vma);
   }
 
 };
@@ -244,7 +248,7 @@ template<> inline void PageManager::unmaprecursive<pagelevels-1>( mword, size_t 
 
 template<> inline void PageManager::relabel<pagelevels+1>( vaddr, PageManager::Owner, PageManager::PageType ) {}
 
-template<> inline mword PageManager::vtol<1>( mword vma ) {
+template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);
   KASSERT(pe->P, FmtHex(vma));
   return ADDR(pe->c) + offset<1>(vma);

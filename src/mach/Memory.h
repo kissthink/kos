@@ -75,11 +75,12 @@ public:
   constexpr operator mword() const { return addr; }
 };
 
-static const vaddr kernelBase = KERNBASE;
+static const vaddr  kernelBase  = KERNBASE;
 static const size_t kernelRange = -KERNBASE;
-static const vaddr lapicAddr  = VAddr(pow2(pagebits) - pagesize<1>());
-static const vaddr videoAddr  = lapicAddr - pagesize<1>();
-static const vaddr topkernel  = videoAddr;
+static const vaddr  lapicAddr   = VAddr(pow2(pagebits) - pagesize<1>());
+static const vaddr  videoAddr   = lapicAddr - pagesize<1>();
+static const vaddr  topkernel   = videoAddr;
+static const vaddr  topuser     = pow2(pagebits-1);
 
 union PageEntry { // see Intel Vol 3, Section 4.5 "IA-32E Paging"
   uint64_t c;     // compact representation

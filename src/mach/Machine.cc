@@ -263,7 +263,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // init AddressSpace
   kernelSpace.setPagetable(pml4addr);
-  kernelSpace.setMemoryRange(kernelEnd, kernelRange - (kernelEnd - kernelBase));
+  kernelSpace.setMemoryRange(kernelEnd, topkernel - kernelEnd);
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
   // activate new page tables -> proper dynamic memory, but no identity mapping
@@ -350,7 +350,7 @@ void Machine::initBSP2() {
   DBG::out(DBG::Basic, kendl);
 
   // update screen's virtual address, before boot memory disappears
-  PageManager::map<1>(videoAddr, PageManager::vtol<4>(Screen::getAddress()), PageManager::Kernel, PageManager::Data);
+  PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data);
   Screen::setAddress(videoAddr);
 
   // free kernel boot memory

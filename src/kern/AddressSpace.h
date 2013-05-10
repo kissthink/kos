@@ -27,6 +27,8 @@
 #include <set>
 
 // TODO: no support for memory overcommit and traditional [s]brk-based heap
+// overcommit: compare available with maximum vm region - keep track of type
+// heap: ensure that variable mappings don't gratuitously encroach on heap
 class AddressSpace : public PageManager {
 public:
   using Owner = PageManager::Owner;
