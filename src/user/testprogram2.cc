@@ -14,11 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
+int a = 2;
+int b = 33;
 
-
-int main()
-{
-	int a = 2;
-	int b = 33;
-	return a*b;
-}
+int main() {
+  return a * b;
+};
