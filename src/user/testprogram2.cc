@@ -14,6 +14,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-int main(int x, char**) {
-  return 2 * x;
-};
+
+
+int main()
+{
+	int a = 2;
+	int b = 33;
+	return a*b;
+}
