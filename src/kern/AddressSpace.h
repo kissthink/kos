@@ -103,7 +103,7 @@ public:
 
   void clonePagetable(AddressSpace& as) {
     pagetable = Processor::getFrameManager()->alloc(pagetablesize());
-    vaddr vpt = as.allocPages<1>(pagetable, pagetablesize(), PageTable);
+    vaddr vpt = as.mapPages<1>(pagetable, pagetablesize(), PageTable);
     vaddr vptorig = as.mapPages<1>(as.pagetable, pagetablesize(), PageTable);
     memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
     as.unmapPages<1>(vptorig, pagetablesize());
