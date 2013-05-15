@@ -37,12 +37,7 @@ done
 echo "  boot" >> $stage/boot/grub/grub.cfg
 echo "}" >> $stage/boot/grub/grub.cfg
 
-if [ "$target" = "pxe" -o "$target" = "fpxe" ]; then
-	if [ "$target" = "fpxe" ]; then
-		# full PXE: need pxelinux.0 pxelinux.cfg/default vesamenu.c32 in $TFTPDIR
-		rm -rf $TFTPDIR/boot
-		$CROSSDIR/sbin/$TARGET-grub-mknetdir --net-directory=$stage
-	fi
+if [ "$target" = "pxe" ]; then
 	cp -a $stage/boot $TFTPDIR
 elif [ "$target" = "rpxe" ]; then
 	scp -rp $stage/boot $TFTPSERVER:$TFTPDIR

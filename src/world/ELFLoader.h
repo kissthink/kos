@@ -92,9 +92,8 @@ public:
 		return true;
 	}
 
-	vaddr findMainAddress(){
-		if(!initialized)
-			return NULL;
+	vaddr findMainAddress() {
+		if(!initialized) return topaddr;
 		//Find Main Method
 		ELFIO::Elf_Half sec_num = elfReader.sections.size();
 		for (int i = 0; i < sec_num; ++i) {
@@ -103,31 +102,29 @@ public:
 			if (psec->get_type() == SHT_SYMTAB) {
 				const ELFIO::symbol_section_accessor symbols(elfReader, psec);
 				for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
+
 					kstring name;
 					ELFIO::Elf64_Addr value;
 					ELFIO::Elf_Xword size;
 					unsigned char bind;
 					unsigned char type;
-					ELFIO::Elf_Half section_index;
+					ELFIO::Elf_Half sec_idx;
 					unsigned char other;
 
 					// Read symbol properties
-					symbols.get_symbol(j, name, value, size, bind, type,
-							section_index, other);
-					if (!strcmp(name.c_str(), "main"))
-					{
+					symbols.get_symbol(j, name, value, size, bind, type, sec_idx, other);
+					if (!strcmp(name.c_str(), "main")) {
 						return value;
 					}
 				}
 			}
 		}
+		return topaddr;
 	}
 
-	vaddr findEntryAddress(){
-		if(!initialized)
-			return NULL;
-		else
-			return elfReader.get_entry();
+	vaddr findEntryAddress() {
+		if (!initialized) return topaddr;
+		else return elfReader.get_entry();
 	}
 
 };

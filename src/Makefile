@@ -16,7 +16,7 @@ LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
-.PHONY: all run debug rgdb bochs pxe fpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
+.PHONY: all run debug rgdb bochs pxe lpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
 
 .PHONY: Makefile.state
 
@@ -61,17 +61,22 @@ gdbdebug:
 bochs: $(IMAGE)
 	$(TOOLSDIR)/bin/bochs -f bochsrc -rc bochsrc.dbg -q
 
-$(ISO) pxe fpxe rpxe: kernel.sys user/built setup_iso.sh
+$(ISO) pxe rpxe: kernel.sys user/built setup_iso.sh
 	rm -rf $(STAGE)
 	./setup_iso.sh $(STAGE) $@ kernel.sys $(RGDB) user/exec/*
 
-$TFTPDIR/boot/grub/i386-pc/core.0:
-	$(MAKE) fpxe
+pxe: $(GRUBPXE)
 
-pxe: $TFTPDIR/boot/grub/i386-pc/core.0
+lpxe: $(GRUBPXE)
+	$(MAKE) pxe
 
-qpxe: $TFTPDIR/boot/grub/i386-pc/core.0
+qpxe: $(GRUBPXE)
 	$(QEMUPXE)
+
+$(GRUBPXE):
+	rm -rf $(TFTPDIR)/boot
+	$(CROSSDIR)/sbin/$(TARGET)-grub-mknetdir --net-directory=$(TFTPDIR)
+	@echo ATTENTION: You also need pxelinux.0 pxelinux.cfg/default vesamenu.c32 in $(TFTPDIR)
 
 $(VDISK): kernel.sys setup_img.sh
 	dd if=/dev/zero of=$(VDISK) bs=516096c count=64 2>/dev/null

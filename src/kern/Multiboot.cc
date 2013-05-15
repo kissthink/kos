@@ -20,8 +20,6 @@
 #include "kern/Kernel.h"
 #include "world/File.h"
 
-#include <libelf.h>
-
 #define FORALLTAGS(tag,start,end) \
   for (multiboot_tag* tag = (multiboot_tag*)(start); \
   vaddr(tag) < (end) && tag->type != MULTIBOOT_TAG_TYPE_END; \
@@ -179,29 +177,3 @@ void Multiboot::readModules(vaddr disp, FrameManager& fm, size_t alignment) {
     }
   }
 }
-
-
-#if 0
-// cf. Elf_Kind in include/libelf/libelf.h
-static const char* elfkind[] __section(".boot.data") = { "none", "ar", "coff", "elf", "unknown" };
-// cf. e_type in include/libelf/elf_repl.h
-static const char* elftype[] __section(".boot.data") = { "none", "rel", "exec", "dyn", "core", "unknown" };
-
-void Multiboot::loadModules(RamFS& fs) {
-  FORALLTAGS(tag,mbiStart,mbiEnd) {
-    if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
-      multiboot_tag_module* tm = (multiboot_tag_module*)tag;
-      DBG::out(DBG::Boot, "module at ", FmtHex(tm->mod_start),
-        '-', FmtHex(tm->mod_end), ": ", tm->cmdline);
-      Elf* e = elf_memory((char*)uintptr_t(tm->mod_start), tm->mod_end - tm->mod_start);
-      KASSERT( e != nullptr, elf_errmsg(-1) );
-      Elf_Kind ek = elf_kind(e);
-      Elf64_Ehdr* ehdr = elf64_getehdr(e);
-      KASSERT( ek >= ELF_K_NONE && ek <= ELF_K_NUM, ek );
-      KASSERT( ehdr != nullptr && ehdr->e_type <= ET_NUM, ehdr->e_type );
-      DBG::outln(DBG::Boot, ' ', elfkind[ek], ' ', elftype[ehdr->e_type]);
-      elf_end(e);
-    }
-  }
-}
-#endif

@@ -82,6 +82,7 @@ void mainLoop(ptr_t) {
 	//Execute Program
 	int (*func_ptr)(void);
 	func_ptr = (int (*)(void))elfLoader.findMainAddress();
+	KASSERT(vaddr(func_ptr) != topaddr, "main not found");
 	kcerr << "return value: "<< func_ptr() << kendl;
 
 	//Activate Kernel Space again
