@@ -65,7 +65,12 @@ $(ISO) pxe fpxe rpxe: kernel.sys user/built setup_iso.sh
 	rm -rf $(STAGE)
 	./setup_iso.sh $(STAGE) $@ kernel.sys $(RGDB) user/exec/*
 
-qpxe: pxe
+$TFTPDIR/boot/grub/i386-pc/core.0:
+	$(MAKE) fpxe
+
+pxe: $TFTPDIR/boot/grub/i386-pc/core.0
+
+qpxe: $TFTPDIR/boot/grub/i386-pc/core.0
 	$(QEMUPXE)
 
 $(VDISK): kernel.sys setup_img.sh
