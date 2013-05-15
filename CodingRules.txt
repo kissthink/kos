@@ -1,0 +1,12 @@
+- header file ifdef -> same capitalization as file name
+- optimize for maximum number of LOC on screen
+  . conditionals with single statement -> same line
+  . conditionals on one same line -> use brackets
+  . no gratuitous empty lines (e.g. 2 empty lines)
+- use constructor initialization
+- try to fit comments on right hand side of code
+- if tabs as spaces, tab space is 2
+
+- types start with upper case, variables with lower case
+  . use capitalization and/or underscore to mark words in names
+
