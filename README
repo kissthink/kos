@@ -23,7 +23,6 @@ The output of the cross compilation script should contain the following
 (among other output; grep for SUCCESS):
 
 SUCCESS: gcc-4.7.2 install
-SUCCESS: libelf-0.8.13 install
 SUCCESS: grub-2.00 install
 SUCCESS: gdb-7.5.1 install
 

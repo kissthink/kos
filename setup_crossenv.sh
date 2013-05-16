@@ -18,7 +18,6 @@ BOCHS=bochs-2.6.1        # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.5.1            # GNU mirror
 GRUB=grub-2.00           # GNU mirror
-LIBELF=libelf-0.8.13     # http://www.mr511.de/software/english.html
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
 QEMU=qemu-1.4.0          # http://www.qemu.org/
 
@@ -87,20 +86,6 @@ function build_gcc() {
 	build $GCC
 }
 
-function build_libelf() {
-	unpack $LIBELF tar.gz
-	cd $TMPDIR/$LIBELF
-	sed -i 's/long long,0/long long,8/' configure.in
-#	sed -i 's/__int64,0/__int64,8/' configure.in
-	autoconf
-	prebuild $LIBELF
-#	cp $PTDIR/elf.h $GCCDIR/$TARGET/include
-	CFLAGS="-g -O2 -mcmodel=kernel" CC=$GCCDIR/bin/$TARGET-gcc\
-	LD=$GCCDIR/bin/$TARGET-ld RANLIB=$GCCDIR/bin/$TARGET-ranlib\
-	../$LIBELF/configure --host=$TARGET --prefix=$GCCDIR/$TARGET --enable-elf64
-	build $LIBELF
-}
-
 function build_gdb() {
 	unpack $GDB tar.bz2
 	prebuild $GDB
@@ -141,10 +126,7 @@ while [ $# -gt 0 ]; do case "$1" in
 bochs)
 	build_bochs && install $BOCHS;;
 gcc)
-	build_gcc && install $GCC
-	build_libelf && install $LIBELF;;
-libelf)
-	build_libelf && install $LIBELF;;
+	build_gcc && install $GCC;;
 gdb)
 	build_gdb && install $GDB;;
 grub)
@@ -153,7 +135,6 @@ qemu)
 	build_qemu && install $QEMU;;
 allcross)
 	build_gcc && install $GCC
-	build_libelf && install $LIBELF
 	build_gdb && install $GDB
 	build_grub && install $GRUB;;
 *)
