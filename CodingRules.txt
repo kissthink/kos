@@ -2,6 +2,7 @@
 - optimize for maximum number of LOC on screen
   . conditionals with single statement -> same line
   . conditionals on one same line -> use brackets
+    -> open bracket on same line as condition
   . no gratuitous empty lines (e.g. 2 empty lines)
 - use constructor initialization
 - try to fit comments on right hand side of code
@@ -10,3 +11,4 @@
 - types start with upper case, variables with lower case
   . use capitalization and/or underscore to mark words in names
 
+- attend to all warnings!
