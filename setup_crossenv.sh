@@ -13,6 +13,7 @@ cd $(dirname $0)
 DLDIR=$(pwd)/download
 PTDIR=$(pwd)/patches
 source $(pwd)/config
+
 cd -
 
 BINUTILS=binutils-2.22   # GNU mirror
