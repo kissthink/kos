@@ -73,20 +73,21 @@ void mainLoop(ptr_t) {
 
 	//ELF Loader
 	ELFLoader elfLoader;
-	elfLoader.loadAndMapELF(f,&userAS);
+	if(elfLoader.loadAndMapELF(f,&userAS))
+	{
+		//Clone and Activate Address Space
+		userAS.clonePagetable(kernelSpace);
+		userAS.activate();
 
-	//Clone and Activate Address Space
-	userAS.clonePagetable(kernelSpace);
-	userAS.activate();
+		//Execute Program
+		int (*func_ptr)(void);
+		func_ptr = (int (*)(void))elfLoader.findMainAddress();
+		KASSERT(vaddr(func_ptr) != topaddr, "main not found");
+		kcerr << "return value: "<< func_ptr() << kendl;
 
-	//Execute Program
-	int (*func_ptr)(void);
-	func_ptr = (int (*)(void))elfLoader.findMainAddress();
-	KASSERT(vaddr(func_ptr) != topaddr, "main not found");
-	kcerr << "return value: "<< func_ptr() << kendl;
-
-	//Activate Kernel Space again
-	kernelSpace.activate();
+		//Activate Kernel Space again
+		kernelSpace.activate();
+	}
 
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events

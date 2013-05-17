@@ -277,14 +277,14 @@ class elfio
     void clean()
     {
 //        delete header;
-        globaldelete(header,sizeof(header));
+        globaldelete(header,sizeof(elf_header));
         header = 0;
 
 //        std::vector<section*>::const_iterator it;
         std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>>::const_iterator it;
         for ( it = sections_.begin(); it != sections_.end(); ++it ) {
 //            delete *it;
-            globaldelete(*it,sizeof(it));
+            globaldelete(*it,sizeof(ELFIO::section));
         }
         sections_.clear();
 
@@ -292,7 +292,7 @@ class elfio
         std::vector<ELFIO::segment*,KernelAllocator<ELFIO::segment*>>::const_iterator it1;
         for ( it1 = segments_.begin(); it1 != segments_.end(); ++it1 ) {
 //            delete *it1;
-			globaldelete(*it1,sizeof(it1));
+			globaldelete(*it1,sizeof(ELFIO::segment));
         }
         segments_.clear();
     }

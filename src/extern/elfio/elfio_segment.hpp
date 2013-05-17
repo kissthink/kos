@@ -106,7 +106,7 @@ class segment_impl : public segment
     Elf64_Off
     get_data_offset() const
     {
-    	return data_offset;
+    	return ph.p_offset;
     }
 
 //------------------------------------------------------------------------------
@@ -156,7 +156,6 @@ class segment_impl : public segment
         stream.seekg( header_offset );
         stream.read( reinterpret_cast<char*>( &ph ), sizeof( ph ) );
 
-        this->data_offset = ph.p_offset;
         if ( PT_NULL != get_type() && 0 != get_file_size() ) {
             stream.seekg( (*convertor)( ph.p_offset ) );
             Elf_Xword size = get_file_size();
@@ -173,7 +172,7 @@ class segment_impl : public segment
                std::streampos data_offset )
     {
         ph.p_offset = data_offset;
-//        ph.p_offset = (*convertor)(ph.p_offset);
+        ph.p_offset = (*convertor)(ph.p_offset);
         f.seekp( header_offset );
         f.write( reinterpret_cast<const char*>( &ph ), sizeof( ph ) );
     }
@@ -183,7 +182,6 @@ class segment_impl : public segment
     mutable T             ph;
     Elf_Half              index;
     mutable char*         data;
-    mutable Elf64_Off	  data_offset;
     std::vector<Elf_Half> sections;
     endianess_convertor*  convertor;
 };
