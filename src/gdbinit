@@ -6,6 +6,7 @@ cont
 end
 
 break Breakpoint2
+info threads
 cont # startup breakpoint
 
 # x/40xg $rsp   # print stack

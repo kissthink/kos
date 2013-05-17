@@ -24,6 +24,7 @@
 #include "dev/PIT.h"
 #include "dev/RTC.h"
 #include "dev/Screen.h"
+#include "gdb/gdb.h"
 #include "kern/FrameManager.h"
 #include "kern/Kernel.h"
 #include "kern/Multiboot.h"
@@ -43,9 +44,6 @@ extern const char __KernelRO,   __KernelRO_End;
 extern const char __KernelData, __KernelDataEnd;
 extern const char __KernelBss,  __KernelBssEnd;
 extern const char __BootHeap,   __BootHeapEnd;
-
-// gdb startup routing
-extern void startGdb();
 
 // screen memory and pointer to it (from Screen.h)
 char Screen::buffer[xmax * ymax];
@@ -110,9 +108,12 @@ static void screenThread(ptr_t) {
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
   // setup IDT, GDT, address space
+  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().setupGDB(apIndex);
+
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
 //  loadTR(tssSelector * sizeof(SegmentDescriptor)); // TODO: separate cache-aligned TSS per core?
+
   clearLDT();
   PageManager::configure();
   kernelSpace.activate();
@@ -216,7 +217,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   loadIDT(idt, sizeof(idt));
 
   // can start GDB after interrupt table is set up
-  if (DBG::test(DBG::GDB)) startGdb();
+  //if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
 
   // install GDT (replacing boot loader's GDT), TSS, TR, LDT
   memset(gdt, 0, sizeof(gdt));
@@ -287,11 +288,17 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);
 
+  // initialize gdb object
+  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().init(cpuCount);
+//  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
+
   // configure BSP processor with main thread 
   processorTable[bspIndex].install();
   Thread* bspIdleThread = Thread::create(kernelSpace);
   bspIdleThread->setName("BSP/idle");
   processorTable[bspIndex].initThread(*bspIdleThread);
+
+  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
