@@ -4,6 +4,6 @@ TOOLSDIR=/usr/local
 TARGET=x86_64-pc-elf
 GCCVER=4.7.2
 
-# only used when setting up PXE booting of KOS
+# only used when setting up PXE booting
 TFTPSERVER=fileserver
 TFTPDIR=/tftpboot2
