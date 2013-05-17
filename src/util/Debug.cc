@@ -20,6 +20,7 @@
 
 static const char* options[] = {
   "acpi",
+  "allstopgdb",
   "boot",
   "basic",
   "libc",

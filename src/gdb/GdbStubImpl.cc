@@ -20,9 +20,6 @@
 
 unsigned int sys_gdb_port;
 
-extern void set_debug_traps();          // from x86_64-stub.cc
-extern void breakpoint();               // from x86_64-stub.cc
-
 void putDebugChar(unsigned char ch) {
     SerialDevice0::write(ch);
 }
@@ -33,11 +30,4 @@ int getDebugChar() {
 
 void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
     Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
-}
-
-void startGdb() {
-    set_debug_traps();
-    kcout << "Waiting for GDB connection...";
-    breakpoint();
-    kcout << " Connected!" << kendl;
 }

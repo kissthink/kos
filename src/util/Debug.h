@@ -24,6 +24,7 @@ class DBG {
 public:
   enum Level : size_t {
     Acpi = 0,
+    AllStopGDB,
     Boot,
     Basic,
     Libc,

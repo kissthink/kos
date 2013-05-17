@@ -8,7 +8,7 @@ BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)
 SOBJECTS=$(BSOURCES:%.cc=%.s)
 EOBJECTS=$(BSOURCES:%.cc=%.e)
-AS_SOURCES=$(wildcard mach/*.S)
+AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
@@ -16,12 +16,12 @@ LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
-.PHONY: all run debug rgdb bochs pxe lpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
+.PHONY: all run debug rgdb rgdballstop bochs pxe lpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
 
 .PHONY: Makefile.state
 
 vpath %.cc $(SOURCEDIRS)
-vpath %.S mach boot
+vpath %.S mach boot gdb
 vpath %.asm boot
 vpath %.cpp test
 
@@ -46,6 +46,11 @@ debug: $(IMAGE)
 
 rgdb:
 	$(MAKE) RGDB=gdb $(IMAGE)
+	$(QEMURGDB) & sleep 1
+	$(GDB) -x gdbinit.rgdb kernel.sys.debug
+
+rgdballstop:
+	$(MAKE) RGDB=allstopgdb $(IMAGE)
 	$(QEMURGDB) & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
 
