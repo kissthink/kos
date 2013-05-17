@@ -9,9 +9,11 @@
 cpucount=$(fgrep processor /proc/cpuinfo|wc -l)
 
 TMPDIR=/spare/tmp
-DLDIR=/home/behrooz/Downloads/kosdownload
-PTDIR=/home/behrooz/git/kos/patches
-source $(dirname $0)/config
+cd $(dirname $0)
+DLDIR=$(pwd)/download
+PTDIR=$(pwd)/patches
+source $(pwd)/config
+cd -
 
 BINUTILS=binutils-2.22   # GNU mirror
 BOCHS=bochs-2.6.1        # http://bochs.sourceforge.net/
@@ -94,7 +96,7 @@ function build_gdb() {
 }
 
 function build_grub() {
-	unpack $GRUB tar.gz
+	unpack $GRUB tar.xz
 	prebuild $GRUB
 	../$GRUB/configure --target=$TARGET --prefix=$CROSSDIR --disable-werror\
 	--disable-device-mapper || error "$GRUB configure"
