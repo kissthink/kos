@@ -33,12 +33,12 @@ void GdbCpuState::_setCpuIdStr() {
 }
 
 void GdbCpuState::setCpuIdStr() {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     _setCpuIdStr();
 }
 
 void GdbCpuState::setCpuId(int cpuIndex) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
 
     this->cpuIndex = cpuIndex;
     _setCpuIdStr();
@@ -48,14 +48,14 @@ void GdbCpuState::setCpuId(int cpuIndex) {
 }
 
 void GdbCpuState::setCpuState(cpuState::cpuStateEnum newState) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
 
     state = newState;
     _setCpuIdStr();
 }
 
 cpuState::cpuStateEnum GdbCpuState::getCpuState() {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return state;
 }
 
@@ -63,38 +63,38 @@ cpuState::cpuStateEnum GdbCpuState::getCpuState() {
  * returns top of the stack
  */
 uint64_t* GdbCpuState::stackPtr() {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return stack + bufferSize/sizeof(uint64_t);
 }
 
 // void GdbCpuState::restoreRegisters() in gdb_asm_functions.S
 
 reg64* GdbCpuState::getRegs64() {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return reg64Buffer;
 }
 
 reg32* GdbCpuState::getRegs32() {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return reg32Buffer;
 }
 
 reg64* GdbCpuState::getReg64(int regno) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return &reg64Buffer[regno];
 }
 
 reg32* GdbCpuState::getReg32(int regno) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     return &reg32Buffer[regno];
 }
 
 void GdbCpuState::setReg64(int regno, reg64 val) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     reg64Buffer[regno] = val;
 }
 
 void GdbCpuState::setReg32(int regno, reg32 val) {
-    ScopedLock<> so(mutex);
+    ScopedLockISR<> so(mutex);
     reg32Buffer[regno] = val;
 }

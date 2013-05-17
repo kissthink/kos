@@ -85,7 +85,6 @@ void _returnFromException(int cpuState = 0) {
             break;
     }
 
-/*
     // continue all other threads in all-stop mode.
     if (DBG::test(DBG::AllStopGDB)) {
         int threadId = Processor::getApicID();
@@ -99,7 +98,6 @@ void _returnFromException(int cpuState = 0) {
             }
         }
     }
-*/
     state->restoreRegisters();
 }
 
@@ -108,7 +106,7 @@ void _returnFromException(int cpuState = 0) {
  * Call when entry_q is not locked.
  */
 void _returnFromExceptionLocked(int cpuState = 0) {
-    entry_q.acquire();
+    entry_q.acquireISR();
 
     GdbCpuState* state = GDB::getInstance().getCurrentCpuState();
     switch (cpuState) {
@@ -123,7 +121,6 @@ void _returnFromExceptionLocked(int cpuState = 0) {
             break;
     }
 
-/*
     // continue all other threads in all-stop mode.
     if (DBG::test(DBG::AllStopGDB)) {
         int threadId = Processor::getApicID();
@@ -137,8 +134,7 @@ void _returnFromExceptionLocked(int cpuState = 0) {
             }
         }
     }
-*/
-    entry_q.release();
+    entry_q.releaseISR();
     state->restoreRegisters();
 }
 
@@ -614,7 +610,7 @@ void consumeVContAction()
     // first thread that enters the interrupt handler
     // will send stop reply packet.
     action->executed = true;
-    entry_q.release();
+    entry_q.releaseISR();
 
     _returnFromExceptionLocked();
 }
@@ -637,7 +633,7 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
             VContAction* action = parse_vcont(ptr);
             KASSERT(action, action);
             if (action) {
-                entry_q.acquire();
+                entry_q.acquireISR();
                 // if the action is not for the current thread,
                 // pass the baton to the waiting thread.
                 if (action->threadId != -1 && action->threadId != 0 &&
@@ -678,6 +674,8 @@ handle_exception (int64_t exceptionVector)
     long addr, length;
     char *ptr;
 
+    KASSERT(!Processor::interruptsEnabled(), "Interrupt enabled in handle_exception");
+
     if (remote_debug) {
         kcdbg << "vector=" << exceptionVector
               << ", eflags=" << FmtHex(*GDB::getInstance()
@@ -698,7 +696,7 @@ handle_exception (int64_t exceptionVector)
      * you have to wait until someone passes a baton.
      */
     kcdbg << "thread " << threadId+1 << " trying to enter\n";
-    entry_q.acquire();
+    entry_q.acquireISR();
 
     // hope this is the last flag
     // if current instruction is halt/pause but it was woken up,
@@ -709,7 +707,7 @@ handle_exception (int64_t exceptionVector)
         waiting[threadId] = true;
         kcdbg << "thread " << threadId+1 << " is waiting for "
               << "real lock holder: " << lockHolder+1 << "\n";
-        entry_q.release();
+        entry_q.releaseISR();
         GDB::getInstance().P(threadId);
         kcdbg << "thread " << threadId+1 << " woke up\n";
         if (shouldReturnFromException[threadId]) {
@@ -826,7 +824,7 @@ begin:
      * Send INT 0x3 IPI to all available cores.
      */
     if (DBG::test(DBG::AllStopGDB)) GDB::getInstance().sendIPIToAllOtherCores();
-    entry_q.release();
+    entry_q.releaseISR();
 
     firstTime = 0;
     while (true) {

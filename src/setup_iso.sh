@@ -29,7 +29,7 @@ echo -n " acpi,boot,dev,frame,libc,pci,vm" >> $stage/boot/grub/grub.cfg
 	shift 1
 }
 [ "$1" = "allstopgdb" ] && {
-	echo -n ",gdb,allstopgdb" >> iso/boot/grub/grub.cfg
+	echo -n ",gdb,allstopgdb" >> $stage/boot/grub/grub.cfg
 	shift 1
 }
 echo >> $stage/boot/grub/grub.cfg

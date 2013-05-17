@@ -12,6 +12,7 @@ class SpinLock;
 namespace gdb {
 
 class GdbCpuState;
+class Semaphore;
 
 struct CpuStates
 {

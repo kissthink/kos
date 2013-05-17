@@ -82,7 +82,7 @@ public:
      * Returns current CPU's id string.
      */
     inline const char* getId() {
-        ScopedLock<> so(mutex);
+        ScopedLockISR<> so(mutex);
         return cpuId;
     }
 
@@ -90,7 +90,7 @@ public:
      * Returns current CPu's index.
      */
     int getCpuIndex() {
-        ScopedLock<> so(mutex);
+        ScopedLockISR<> so(mutex);
         return cpuIndex;
     }
 
@@ -99,7 +99,7 @@ public:
      * (e.g. m1,m2,m3,m4)
      */
     inline std::string getCpuInfo() {
-        ScopedLock<> so(mutex);
+        ScopedLockISR<> so(mutex);
         return cpuInfo;
     }
 
