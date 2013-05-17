@@ -1,0 +1,287 @@
+diff -rupN elfio-2.2/elfio/elfio_header.hpp working-elf/elfio_header.hpp
+--- elfio-2.2/elfio/elfio_header.hpp	2013-05-17 10:49:18.917386682 -0400
++++ working-elf/elfio_header.hpp	2013-05-17 11:04:04.789377000 -0400
+@@ -31,7 +31,7 @@ class elf_header
+ {
+   public:
+     virtual ~elf_header() {};
+-    virtual bool load( std::ifstream& stream )       = 0;
++    virtual bool load( std::istream& stream )       = 0;
+     virtual bool save( std::ofstream& stream ) const = 0;
+ 
+     // ELF header functions
+@@ -98,7 +98,7 @@ template< class T > class elf_header_imp
+     }
+ 
+     bool
+-    load( std::ifstream& stream )
++    load( std::istream& stream )
+     {
+         stream.seekg( 0 );
+         stream.read( reinterpret_cast<char*>( &header ), sizeof( header ) );
+diff -rupN elfio-2.2/elfio/elfio.hpp working-elf/elfio.hpp
+--- elfio-2.2/elfio/elfio.hpp	2013-05-17 10:49:18.925386682 -0400
++++ working-elf/elfio.hpp	2013-05-17 11:32:46.401359000 -0400
+@@ -32,9 +32,10 @@ THE SOFTWARE.
+ 
+ #include <string>
+ #include <fstream>
+-#include <algorithm>
++//#include <algorithm>
+ #include <vector>
+ #include <typeinfo>
++#include <sstream>      // std::istringstream
+ 
+ #include "elf_types.hpp"
+ #include "elfio_utils.hpp"
+@@ -136,6 +137,54 @@ class elfio
+ 
+         return true;
+     }
++//------------------------------------------------------------------------------
++   bool load(char* fileData, unsigned int size )
++   {
++	   clean();
++
++	   std::istringstream stream;
++	   stream.rdbuf()->pubsetbuf(fileData,size);
++
++	   //stream.open( file_name.c_str(), std::ios::in | std::ios::binary );
++	   if ( !stream ) {
++		   return false;
++	   }
++
++	   unsigned char e_ident[EI_NIDENT];
++
++	   // Read ELF file signature
++	   stream.seekg( 0 );
++	   stream.read( reinterpret_cast<char*>( &e_ident ), sizeof( e_ident ) );
++
++	   // Is it ELF file?
++	   if ( stream.gcount() != sizeof( e_ident ) ||
++			e_ident[EI_MAG0] != ELFMAG0    ||
++			e_ident[EI_MAG1] != ELFMAG1    ||
++			e_ident[EI_MAG2] != ELFMAG2    ||
++			e_ident[EI_MAG3] != ELFMAG3 ) {
++		   return false;
++	   }
++
++	   if ( ( e_ident[EI_CLASS] != ELFCLASS64 ) &&
++			( e_ident[EI_CLASS] != ELFCLASS32 )) {
++		   return false;
++	   }
++
++	   convertor.setup( e_ident[EI_DATA] );
++
++	   header = create_header( e_ident[EI_CLASS], e_ident[EI_DATA] );
++	   if ( 0 == header ) {
++		   return false;
++	   }
++	   if ( !header->load( stream ) ) {
++		   return false;
++	   }
++
++	   load_sections( stream );
++	   load_segments( stream );
++
++	   return true;
++   }
+ 
+ //------------------------------------------------------------------------------
+     bool save( const kstring& file_name )
+@@ -227,18 +276,23 @@ class elfio
+ //------------------------------------------------------------------------------
+     void clean()
+     {
+-        delete header;
++//        delete header;
++        globaldelete(header,sizeof(header));
+         header = 0;
+ 
+-        std::vector<section*>::const_iterator it;
++//        std::vector<section*>::const_iterator it;
++        std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>>::const_iterator it;
+         for ( it = sections_.begin(); it != sections_.end(); ++it ) {
+-            delete *it;
++//            delete *it;
++            globaldelete(*it,sizeof(it));
+         }
+         sections_.clear();
+ 
+-        std::vector<segment*>::const_iterator it1;
++//        std::vector<segment*>::const_iterator it1;
++        std::vector<ELFIO::segment*,KernelAllocator<ELFIO::segment*>>::const_iterator it1;
+         for ( it1 = segments_.begin(); it1 != segments_.end(); ++it1 ) {
+-            delete *it1;
++//            delete *it1;
++			globaldelete(*it1,sizeof(it1));
+         }
+         segments_.clear();
+     }
+@@ -323,7 +377,7 @@ class elfio
+     }
+ 
+ //------------------------------------------------------------------------------
+-    Elf_Half load_sections( std::ifstream& stream )
++    Elf_Half load_sections( std::istream& stream )
+     {
+         Elf_Half  entry_size = header->get_section_entry_size();
+         Elf_Half  num        = header->get_sections_num();
+@@ -355,7 +409,7 @@ class elfio
+     }
+ 
+ //------------------------------------------------------------------------------
+-    bool load_segments( std::ifstream& stream )
++    bool load_segments( std::istream& stream )
+     {
+         Elf_Half  entry_size = header->get_segment_entry_size();
+         Elf_Half  num        = header->get_segments_num();
+@@ -541,7 +595,8 @@ class elfio
+         {
+             section* sec = 0;
+ 
+-            std::vector<section*>::const_iterator it;
++//          std::vector<section*>::const_iterator it;
++            std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>>::const_iterator it;
+             for ( it = parent->sections_.begin(); it != parent->sections_.end(); ++it ) {
+                 if ( (*it)->get_name() == name ) {
+                     sec = *it;
+@@ -610,8 +665,10 @@ class elfio
+ //------------------------------------------------------------------------------
+   private:
+     elf_header*           header;
+-    std::vector<section*> sections_;
+-    std::vector<segment*> segments_;
++//    std::vector<section*> sections_;
++    std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>> sections_;
++//    std::vector<segment*> segments_;
++    std::vector<ELFIO::segment*,KernelAllocator<ELFIO::segment*>> segments_;
+     endianess_convertor   convertor;
+ 
+     Elf_Xword current_file_pos;
+diff -rupN elfio-2.2/elfio/elfio_section.hpp working-elf/elfio_section.hpp
+--- elfio-2.2/elfio/elfio_section.hpp	2013-05-17 10:49:18.941386681 -0400
++++ working-elf/elfio_section.hpp	2013-05-17 11:28:39.885362000 -0400
+@@ -55,7 +55,7 @@ class section
+ 
+   protected:
+     virtual void set_index( Elf_Half )                = 0;
+-    virtual void load( std::ifstream& f,
++    virtual void load( std::istream& f,
+                        std::streampos header_offset ) = 0;
+     virtual void save( std::ofstream& f,
+                        std::streampos header_offset,
+@@ -80,7 +80,8 @@ class section_impl : public section
+ //------------------------------------------------------------------------------
+     ~section_impl()
+     {
+-        delete [] data;
++//        delete [] data;
++    	globaldelete(data,data_size);
+     }
+ 
+ //------------------------------------------------------------------------------
+@@ -145,7 +146,8 @@ class section_impl : public section
+     set_data( const char* raw_data, Elf_Word size )
+     {
+         if ( get_type() != SHT_NOBITS ) {
+-            delete [] data;
++//            delete [] data;
++        	globaldelete (data,data_size);
+             data = new char[size];
+             if ( 0 != data && 0 != raw_data ) {
+                 data_size = size;
+@@ -177,7 +179,8 @@ class section_impl : public section
+                 if ( 0 != new_data ) {
+                     std::copy( data, data + get_size(), new_data );
+                     std::copy( raw_data, raw_data + size, new_data + get_size() );
+-                    delete [] data;
++//                    delete [] data;
++                    globaldelete(data,data_size);
+                     data = new_data;
+                 }
+             }
+@@ -203,7 +206,7 @@ class section_impl : public section
+ 
+ //------------------------------------------------------------------------------
+     void
+-    load( std::ifstream& stream,
++    load( std::istream& stream,
+           std::streampos header_offset )
+     {
+         std::fill_n( reinterpret_cast<char*>( &header ), sizeof( header ), '\0' );
+diff -rupN elfio-2.2/elfio/elfio_segment.hpp working-elf/elfio_segment.hpp
+--- elfio-2.2/elfio/elfio_segment.hpp	2013-05-17 10:49:18.945386681 -0400
++++ working-elf/elfio_segment.hpp	2013-05-17 11:29:21.001361000 -0400
+@@ -45,6 +45,7 @@ class segment
+     ELFIO_GET_SET_ACCESS_DECL( Elf_Xword,  memory_size      );
+ 
+     virtual const char* get_data() const = 0;
++    virtual Elf64_Off get_data_offset() const = 0;
+ 
+     virtual Elf_Half add_section_index( Elf_Half index, Elf_Xword addr_align ) = 0;
+     virtual Elf_Half get_sections_num()                                  const = 0;
+@@ -52,7 +53,7 @@ class segment
+ 
+   protected:
+     virtual void set_index( Elf_Half )                                             = 0;
+-    virtual void load( std::ifstream& stream, std::streampos header_offset ) const = 0;
++    virtual void load( std::istream& stream, std::streampos header_offset ) const = 0;
+     virtual void save( std::ofstream& f, std::streampos header_offset,
+                        std::streampos data_offset )                                = 0;
+ };
+@@ -74,7 +75,8 @@ class segment_impl : public segment
+ //------------------------------------------------------------------------------
+     virtual ~segment_impl()
+     {
+-        delete [] data;
++//        delete [] data;
++        globaldelete(data,get_file_size());
+     }
+ 
+ //------------------------------------------------------------------------------
+@@ -100,6 +102,12 @@ class segment_impl : public segment
+     {
+         return data;
+     }
++//------------------------------------------------------------------------------
++    Elf64_Off
++    get_data_offset() const
++    {
++    	return data_offset;
++    }
+ 
+ //------------------------------------------------------------------------------
+     Elf_Half
+@@ -142,12 +150,13 @@ class segment_impl : public segment
+ 
+ //------------------------------------------------------------------------------
+     void
+-    load( std::ifstream& stream,
++    load( std::istream& stream,
+           std::streampos header_offset ) const
+     {
+         stream.seekg( header_offset );
+         stream.read( reinterpret_cast<char*>( &ph ), sizeof( ph ) );
+ 
++        this->data_offset = ph.p_offset;
+         if ( PT_NULL != get_type() && 0 != get_file_size() ) {
+             stream.seekg( (*convertor)( ph.p_offset ) );
+             Elf_Xword size = get_file_size();
+@@ -164,7 +173,7 @@ class segment_impl : public segment
+                std::streampos data_offset )
+     {
+         ph.p_offset = data_offset;
+-        ph.p_offset = (*convertor)(ph.p_offset);
++//        ph.p_offset = (*convertor)(ph.p_offset);
+         f.seekp( header_offset );
+         f.write( reinterpret_cast<const char*>( &ph ), sizeof( ph ) );
+     }
+@@ -174,6 +183,7 @@ class segment_impl : public segment
+     mutable T             ph;
+     Elf_Half              index;
+     mutable char*         data;
++    mutable Elf64_Off	  data_offset;
+     std::vector<Elf_Half> sections;
+     endianess_convertor*  convertor;
+ };

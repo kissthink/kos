@@ -52,7 +52,7 @@ class symbol_section_accessor
 //------------------------------------------------------------------------------
     bool
     get_symbol( Elf_Xword      index,
-    			kstring&   name,
+                kstring&   name,
                 Elf64_Addr&    value,
                 Elf_Xword&     size,
                 unsigned char& bind,
@@ -99,7 +99,7 @@ class symbol_section_accessor
                         ( 2 + nbucket + y ) * sizeof( Elf_Word ) );
                 get_symbol( y, str, value, size, bind, type, section_index, other );
             }
-            if (  str.compare(name)==0 ) {
+            if (  str == name ) {
                 ret = true;
             }
         }

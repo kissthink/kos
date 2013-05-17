@@ -1,0 +1,9 @@
+#!/bin/bash
+
+#to replace all the std::string with kstring
+sed -i 's,std::string,kstring,g' *.hpp
+
+#To replace #include <elfio/XXX.hpp> to: #include "XXX.hpp"
+for file in *.hpp; do
+	sed -i -r 's/#include <elfio\/(.*)>/#include "\1"/' $file
+done

@@ -603,7 +603,7 @@ class dump
                             << std::endl;
                     }
                     for ( int i = 0; i < sym_no; ++i ) {
-                        std::string   name;
+                        kstring   name;
                         Elf64_Addr    value;
                         Elf_Xword     size;
                         unsigned char bind;
@@ -624,7 +624,7 @@ class dump
     static void
     symbol_table( std::ostream& out,
                   Elf_Half      no,
-                  std::string&  name,
+                  kstring&  name,
                   Elf64_Addr    value,
                   Elf_Xword     size,
                   unsigned char bind,
@@ -680,7 +680,7 @@ class dump
                         << std::endl;
                     for ( int j = 0; j < no_notes; ++j ) {    // For all notes
                         Elf_Word    type;
-                        std::string name;
+                        kstring name;
                         void*       desc;
                         Elf_Word    descsz;
                     
@@ -701,7 +701,7 @@ class dump
     note( std::ostream&      out,
           int                no,
           Elf_Word           type,
-          const std::string& name )
+          const kstring& name )
     {
         out << "  [" 
             << DUMP_DEC_FORMAT( 2 ) << no
@@ -728,7 +728,7 @@ class dump
                     for ( int i = 0; i < dyn_no; ++i ) {
                         Elf_Xword   tag;
                         Elf_Xword   value;
-                        std::string str;
+                        kstring str;
                         dynamic.get_entry( i, tag, value, str );
                         dynamic_tag( out, i, tag, value, str, reader.get_class() );
                         if ( DT_NULL == tag ) {
@@ -748,7 +748,7 @@ class dump
                  int           no,
                  Elf_Xword     tag,
                  Elf_Xword     value,
-                 std::string   str,
+                 kstring   str,
                  unsigned int  elf_class )
     {
             out << "[" 
@@ -767,11 +767,11 @@ class dump
   private:
 //------------------------------------------------------------------------------
     template< typename T, typename K >
-    std::string
+    kstring
     static
     find_value_in_table( const T& table, const K& key )
     {
-        std::string res = "?";
+        kstring res = "?";
         for ( unsigned int i = 0; i < sizeof( table )/sizeof( table[0] ); ++i ) {
             if ( table[i].key == key ) {
                 res = table[i].str;
@@ -786,10 +786,10 @@ class dump
 //------------------------------------------------------------------------------
     template< typename T, typename K >
     static
-    std::string
+    kstring
     format_assoc( const T& table, const K& key )
     {
-        std::string str = find_value_in_table( table, key );
+        kstring str = find_value_in_table( table, key );
         if ( str == "?" ) {
             std::ostringstream oss;
             oss << str << " (0x" << std::hex << key << ")";
@@ -803,7 +803,7 @@ class dump
 //------------------------------------------------------------------------------
     template< typename T >
     static
-    std::string
+    kstring
     format_assoc( const T& table, const char key )
     {
         return format_assoc( table, (const int)key );
@@ -812,10 +812,10 @@ class dump
     
 //------------------------------------------------------------------------------
     static
-    std::string
+    kstring
     section_flags( Elf_Xword flags )
     {
-        std::string ret = "";
+        kstring ret = "";
         if ( flags & SHF_WRITE ) {
             ret += "W";
         }
@@ -834,7 +834,7 @@ class dump
 #define STR_FUNC_TABLE( name )                    \
     template< typename T >                        \
     static                                        \
-    std::string                                   \
+    kstring                                   \
     str_##name( const T key )                     \
     {                                             \
         return format_assoc( name##_table, key ); \

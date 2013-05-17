@@ -54,7 +54,7 @@ class dynamic_section_accessor
     get_entry( Elf_Xword    index,
                Elf_Xword&   tag,
                Elf_Xword&   value,
-               std::string& str ) const
+               kstring& str ) const
     {
         if ( index >= get_entries_num() ) {    // Is index valid
             return false;
@@ -99,7 +99,7 @@ class dynamic_section_accessor
 //------------------------------------------------------------------------------
     void
     add_entry( Elf_Xword&   tag,
-               std::string& str )
+               kstring& str )
     {
         string_section_accessor strsec =
             elf_file.sections[ get_string_table_index() ];

@@ -9,8 +9,8 @@
 cpucount=$(fgrep processor /proc/cpuinfo|wc -l)
 
 TMPDIR=/spare/tmp
-DLDIR=~mkarsten/work/kos/download
-PTDIR=~mkarsten/work/kos/patches
+DLDIR=/home/behrooz/Downloads/kosdownload
+PTDIR=/home/behrooz/git/kos/patches
 source $(dirname $0)/config
 
 BINUTILS=binutils-2.22   # GNU mirror
@@ -19,7 +19,7 @@ GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.5.1            # GNU mirror
 GRUB=grub-2.00           # GNU mirror
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
-QEMU=qemu-1.4.0          # http://www.qemu.org/
+QEMU=qemu-1.4.1          # http://www.qemu.org/
 
 mkdir -p $TMPDIR
 
@@ -94,7 +94,7 @@ function build_gdb() {
 }
 
 function build_grub() {
-	unpack $GRUB tar.xz
+	unpack $GRUB tar.gz
 	prebuild $GRUB
 	../$GRUB/configure --target=$TARGET --prefix=$CROSSDIR --disable-werror\
 	--disable-device-mapper || error "$GRUB configure"

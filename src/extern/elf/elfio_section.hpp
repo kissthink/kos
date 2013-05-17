@@ -36,7 +36,7 @@ class section
 
     virtual Elf_Half get_index() const = 0;
 
-    ELFIO_GET_SET_ACCESS_DECL( std::string, name               );
+    ELFIO_GET_SET_ACCESS_DECL( kstring, name               );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Word,    type               );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Xword,   flags              );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Word,    info               );
@@ -49,9 +49,9 @@ class section
 
     virtual const char* get_data() const                                = 0;
     virtual void        set_data( const char* pData, Elf_Word size )    = 0;
-    virtual void        set_data( const std::string& data )             = 0;
+    virtual void        set_data( const kstring& data )             = 0;
     virtual void        append_data( const char* pData, Elf_Word size ) = 0;
-    virtual void        append_data( const std::string& data )          = 0;
+    virtual void        append_data( const kstring& data )          = 0;
 
   protected:
     virtual void set_index( Elf_Half )                = 0;
@@ -80,7 +80,8 @@ class section_impl : public section
 //------------------------------------------------------------------------------
     ~section_impl()
     {
-        globaldelete(data,data_size);
+//        delete [] data;
+    	globaldelete(data,data_size);
     }
 
 //------------------------------------------------------------------------------
@@ -104,7 +105,7 @@ class section_impl : public section
 
 
 //------------------------------------------------------------------------------
-    std::string
+    kstring
     get_name() const
     {
         return name;
@@ -112,7 +113,7 @@ class section_impl : public section
 
 //------------------------------------------------------------------------------
     void
-    set_name( std::string name_ )
+    set_name( kstring name_ )
     {
         name = name_;
     }
@@ -145,7 +146,8 @@ class section_impl : public section
     set_data( const char* raw_data, Elf_Word size )
     {
         if ( get_type() != SHT_NOBITS ) {
-            globaldelete (data,data_size);
+//            delete [] data;
+        	globaldelete (data,data_size);
             data = new char[size];
             if ( 0 != data && 0 != raw_data ) {
                 data_size = size;
@@ -158,7 +160,7 @@ class section_impl : public section
 
 //------------------------------------------------------------------------------
     void
-    set_data( const std::string& str_data )
+    set_data( const kstring& str_data )
     {
         return set_data( str_data.c_str(), (Elf_Word)str_data.size() );
     }
@@ -177,6 +179,7 @@ class section_impl : public section
                 if ( 0 != new_data ) {
                     std::copy( data, data + get_size(), new_data );
                     std::copy( raw_data, raw_data + size, new_data + get_size() );
+//                    delete [] data;
                     globaldelete(data,data_size);
                     data = new_data;
                 }
@@ -187,7 +190,7 @@ class section_impl : public section
 
 //------------------------------------------------------------------------------
     void
-    append_data( const std::string& str_data )
+    append_data( const kstring& str_data )
     {
         return append_data( str_data.c_str(), (Elf_Word)str_data.size() );
     }
@@ -263,7 +266,7 @@ class section_impl : public section
   private:
     T                          header;
     Elf_Half                   index;
-    std::string                name;
+    kstring                name;
     char*                      data;
     Elf_Word                   data_size;
     const endianess_convertor* convertor;

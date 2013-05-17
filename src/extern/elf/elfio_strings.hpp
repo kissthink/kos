@@ -75,7 +75,7 @@ class string_section_accessor
 
 //------------------------------------------------------------------------------
     Elf_Word
-    add_string( const std::string& str )
+    add_string( const kstring& str )
     {
         // Strings are addeded to the end of the current section data
         Elf_Word current_position = (Elf_Word)string_section->get_size();

@@ -75,6 +75,7 @@ class segment_impl : public segment
 //------------------------------------------------------------------------------
     virtual ~segment_impl()
     {
+//        delete [] data;
         globaldelete(data,get_file_size());
     }
 
@@ -101,12 +102,12 @@ class segment_impl : public segment
     {
         return data;
     }
-
+//------------------------------------------------------------------------------
     Elf64_Off
     get_data_offset() const
-	{
-		return data_offset;
-	}
+    {
+    	return data_offset;
+    }
 
 //------------------------------------------------------------------------------
     Elf_Half
@@ -172,6 +173,7 @@ class segment_impl : public segment
                std::streampos data_offset )
     {
         ph.p_offset = data_offset;
+//        ph.p_offset = (*convertor)(ph.p_offset);
         f.seekp( header_offset );
         f.write( reinterpret_cast<const char*>( &ph ), sizeof( ph ) );
     }
@@ -181,7 +183,7 @@ class segment_impl : public segment
     mutable T             ph;
     Elf_Half              index;
     mutable char*         data;
-    mutable Elf64_Off			  data_offset;
+    mutable Elf64_Off	  data_offset;
     std::vector<Elf_Half> sections;
     endianess_convertor*  convertor;
 };
