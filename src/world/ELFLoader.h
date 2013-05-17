@@ -8,7 +8,7 @@
 #ifndef ELFLOADER_H_
 #define ELFLOADER_H_
 
-#include "extern/elf/elfio.hpp"
+#include "extern/elfio/elfio.hpp"
 
 
 class ELFLoader {
