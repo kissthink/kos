@@ -8,93 +8,85 @@ using namespace gdb;
 using namespace std;
 
 namespace gdb {
-    namespace cpuState {
-        const char* cpuStateStr[] = { "Unknown",
-                                      "Halted",
-                                      "Paused",
-                                      "Breakpoint",
-                                      "Running" };
-    }
+  namespace cpuState {
+    const char* cpuStateStr[] = { "Unknown",
+                                  "Halted",
+                                  "Paused",
+                                  "Breakpoint",
+                                  "Running" };
+  }
 }
 
 GdbCpuState::GdbCpuState()
 : gdbErrorCode(0)
-, state(cpuState::UNKNOWN)
-{
-    memset(cpuId, 0, sizeof(char) * 20);
-    memset(stack, 0, bufferSize);
-    memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
-    memset(reg32Buffer, 0, numRegs32 * sizeof(reg32));
+, state(cpuState::UNKNOWN) {
+  memset(cpuId, 0, sizeof(char) * 20);
+  memset(stack, 0, bufferSize);
+  memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
+  memset(reg32Buffer, 0, numRegs32 * sizeof(reg32));
 }
 
 void GdbCpuState::_setCpuIdStr() {
-    memset(cpuId, 0, sizeof(char) * 20);
-    snprintf(cpuId, 20, "Core %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
+  memset(cpuId, 0, sizeof(char) * 20);
+  snprintf(cpuId, 20, "Core %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
 }
 
 void GdbCpuState::setCpuIdStr() {
-    ScopedLockISR<> so(mutex);
-    _setCpuIdStr();
+  ScopedLockISR<> so(mutex);
+  _setCpuIdStr();
 }
 
 void GdbCpuState::setCpuId(int cpuIndex) {
-    ScopedLockISR<> so(mutex);
-
-    this->cpuIndex = cpuIndex;
-    _setCpuIdStr();
-    char buf2[10];
-    snprintf(buf2, 10, "m%d", cpuIndex+1);
-    cpuInfo = buf2;
+  ScopedLockISR<> so(mutex);
+  this->cpuIndex = cpuIndex;
+  _setCpuIdStr();
+  char buf2[10];
+  snprintf(buf2, 10, "m%d", cpuIndex+1);
+  cpuInfo = buf2;
 }
 
 void GdbCpuState::setCpuState(cpuState::cpuStateEnum newState) {
-    ScopedLockISR<> so(mutex);
-
-    state = newState;
-    _setCpuIdStr();
+  ScopedLockISR<> so(mutex);
+  state = newState;
+  _setCpuIdStr();
 }
 
 cpuState::cpuStateEnum GdbCpuState::getCpuState() {
-    ScopedLockISR<> so(mutex);
-    return state;
+  ScopedLockISR<> so(mutex);
+  return state;
 }
 
-/*
- * returns top of the stack
- */
 uint64_t* GdbCpuState::stackPtr() {
-    ScopedLockISR<> so(mutex);
-    return stack + bufferSize/sizeof(uint64_t);
+  ScopedLockISR<> so(mutex);
+  return stack + bufferSize/sizeof(uint64_t);
 }
-
-// void GdbCpuState::restoreRegisters() in gdb_asm_functions.S
 
 reg64* GdbCpuState::getRegs64() {
-    ScopedLockISR<> so(mutex);
-    return reg64Buffer;
+  ScopedLockISR<> so(mutex);
+  return reg64Buffer;
 }
 
 reg32* GdbCpuState::getRegs32() {
-    ScopedLockISR<> so(mutex);
-    return reg32Buffer;
+  ScopedLockISR<> so(mutex);
+  return reg32Buffer;
 }
 
 reg64* GdbCpuState::getReg64(int regno) {
-    ScopedLockISR<> so(mutex);
-    return &reg64Buffer[regno];
+  ScopedLockISR<> so(mutex);
+  return &reg64Buffer[regno];
 }
 
 reg32* GdbCpuState::getReg32(int regno) {
-    ScopedLockISR<> so(mutex);
-    return &reg32Buffer[regno];
+  ScopedLockISR<> so(mutex);
+  return &reg32Buffer[regno];
 }
 
 void GdbCpuState::setReg64(int regno, reg64 val) {
-    ScopedLockISR<> so(mutex);
-    reg64Buffer[regno] = val;
+  ScopedLockISR<> so(mutex);
+  reg64Buffer[regno] = val;
 }
 
 void GdbCpuState::setReg32(int regno, reg32 val) {
-    ScopedLockISR<> so(mutex);
-    reg32Buffer[regno] = val;
+  ScopedLockISR<> so(mutex);
+  reg32Buffer[regno] = val;
 }

@@ -21,13 +21,13 @@
 unsigned int sys_gdb_port;
 
 void putDebugChar(unsigned char ch) {
-    SerialDevice0::write(ch);
+  SerialDevice0::write(ch);
 }
 
 int getDebugChar() {
-    return SerialDevice0::read();
+  return SerialDevice0::read();
 }
 
 void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
-    Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
+  Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
 }
