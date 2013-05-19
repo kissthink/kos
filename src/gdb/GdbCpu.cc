@@ -19,7 +19,8 @@ namespace gdb {
 
 GdbCpuState::GdbCpuState()
 : gdbErrorCode(0)
-, state(cpuState::UNKNOWN) {
+, state(cpuState::UNKNOWN)
+, ripDecremented(false) {
   memset(cpuId, 0, sizeof(char) * 20);
   memset(stack, 0, bufferSize);
   memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
@@ -89,4 +90,26 @@ void GdbCpuState::setReg64(int regno, reg64 val) {
 void GdbCpuState::setReg32(int regno, reg32 val) {
   ScopedLockISR<> so(mutex);
   reg32Buffer[regno] = val;
+}
+
+void GdbCpuState::decrementRip() {
+  ScopedLockISR<> so(mutex);
+  if (!ripDecremented) {
+    reg64Buffer[registers::RIP] -= 1;
+    ripDecremented = true;
+  }
+}
+
+void GdbCpuState::incrementRip() {
+  ScopedLockISR<> so(mutex);
+  if (ripDecremented) {
+    reg64Buffer[registers::RIP] += 1;
+    ripDecremented = false;
+    kcdbg << "rip incremented\n";
+  }
+}
+
+void GdbCpuState::resetRip() {
+  ScopedLockISR<> so(mutex);
+  ripDecremented = false;
 }

@@ -526,10 +526,9 @@ void consumeVContAction()
   if (action->action[0] == 'c') {
     // trap bit should have been cleared.
     KASSERT((eflags & 0x00000100) == 0, FmtHex(eflags));
-
     isFree = true;
-    // set isContinue so that subsequent thread will send stop reply.
-    setContinue(action);
+    setContinue(action);  // set isContinue so that subsequent thread will send stop reply.
+    GDB::getInstance().getCurrentCpuState()->incrementRip();  // increment rip if rip was decremented
     // if there's a thread waiting on breakpoint, switch to that thread.
     for (int i = 0; i < GDB::getInstance().getNumCpusInitialized(); i++) {
       if (waiting[i]) {
@@ -608,19 +607,30 @@ handle_exception (int64_t exceptionVector) {
 
   KASSERT(!Processor::interruptsEnabled(), "Interrupt enabled in handle_exception");
 
-  kcdbg << "thread=" << Processor::getApicID()+1
-        << " vector=" << exceptionVector
-        << ", eflags=" << FmtHex(*GDB::getInstance()
-          .getCurrentCpuState()->getReg32(gdb::registers::EFLAGS))
-        << ", pc=" << FmtHex(*GDB::getInstance()
-          .getCurrentCpuState()->getReg64(gdb::registers::RIP))
+  int threadId = Processor::getApicID();
+  GDB::getInstance().getCurrentCpuState()->setCpuState(cpuState::BREAKPOINT);
+
+  kcdbg << "thread=" << threadId+1
+        << ", vector=" << exceptionVector
+        << ", eflags=" << FmtHex(*GDB::getInstance().getCurrentCpuState()->getReg32(gdb::registers::EFLAGS))
+        << ", pc=" << FmtHex(*GDB::getInstance().getCurrentCpuState()->getReg64(gdb::registers::RIP))
         << "\n";
+
+  // for int 3, rip pushed by interrupt handling mechanism may not be a correct value
+  // decrement rip value back to an instruction causing breakpoint and let it try again with a valid address
+  GDB::getInstance().getCurrentCpuState()->resetRip();
+  if (exceptionVector == 3) {
+    reg32 eflags = *GDB::getInstance().getCurrentCpuState()->getReg32(registers::EFLAGS);
+    kcdbg << "eflags & 0x100 = " << (eflags & 0x100) << "\n";
+    if ((eflags & 0x100) == 0) {   // if TF is set, treat the rip valid
+      GDB::getInstance().getCurrentCpuState()->decrementRip();
+      kcdbg << "thread " << threadId+1 << " decrement rip to "
+            << FmtHex(*GDB::getInstance().getCurrentCpuState()->getReg64(registers::RIP)) << "\n";
+    }
+  }
 
   sigval = computeSignal(exceptionVector);
   ptr = outputBuffer;
-
-  int threadId = Processor::getApicID();
-  GDB::getInstance().getCurrentCpuState()->setCpuState(cpuState::BREAKPOINT);
 
   /**
    * If a baton is held by another thread and the lockholder is not you,

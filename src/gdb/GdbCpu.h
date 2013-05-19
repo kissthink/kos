@@ -49,6 +49,8 @@ class GdbCpuState {
   cpuState::cpuStateEnum state;
   SpinLock mutex;
 
+  bool ripDecremented;    // rip is decremented for int 3 with 's'
+
   void setCpuIdStr();     // CPU string used by 'info thread'
   void _setCpuIdStr();
 
@@ -89,6 +91,10 @@ public:
   void setReg64(int regno, reg64 val);
   void setReg32(int regno, reg32 val);
 
+  // rip manipulation
+  void decrementRip();
+  void incrementRip();
+  void resetRip();
 
 } __attribute__((aligned(4096)));   // required to compile
 

@@ -63,6 +63,12 @@ gdbdebug:
 	$(QEMURGDB) -s -S & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
 
+gdballstopdebug:
+	$(MAKE) RGDB=allstopgdb $(IMAGE)
+	xterm -e $(GDB) -x gdbinit.qemu kernel.sys.debug &
+	$(QEMURGDB) -s -S & sleep 1
+	$(GDB) -x gdbinit.rgdb kernel.sys.debug
+
 bochs: $(IMAGE)
 	$(TOOLSDIR)/bin/bochs -f bochsrc -rc bochsrc.dbg -q
 

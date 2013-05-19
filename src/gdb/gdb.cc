@@ -159,9 +159,9 @@ void GDB::sendIPIToAllOtherCores() const {
     if (cpuStates[i].getCpuState() != cpuState::BREAKPOINT &&
         cpuStates[i].getCpuState() != cpuState::UNKNOWN) {
       LAPIC* lapic = (LAPIC *) lapicAddr;
-      kcdbg << "sending ipi 0x3 from " << curCpuIdx+1 << " to core: " << i+1 << "\n";
+      kcdbg << "sending ipi 0x1 from " << curCpuIdx+1 << " to core: " << i+1 << "\n";
       KASSERT(lapic != 0, "LAPIC is NULL");
-      mword err = lapic->sendIPI(i, 0x3);
+      mword err = lapic->sendIPI(i, 0x1);
       KASSERT(err == 0, FmtHex(err));
     }
   }
