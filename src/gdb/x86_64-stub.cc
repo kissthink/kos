@@ -41,12 +41,11 @@ VContAction* isContinue = NULL;     // VContAction for 'c' from previous thread.
                                     // to send a stop reply packet for previous thread.
 
 int lockHolder = -1;                // used for holding baton.
-// FIXME Shouldn't use constant value
-bool waiting[4];                    // represents a CPU waiting on entry queue.
-bool shouldReturnFromException[4];
+bool* waiting;                      // represents a CPU waiting on entry queue.
+bool* shouldReturnFromException;
 bool halted = false;                // represent if the source rip is hlt.
 bool paused = false;                // represent if the source ip is pause.
-gdb::SpinLock entry_q;              // entry queue mutex. (part of split binary semaphore)
+gdb::GdbSpinLock entry_q;           // entry queue mutex. (part of split binary semaphore)
 
 // Notify next thread to send stop reply.
 void setContinue(VContAction* cont) {
@@ -901,7 +900,8 @@ void set_debug_traps() {
   exceptionHandler (7, catchException7);
   exceptionHandler (16, catchException16);
 
-  KASSERT(GDB::getInstance().getNumCpus() == 4, "Needs 4 cpus");
+  waiting = new bool[GDB::getInstance().getNumCpus()];
+  shouldReturnFromException = new bool[GDB::getInstance().getNumCpus()];
   for (int i = 0; i < GDB::getInstance().getNumCpus(); i++) {
     waiting[i] = false;
     shouldReturnFromException[i] = false;

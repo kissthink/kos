@@ -3,6 +3,7 @@
 
 #include "gdb/VContAction.h"
 
+class Processor;
 class SpinLock;
 
 namespace gdb {
@@ -10,24 +11,10 @@ namespace gdb {
 class GdbCpuState;
 class Semaphore;
 
-struct CpuStates {
-  GdbCpuState* curCpuState;
-  GdbCpuState* cCpuState;
-  GdbCpuState* gCpuState;
-  bool initialized;
-  bool blocked;
-
-  CpuStates() :
-  curCpuState(0), cCpuState(0), gCpuState(0)
-  , initialized(false)
-  , blocked(true)
-  {}
-};
-
 class GDB {
 public:
   static GDB& getInstance();                // singleton method
-  void init(int numCpu);                    // call before using GDB
+  void init(int numCpu, Processor* processorTable);   // call before using GDB
 
   // returns CPU states
   GdbCpuState* getCurrentCpuState() const;
@@ -75,7 +62,7 @@ public:
 private:
   GDB();
   GdbCpuState* cpuStates;
-  CpuStates* cpuStatesPtr;
+  Processor* processorTable;
   int numCpu;
   int numInitialized;
   int enumIdx;

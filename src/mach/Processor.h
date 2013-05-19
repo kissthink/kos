@@ -21,6 +21,7 @@
 #include "mach/APIC.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
+#include "gdb/gdb.h"
 
 class Thread;
 class FrameManager;
@@ -29,18 +30,23 @@ class FrameManager;
 // use fs:0 as 'this', then access member: slower, but cleaner?
 
 class Processor {
-  mword         apicID;
-  mword         cpuID;
-  Thread*       currThread;
-  Thread*       idleThread;
-  FrameManager* frameManager;
-  mword					lockCount;
+  mword             apicID;
+  mword             cpuID;
+  Thread*           currThread;
+  Thread*           idleThread;
+  FrameManager*     frameManager;
+  mword					    lockCount;
+  gdb::GdbCpuState* curCpuState;
+  gdb::GdbCpuState* cCpuState;
+  gdb::GdbCpuState* gCpuState;
 
   friend class Machine;
+  friend void gdb::GDB::setupGDB(int cpuIdx);
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
-    frameManager(nullptr), lockCount(mwordlimit / 2) {}
+    frameManager(nullptr), lockCount(mwordlimit / 2),
+    curCpuState(0), cCpuState(0), gCpuState(0) {}
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
@@ -57,6 +63,11 @@ class Processor {
   }
   static volatile LAPIC* lapic() {
    return (LAPIC*)lapicAddr;
+  }
+  void initGdbCpuStates(gdb::GdbCpuState* state) {
+    curCpuState = state;
+    cCpuState = state;
+    gCpuState = state;
   }
 
 public:

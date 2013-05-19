@@ -9,7 +9,7 @@
  */
 namespace gdb {
 
-class SpinLock {
+class GdbSpinLock {
   bool locked;
   void acquireInternal() volatile {
     while (__atomic_test_and_set(&locked, __ATOMIC_SEQ_CST))
@@ -19,11 +19,11 @@ class SpinLock {
     __atomic_clear(&locked, __ATOMIC_SEQ_CST);
   }
 public:
-  SpinLock() : locked(false) {}
-  ptr_t operator new(std::size_t) { return ::operator new(SpinLock::size()); }
-  void operator delete(ptr_t ptr) { globaldelete(ptr, SpinLock::size()); }
+  GdbSpinLock() : locked(false) {}
+  ptr_t operator new(std::size_t) { return ::operator new(GdbSpinLock::size()); }
+  void operator delete(ptr_t ptr) { globaldelete(ptr, GdbSpinLock::size()); }
   static constexpr size_t size() {
-    return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(SpinLock);
+    return sizeof(GdbSpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(GdbSpinLock);
   }
   void acquireISR() volatile {
     KASSERT(!Processor::interruptsEnabled(), "interrupt must be disabled");

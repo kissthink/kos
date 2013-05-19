@@ -23,21 +23,18 @@ GDB& GDB::getInstance() {
 }
 
 GDB::GDB()
-: cpuStates(0)
-, cpuStatesPtr(0)
-, numCpu(0)
-, numInitialized(0)
-, enumIdx(0)
+: cpuStates(0), processorTable(0)
+, numCpu(0), numInitialized(0), enumIdx(0)
 , sem(0)
-, vContActionQueue(0)
-, vContActionReply(0)
+, vContActionQueue(0), vContActionReply(0)
 {}
 
-void GDB::init(int numCpu) {
+void GDB::init(int numCpu, Processor* processorTable) {
   KASSERT(numCpu > 0, numCpu);
   this->numCpu = numCpu;
   cpuStates = new GdbCpuState[numCpu];
-  cpuStatesPtr = new CpuStates[numCpu];
+  this->processorTable = processorTable;
+  kcdbg << "Processor table " << FmtHex(processorTable) << "\n";
   sem = new Semaphore[numCpu];
   vContActionQueue = new EmbeddedQueue<VContAction>[numCpu];
   for (int i = 0; i < numCpu; i++) {
@@ -55,7 +52,7 @@ GdbCpuState* GDB::getCurrentCpuState() const {
 
 GdbCpuState* GDB::_getCurrentCpuState() const {
   mword x;
-  asm volatile("mov %%gs:0, %0" : "=r"(x));
+  asm volatile("mov %%fs:48, %0" : "=r"(x));
   return reinterpret_cast<GdbCpuState *>(x);
 }
 
@@ -68,12 +65,8 @@ GdbCpuState* GDB::getCpuState(int cpuIdx) {
 void GDB::setupGDB(int cpuIdx) {
   ScopedLockISR<> so(mutex);
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  cpuStatesPtr[cpuIdx].curCpuState = &cpuStates[cpuIdx];
-  cpuStatesPtr[cpuIdx].cCpuState = &cpuStates[cpuIdx];
-  cpuStatesPtr[cpuIdx].gCpuState = &cpuStates[cpuIdx];
-  cpuStatesPtr[cpuIdx].initialized = true;
+  processorTable[cpuIdx].initGdbCpuStates(&cpuStates[cpuIdx]);
   kcdbg << "setup cpu: " << cpuIdx+1 << "\n";
-  MSR::write(MSR::GS_BASE, mword(&cpuStatesPtr[cpuIdx]));
   numInitialized = cpuIdx+1;
   cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
 }
@@ -128,13 +121,13 @@ int GDB::getNumCpusInitialized() const {
 void GDB::setGCpu(int cpuIdx) {
   ScopedLockISR<> so(mutex);
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  asm volatile("mov %0, %%gs:16" :: "r"(&cpuStates[cpuIdx]) : "memory");
+  asm volatile("mov %0, %%fs:64" :: "r"(&cpuStates[cpuIdx]) : "memory");
 }
 
 GdbCpuState* GDB::getGCpu() const {
   ScopedLockISR<> so(mutex);
   mword x;
-  asm volatile("mov %%gs:16, %0" : "=r"(x));
+  asm volatile("mov %%fs:64, %0" : "=r"(x));
   if (x) return reinterpret_cast<GdbCpuState *>(x);
   return _getCurrentCpuState();
 }
@@ -142,13 +135,13 @@ GdbCpuState* GDB::getGCpu() const {
 void GDB::setCCpu(int cpuIdx) {
   ScopedLockISR<> so(mutex);
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  asm volatile("mov %0, %%gs:8" :: "r"(&cpuStates[cpuIdx]) : "memory");
+  asm volatile("mov %0, %%fs:56" :: "r"(&cpuStates[cpuIdx]) : "memory");
 }
 
 GdbCpuState* GDB::getCCpu() const {
   ScopedLockISR<> so(mutex);
   mword x;
-  asm volatile("mov %%gs:8, %0" : "=r"(x));
+  asm volatile("mov %%fs:56, %0" : "=r"(x));
   if (x) return reinterpret_cast<GdbCpuState *>(x);
   return _getCurrentCpuState();
 }

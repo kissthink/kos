@@ -216,9 +216,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   setupAllIDTs();
   loadIDT(idt, sizeof(idt));
 
-  // can start GDB after interrupt table is set up
-  //if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
-
   // install GDT (replacing boot loader's GDT), TSS, TR, LDT
   memset(gdt, 0, sizeof(gdt));
   setupGDT(kernCodeSelector, 0, 0, true);
@@ -289,8 +286,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   initACPI(rsdp);
 
   // initialize gdb object
-  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().init(cpuCount);
-//  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
+  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().init(cpuCount, processorTable);
 
   // configure BSP processor with main thread 
   processorTable[bspIndex].install();

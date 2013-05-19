@@ -120,7 +120,7 @@ CatchEx_TOP \ex_num
     push %rdi           # save rdi, rsi
     push %rsi
 #    mov currentCpu, %rdi
-    mov %gs:0, %rdi
+    mov %fs:48, %rdi
     mov $\ex_num, %rsi
     call _ZN3gdb11GdbCpuState13saveRegistersEv
 .endm
