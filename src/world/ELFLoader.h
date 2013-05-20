@@ -40,7 +40,7 @@ public:
 			if (pseg->get_type() != PT_LOAD){	continue;	}
 
 			//Filesize > Memsize
-			if (pseg->get_file_size() > pseg->get_file_size()) {
+			if (pseg->get_file_size() > pseg->get_memory_size()) {
 				kcerr << " image_load:: p_filesz > p_memsz ";
 				return false;
 			}
