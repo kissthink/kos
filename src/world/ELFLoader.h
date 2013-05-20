@@ -62,6 +62,12 @@ public:
 
 			PageManager::PageType permissionType;
 
+			/*
+			 * There is actually a problem here.
+			 * ELF segments contain several sections, and we know that permissions can be assigned only to the pages.
+			 * Therefore, if the .rodata and .text are in the same segment and small enough to be in the same page! then the page should be Read+Execute!
+			 * and .rodata are also executable, this usually happens in small programs.
+			 */
 			if (!(pseg->get_flags() & PF_W)) {	permissionType = PageManager::PageType::Data; }
 			if (pseg->get_flags() & PF_X) {	permissionType = PageManager::PageType::Code; }
 
