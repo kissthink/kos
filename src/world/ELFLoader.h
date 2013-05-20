@@ -5,21 +5,17 @@
  *      Author: behrooz
  */
 
-#ifndef ELFLOADER_H_
-#define ELFLOADER_H_
+#ifndef ELFLoader_h_
+#define ELFLoader_h_
 
 #include "extern/elfio/elfio.hpp"
 
-
 class ELFLoader {
-
 private:
 	ELFIO::elfio elfReader;
 	bool initialized;
 public:
-	ELFLoader (){
-		initialized = false;
-	}
+	ELFLoader () : initialized(false) {}
 
 	bool loadAndMapELF(File* elfFile, AddressSpace* addSpace ){
 		// Load ELF data
@@ -41,52 +37,40 @@ public:
 			const ELFIO::segment* pseg = elfReader.segments[i];
 
 			//Not loadable Segment
-			if (pseg->get_type() != PT_LOAD)
-				continue;
+			if (pseg->get_type() != PT_LOAD){	continue;	}
+
 			//Filesize > Memsize
 			if (pseg->get_file_size() > pseg->get_file_size()) {
 				kcerr << " image_load:: p_filesz > p_memsz ";
-				//return 0;
+				return false;
 			}
 			//Empty Segment
-			if (!pseg->get_file_size())
-				continue;
+			if (!pseg->get_file_size()){	continue;	}
 
-			//Virtual Address
-			vaddr seg_va = pseg->get_virtual_address();
-			//Align it
-			seg_va = align_down(seg_va,pagesize<1>());
-			//Segment Offset in file
-			vaddr offset = (vaddr) (pseg->get_data_offset()+elfFile->startptr());
-			//Align File Offset
+			vaddr seg_va = pseg->get_virtual_address();//Virtual Address
+			seg_va = align_down(seg_va,pagesize<1>());//Align it
+			vaddr offset = (vaddr) (pseg->get_data_offset()+elfFile->startptr());//Segment Offset in file
 			offset = align_down(offset,pagesize<1>());//Padd offset back
-			//Finally this padded offset is our linear address
-			vaddr seg_la = offset;
+			vaddr seg_la = offset;//Finally this padded offset is our linear address
 			seg_la = PageManager::vtol(seg_la);
 			seg_la = align_down(seg_la, pagesize<1>());//Align Linear address as well
 
-			//How much we padded?
-			size_t padding = pseg->get_virtual_address() & 0xfff;
+			size_t padding = pseg->get_virtual_address() & 0xfff;//How much we padded?
 			//kcdbg <<std::hex<<"la:"<<seg_la<<"  aligned:"<<aligned(seg_la,pagesize<1>())<<"   ";
 			size_t aligned_size = align_up(pseg->get_file_size()+padding, pagesize<1>());
 			//kcout <<std::hex<<"i is:"<<i<<"   aligned:"<<aligned_size<<"  vma:"<<seg_va<<"  lma:"<<seg_la<<"  non-aligned-size:"<<(pseg->get_file_size()+padding);
 
-			//MapPages
-			addSpace->mapPages<1>(seg_la,seg_va,aligned_size,PageManager::PageType::Code);
+			PageManager::PageType permissionType;
 
+			if (!(pseg->get_flags() & PF_W)) {	permissionType = PageManager::PageType::Data; }
+			if (pseg->get_flags() & PF_X) {	permissionType = PageManager::PageType::Code; }
 
-			//TODO zero out BSS
-			if (pseg->get_memory_size() > pseg->get_memory_size()) {
+			addSpace->mapPages<1>(seg_la,seg_va,aligned_size,permissionType);//MapPages
+
+			if (pseg->get_memory_size() > pseg->get_file_size()) {//zero out BSS
 				//BSS --> should be zeroed out
-			}
-
-			//TODO set permissions
-			if (!(pseg->get_flags() & PF_W)) {
-				// write
-			}
-
-			if (pseg->get_flags() & PF_X) {
-				// Executable.
+				vaddr bssStart = seg_va+pseg->get_file_size()+1;
+				memset((void*)bssStart,0,pseg->get_memory_size() - pseg->get_file_size());
 			}
 		}
 		return true;
@@ -98,11 +82,9 @@ public:
 		ELFIO::Elf_Half sec_num = elfReader.sections.size();
 		for (int i = 0; i < sec_num; ++i) {
 			ELFIO::section* psec = elfReader.sections[i];
-			// Check section type
-			if (psec->get_type() == SHT_SYMTAB) {
+			if (psec->get_type() == SHT_SYMTAB) {// Check section type
 				const ELFIO::symbol_section_accessor symbols(elfReader, psec);
 				for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
-
 					kstring name;
 					ELFIO::Elf64_Addr value;
 					ELFIO::Elf_Xword size;
@@ -126,8 +108,6 @@ public:
 		if (!initialized) return topaddr;
 		else return elfReader.get_entry();
 	}
-
 };
 
-
-#endif /* ELFLOADER_H_ */
+#endif /* ELFLoader_h_ */
