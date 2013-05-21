@@ -32,6 +32,7 @@ public:
     Error,
     Frame,
     GDB,
+    LGDB,
     MemAcpi,
     Paging,
     PCI,
@@ -69,10 +70,18 @@ public:
 
   template<typename... Args>
   static void outln( Level c, const Args&... a ) {
-    lk.acquire();
+    if (c == LGDB) {
+      lk.acquireISR();
+    } else {
+      lk.acquire();
+    }
     out(c, a...);
     out(c, kendl);
-    lk.release();
+    if (c == LGDB) {
+      lk.releaseISR();
+    } else {
+      lk.release();
+    }
   }
 
   static bool test( Level c ) {
