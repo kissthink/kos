@@ -202,19 +202,22 @@ bool GDB::isEmptyVContActionQueue(int cpuIdx) const {
   return vContActionQueue[cpuIdx].empty();
 }
 
-VContAction* GDB::nextVContAction() {
+VContAction* GDB::nextVContAction(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  return vContActionQueue[Processor::getApicID()].front();
+  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  return vContActionQueue[cpuIdx].front();
 }
 
-const VContAction* GDB::nextVContAction() const {
+const VContAction* GDB::nextVContAction(int cpuIdx) const {
   ScopedLockISR<> so(mutex);
-  return vContActionQueue[Processor::getApicID()].front();
+  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  return vContActionQueue[cpuIdx].front();
 }
 
-void GDB::popVContAction() {
+void GDB::popVContAction(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  vContActionQueue[Processor::getApicID()].pop();
+  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  vContActionQueue[cpuIdx].pop();
 }
 
 void GDB::setVContActionReply(int signal) {

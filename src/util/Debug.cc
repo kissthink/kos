@@ -28,6 +28,7 @@ static const char* options[] = {
   "error",
   "frame",
   "gdb",
+  "lgdb",
   "memacpi",
   "paging",
   "pci",
