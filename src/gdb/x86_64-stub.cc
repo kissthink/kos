@@ -614,7 +614,7 @@ void updateFlagsOnThreadSwitch() {
   int threadId = Processor::getApicID();
   Thread* currThread = Processor::getCurrThread();
 
-  if (bspThreadInfo.thread == NULL) {
+  if (bspThreadInfo.thread == nullptr) {
     bspThreadInfo.thread = currThread;
     bspThreadInfo.cpuIdx = threadId;
   } else {
@@ -734,6 +734,18 @@ handle_exception (int64_t exceptionVector) {
   DBG::outln(DBG::LGDB, "thread ", threadId+1, " got in");
 
   memset(outputBuffer, 0, BUFMAX);      // reset output buffer
+
+  for (int i = 0; i < 1000000; i++) {
+    Pause();
+  }
+
+/*
+  if (threadId != 0) {
+    DBG::outln(DBG::LGDB, "enable interrupt for CPU 0");
+    shouldReturnFromException[0] = true;
+    GDB::getInstance().V(0);
+  }
+*/
 
   /**
    * Previous thread executed 'c' (cotinue)

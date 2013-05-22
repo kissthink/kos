@@ -58,6 +58,7 @@ public:
   void popVContAction(int cpuIdx);
   void setVContActionReply(int signal);
   VContActionReply* removeVContActionReply();
+  void sendINT1(int cpuIdx);
 
 private:
   GDB();

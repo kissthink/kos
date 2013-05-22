@@ -23,7 +23,7 @@ echo "set default=0" >> $stage/boot/grub/grub.cfg
 echo >> $stage/boot/grub/grub.cfg
 echo 'menuentry "KOS" {' >> $stage/boot/grub/grub.cfg
 echo -n "  multiboot2 /boot/$kernel" >> $stage/boot/grub/grub.cfg
-echo -n " acpi,boot,dev,frame,libc,lgdb,pci,scheduler,vm" >> $stage/boot/grub/grub.cfg
+echo -n " acpi,boot,dev,frame,libc,lgdb,pci,vm" >> $stage/boot/grub/grub.cfg
 [ "$1" = "gdb" ] && {
 	echo -n ",gdb" >> $stage/boot/grub/grub.cfg
 	shift 1

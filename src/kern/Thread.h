@@ -54,6 +54,12 @@ public:
     t->run(func, data);
     return t;
   }
+  static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize, const char* n) {
+    Thread* t = create(as, stackSize);
+    t->setName(n);
+    t->run(func, data);
+    return t;
+  }
   static void destroy(Thread* t) {
     t->~Thread();
     vaddr mem = vaddr(t) + sizeof(Thread) - t->stackSize;

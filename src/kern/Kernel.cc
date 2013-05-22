@@ -23,6 +23,8 @@
 #include "world/File.h"
 #include "world/ELFLoader.h"
 
+#include "gdb/gdb.h"
+
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelVM kernelVM;
 Scheduler kernelScheduler;
@@ -60,7 +62,7 @@ void mainLoop(ptr_t) {
     char c;
     if (f1->read( &c, 1 ) == 0) break;
     kcout << c;
-    kcdbg << c;
+//    kcdbg << c;
   }
 
 	File* f = kernelFS.find("testprogram2")->second;
@@ -88,9 +90,16 @@ void mainLoop(ptr_t) {
 		//Activate Kernel Space again
 		kernelSpace.activate();
 	}
-
+/*
+  if (Processor::getApicID() == 0) {
+    Processor::disableInterrupts();
+    DBG::outln(DBG::LGDB, "disabled interrupt for core 1");
+    while (1) Pause();
+  }
+*/
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
+  /*
   Thread::create(task, nullptr, kernelSpace)->setName("A");
   Thread::create(task, nullptr, kernelSpace)->setName("B");
   Thread::create(task, nullptr, kernelSpace)->setName("C");
@@ -115,6 +124,31 @@ void mainLoop(ptr_t) {
   Thread::create(task, nullptr, kernelSpace)->setName("V");
   Thread::create(task, nullptr, kernelSpace)->setName("W");
   Thread::create(task, nullptr, kernelSpace)->setName("X");
+  */
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "A");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "B");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "C");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "D");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "E");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "F");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "G");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "H");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "I");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "J");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "K");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "L");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "M");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "N");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "O");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "P");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "Q");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "R");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "S");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "T");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "U");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "V");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "W");
+  Thread::create(task, nullptr, kernelSpace, 2*pagesize<1>(), "X");
   task(nullptr);
 }
 

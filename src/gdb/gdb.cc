@@ -7,6 +7,7 @@
 #include "mach/APIC.h"
 #include "mach/Memory.h"
 #include "mach/Processor.h"
+#include "util/Debug.h"
 #include "util/SpinLock.h"
 
 using namespace gdb;
@@ -34,7 +35,7 @@ void GDB::init(int numCpu, Processor* processorTable) {
   this->numCpu = numCpu;
   cpuStates = new GdbCpuState[numCpu];
   this->processorTable = processorTable;
-  kcdbg << "Processor table " << FmtHex(processorTable) << "\n";
+  DBG::outln(DBG::LGDB, "Processor table ", FmtHex(processorTable));
   sem = new Semaphore[numCpu];
   vContActionQueue = new EmbeddedQueue<VContAction>[numCpu];
   for (int i = 0; i < numCpu; i++) {
@@ -42,7 +43,7 @@ void GDB::init(int numCpu, Processor* processorTable) {
   }
 
   setupGDB(0);        // install CpuStates needed for GDB in BSP
-  kcdbg << "GDB state initialized for " << numCpu << " cores.\n";
+  DBG::outln(DBG::LGDB, "GDB state initialized for ", numCpu, " cores");
 }
 
 GdbCpuState* GDB::getCurrentCpuState() const {
@@ -66,7 +67,7 @@ void GDB::setupGDB(int cpuIdx) {
   ScopedLockISR<> so(mutex);
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   processorTable[cpuIdx].initGdbCpuStates(&cpuStates[cpuIdx]);
-  kcdbg << "setup cpu: " << cpuIdx+1 << "\n";
+  DBG::outln(DBG::LGDB, "setup cpu: ", cpuIdx+1);
   numInitialized = cpuIdx+1;
   cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
 }
@@ -152,7 +153,7 @@ void GDB::sendIPIToAllOtherCores() const {
     if (cpuStates[i].getCpuState() != cpuState::BREAKPOINT &&
         cpuStates[i].getCpuState() != cpuState::UNKNOWN) {
       LAPIC* lapic = (LAPIC *) lapicAddr;
-      kcdbg << "sending ipi 0x1 from " << curCpuIdx+1 << " to core: " << i+1 << "\n";
+      DBG::outln(DBG::LGDB, "sending ipi 0x1 from ", curCpuIdx+1, " to core: ", i+1);
       KASSERT(lapic != 0, "LAPIC is NULL");
       mword err = lapic->sendIPI(i, 0x1);
       KASSERT(err == 0, FmtHex(err));
@@ -163,17 +164,17 @@ void GDB::sendIPIToAllOtherCores() const {
 void GDB::P(int cpuIdx) {
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   KASSERT(cpuIdx < numInitialized, cpuIdx);
-  kcdbg << "enter P(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::LGDB, "enter P(", cpuIdx+1, ")");
   sem[cpuIdx].P();
-  kcdbg << "leave P(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::LGDB, "leave P(", cpuIdx+1, ")");
 }
 
 void GDB::V(int cpuIdx) {
   KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   KASSERT(cpuIdx < numInitialized, cpuIdx);
-  kcdbg << "enter V(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::LGDB, "enter V(", cpuIdx+1, ")");
   sem[cpuIdx].V();
-  kcdbg << "leave V(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::LGDB, "leave V(", cpuIdx+1, ")");
 }
 
 void GDB::addVContAction(VContAction* action, int cpuIdx) {
@@ -235,4 +236,12 @@ VContActionReply* GDB::removeVContActionReply() {
   VContActionReply* reply = vContActionReply;
   vContActionReply = 0;
   return reply;
+}
+
+void GDB::sendINT1(int cpuIdx) {
+  LAPIC* lapic = (LAPIC *) lapicAddr;
+  DBG::outln(DBG::LGDB, "sending ipi 0x1 from ", Processor::getApicID()+1, " to core: ", cpuIdx+1);
+  KASSERT(lapic != 0, "LAPIC is NULL");
+  mword err = lapic->sendIPI(cpuIdx, 0x1);
+  KASSERT(err == 0, FmtHex(err));
 }

@@ -39,10 +39,10 @@ void Scheduler::schedule() {
   }
   Processor::setCurrThread(nextThread);
   KASSERT(Processor::getLockCount() == 1, Processor::getLockCount());
-  DBG::out(DBG::Scheduler, "CPU ", Processor::getApicID(), " switch: ");
-  if (prevThread->getName()) DBG::out(DBG::Scheduler, prevThread->getName());
-  else DBG::out(DBG::Scheduler, prevThread);
-  DBG::out(DBG::Scheduler, " -> ");
+  DBG::outln(DBG::Scheduler, "CPU ", Processor::getApicID(), " switch: ");
+  if (prevThread->getName()) DBG::outln(DBG::Scheduler, prevThread->getName());
+  else DBG::outln(DBG::Scheduler, prevThread);
+  DBG::outln(DBG::Scheduler, " -> ");
   if (nextThread->getName()) DBG::outln(DBG::Scheduler, nextThread->getName());
   else DBG::outln(DBG::Scheduler, nextThread);
 

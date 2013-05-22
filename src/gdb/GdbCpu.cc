@@ -1,4 +1,5 @@
 #include "GdbCpu.h"
+#include "util/Debug.h"
 #include <cstring>
 
 #undef __STRICT_ANSI__
@@ -105,7 +106,7 @@ void GdbCpuState::incrementRip() {
   if (ripDecremented) {
     reg64Buffer[registers::RIP] += 1;
     ripDecremented = false;
-    kcdbg << "rip incremented\n";
+    DBG::outln(DBG::LGDB, "rip incremented");
   }
 }
 
