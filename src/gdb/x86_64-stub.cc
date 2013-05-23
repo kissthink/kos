@@ -5,12 +5,11 @@
 #include "gdb/GdbCpu.h"
 #include "gdb/gdb.h"
 #include "gdb/gdb_asm_functions.h"
-#include "gdb/SpinLock.h"
+#include "gdb/Semaphore.h"
 #include "gdb/VContAction.h"
 #include "kern/Thread.h"
 #include "mach/Processor.h"
 #include "util/Debug.h"
-#include "util/SpinLock.h"
 #include "util/EmbeddedQueue.h"
 
 #undef __STRICT_ANSI__
@@ -40,8 +39,7 @@ static bool isFree = true;          // baton is not picked up.
 static int lockHolder = -1;                // used for holding baton.
 static bool* waiting;                      // represents a CPU waiting on entry queue.
 static bool* shouldReturnFromException;    // return from interrupt handler right away (used for allstop mode)
-static gdb::GdbSpinLock entry_q;           // entry queue mutex. (part of split binary semaphore)
-//SpinLock entry_q;
+static gdb::Semaphore entry_q;
 static gdb::GdbCpuState* cCpu = nullptr;
 static gdb::GdbCpuState* gCpu = nullptr;
 
@@ -84,7 +82,7 @@ void _returnFromException(int cpuState = 0) {
 
 // use if entry_q is not locked
 void _returnFromExceptionLocked(int cpuState = 0) {
-  entry_q.acquireISR();
+  entry_q.P();
   GdbCpuState* state = GDB::getInstance().getCurrentCpuState();
   switch (cpuState) {
     case 0: state->setCpuState(cpuState::RUNNING); break;
@@ -104,7 +102,7 @@ void _returnFromExceptionLocked(int cpuState = 0) {
       }
     }
   }
-  entry_q.releaseISR();
+  entry_q.V();
   state->restoreRegisters();
 }
 
@@ -530,7 +528,7 @@ void consumeVContAction()
   // first thread that enters the interrupt handler
   // will send stop reply packet.
   action->executed = true;
-  entry_q.releaseISR();
+  entry_q.V();
   _returnFromExceptionLocked();
 }
 
@@ -552,7 +550,7 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
       VContAction* action = parse_vcont(ptr);
       KASSERT0(action);
       if (action) {
-        entry_q.acquireISR();
+        entry_q.P();
         // if the action is not for the current thread,
         // pass the baton to the waiting thread.
         if (action->threadId != -1 && action->threadId != 0 &&
@@ -627,12 +625,12 @@ handle_exception (int64_t exceptionVector) {
    * you have to wait until someone passes a baton.
    */
   DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " trying to enter");
-  entry_q.acquireISR();
+  entry_q.P();
 
   if (gdbThread != nullptr && gdbThread != currThread && !isFree && (lockHolder == -1 || lockHolder != threadId)) {
     waiting[threadId] = true;
     DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " is waiting for real lock holder: ", lockHolder+1);
-    entry_q.releaseISR();
+    entry_q.V();
     GDB::getInstance().P(threadId);
     DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " woke up");
     if (shouldReturnFromException[threadId]) {
@@ -678,7 +676,7 @@ handle_exception (int64_t exceptionVector) {
    * Send INT 0x3 IPI to all available cores.
    */
   if (allstop) GDB::getInstance().sendIPIToAllOtherCores();
-  entry_q.releaseISR();
+  entry_q.V();
 
   while (true) {
     outputBuffer[0] = 0;        // reset out buffer to 0
@@ -883,6 +881,7 @@ void set_debug_traps(bool as) {
     waiting[i] = false;
     shouldReturnFromException[i] = false;
   }
+  entry_q.resetCounter(1);  // simulate mutex
 
   allstop = as;
   initialized = 1;
