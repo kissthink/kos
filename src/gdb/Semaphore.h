@@ -20,11 +20,16 @@ public:
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(Semaphore);
   }
   void P() volatile {
-    {
+    for(;;) {
+      Pause();
       ScopedLockISR<> so(lk);
-      counter -= 1;
+      if (counter <= 0) {
+        continue;
+      } else {
+        counter--;
+        break;
+      }
     }
-    while (counter < 0) Pause();
   }
 
   void V() volatile {
