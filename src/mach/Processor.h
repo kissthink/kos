@@ -40,16 +40,13 @@ class Processor {
   FrameManager*     frameManager;
   mword					    lockCount;
   gdb::GdbCpuState* curCpuState;
-  gdb::GdbCpuState* cCpuState;
-  gdb::GdbCpuState* gCpuState;
 
   friend class Machine;
 //  friend void gdb::GDB::setupGDB(int cpuIdx);
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
-    frameManager(nullptr), lockCount(mwordlimit / 2),
-    curCpuState(0), cCpuState(0), gCpuState(0) {}
+    frameManager(nullptr), lockCount(mwordlimit / 2), curCpuState(0) {}
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
@@ -71,8 +68,6 @@ class Processor {
 public:
   void initGdbCpuStates(gdb::GdbCpuState* state) {
     curCpuState = state;
-    cCpuState = state;
-    gCpuState = state;
   }
   static mword getApicID() {
     mword x; asm volatile("mov %%fs:0, %0" : "=r"(x)); return x;

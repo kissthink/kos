@@ -6,6 +6,7 @@
 #include "gdb/gdb.h"
 #include "gdb/gdb_asm_functions.h"
 #include "gdb/SpinLock.h"
+#include "gdb/VContAction.h"
 #include "kern/Thread.h"
 #include "mach/Processor.h"
 #include "util/Debug.h"
@@ -36,56 +37,19 @@ static const char hexchars[]="0123456789abcdef";
 
 static bool isFree = true;          // baton is not picked up.
 
-static VContAction* isContinue = NULL; // VContAction for 'c' from previous thread.
-                                    // it is used to notify the current thread
-                                    // to send a stop reply packet for previous thread.
-
-struct ThreadSeen {
-  Thread* currThread;               // current thread
-  Thread* prevThread;               // last seen thread
-
-  ThreadSeen(): currThread(0), prevThread(0) {}
-};
-
-struct BSPThreadInfo {
-  Thread* thread;
-  int cpuIdx;
-
-  BSPThreadInfo(): thread(0), cpuIdx(-1) {}
-};
-
-int lockHolder = -1;                // used for holding baton.
-bool* waiting;                      // represents a CPU waiting on entry queue.
-bool* shouldReturnFromException;
-int* coreIdxTable;                  // maps current core index
-ThreadSeen* threadsSeen;            // queues all threads seen for each core.
-BSPThreadInfo bspThreadInfo;
-//bool halted = false;                // represent if the source rip is hlt.
-//bool paused = false;                // represent if the source ip is pause.
-gdb::GdbSpinLock entry_q;           // entry queue mutex. (part of split binary semaphore)
+static int lockHolder = -1;                // used for holding baton.
+static bool* waiting;                      // represents a CPU waiting on entry queue.
+static bool* shouldReturnFromException;    // return from interrupt handler right away (used for allstop mode)
+static gdb::GdbSpinLock entry_q;           // entry queue mutex. (part of split binary semaphore)
 //SpinLock entry_q;
+static gdb::GdbCpuState* cCpu = nullptr;
+static gdb::GdbCpuState* gCpu = nullptr;
 
-//DBG::Level debugLevel = (DBG::test(DBG::AllStopGDB) ? DBG::AllStopGDB : DBG::GDB);
-
-int getCurrentCoreIdx() {
-  return coreIdxTable[Processor::getApicID()];
-}
+static EmbeddedQueue<VContAction> vContActionQueue;
+static Thread* gdbThread = nullptr;        // thread talking to gdb (remember because it moves among cores)
+static VContAction* prevAction = nullptr;  // previous vContAction
 
 static bool allstop = false;
-
-// Notify next thread to send stop reply.
-void setContinue(VContAction* cont) {
-  KASSERT0(!isContinue);
-  VContAction* action = GDB::getInstance().nextVContAction(getCurrentCoreIdx());
-  KASSERT1(*cont == *action, "Cannot set continue action if it's not first vCont in queue");
-  isContinue = cont;
-  GDB::getInstance().popVContAction(getCurrentCoreIdx());
-}
-
-void clearContinue() {
-  KASSERT0(isContinue);
-  isContinue = NULL;
-}
 
 /**
  * Returns from the exception handler.
@@ -106,10 +70,10 @@ void _returnFromException(int cpuState = 0) {
   if (allstop) {
     int threadId = Processor::getApicID();
     for (int i = 0; i < GDB::getInstance().getNumCpusInitialized(); i++) {
-      if (coreIdxTable[i] == threadId) continue;
-      if (waiting[coreIdxTable[i]]) {
-        waiting[coreIdxTable[i]] = false;                   // wake thread and force it to return
-        shouldReturnFromException[coreIdxTable[i]] = true;
+      if (i == threadId) continue;
+      if (waiting[i]) {
+        waiting[i] = false;                   // wake thread and force it to return
+        shouldReturnFromException[i] = true;
         GDB::getInstance().V(i);
       }
     }
@@ -132,10 +96,10 @@ void _returnFromExceptionLocked(int cpuState = 0) {
   if (allstop) {
     int threadId = Processor::getApicID();
     for (int i = 0; i < GDB::getInstance().getNumCpusInitialized(); i++) {
-      if (coreIdxTable[i] == threadId) continue;
-      if (waiting[coreIdxTable[i]]) {
-        waiting[coreIdxTable[i]] = false;                   // wake the thread and force it to return
-        shouldReturnFromException[coreIdxTable[i]] = true;
+      if (i == threadId) continue;
+      if (waiting[i]) {
+        waiting[i] = false;                   // wake the thread and force it to return
+        shouldReturnFromException[i] = true;
         GDB::getInstance().V(i);
       }
     }
@@ -495,15 +459,8 @@ VContAction* parse_vcont(char* ptr)
       KASSERT1(res_thread <= GDB::getInstance().getNumCpusInitialized(), res_thread);
       vContAction->threadId = res_thread;
       vContAction->threadAssigned = true;
-      GDB::getInstance().addVContAction(vContAction, coreIdxTable[res_thread-1]);
-      DBG::outlnISR(DBG::GDBDebug, "putting vContAction to ", coreIdxTable[res_thread-1]+1);
-//      GDB::getInstance().addVContAction(vContAction, res_thread-1);
-    } else {
-      // current thread will handle action if thread = -1 or 0
-      GDB::getInstance().addVContAction(vContAction, getCurrentCoreIdx());
-      DBG::outlnISR(DBG::GDBDebug, "putting vContAction to ", getCurrentCoreIdx()+1);
-//      GDB::getInstance().addVContAction(vContAction);
     }
+    vContActionQueue.push(vContAction);
 
     result = vContAction;
     DBG::outlnISR(DBG::GDBDebug, "Parsed vContAction - ", *vContAction);
@@ -519,7 +476,7 @@ VContAction* parse_vcont(char* ptr)
  */
 void consumeVContAction()
 {
-  VContAction* action = GDB::getInstance().nextVContAction(getCurrentCoreIdx());
+  VContAction* action = vContActionQueue.front();
   DBG::outlnISR(DBG::GDBDebug, *action, " from thread: ", Processor::getApicID() + 1);
 
   KASSERT0(action);
@@ -551,8 +508,10 @@ void consumeVContAction()
     // trap bit should have been cleared.
     KASSERT1((eflags & 0x00000100) == 0, FmtHex(eflags));
     isFree = true;
-    setContinue(action);  // set isContinue so that subsequent thread will send stop reply.
-    GDB::getInstance().getCurrentCpuState()->incrementRip();  // increment rip if rip was decremented
+    // increment rip only if it was actual breakpoint set by user (not set by gdb for next)
+    if (prevAction == nullptr || prevAction->action[0] != 'c') {
+      GDB::getInstance().getCurrentCpuState()->incrementRip();  // increment rip if rip was decremented
+    }
     // if there's a thread waiting on breakpoint, switch to that thread.
     for (int i = 0; i < GDB::getInstance().getNumCpusInitialized(); i++) {
       if (waiting[i]) {
@@ -597,12 +556,12 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
         // if the action is not for the current thread,
         // pass the baton to the waiting thread.
         if (action->threadId != -1 && action->threadId != 0 &&
-              coreIdxTable[action->threadId-1] != coreIdxTable[(int)Processor::getApicID()]) {
-          if (waiting[coreIdxTable[action->threadId-1]]) {
+              action->threadId-1 != (int)Processor::getApicID()) {
+          if (waiting[action->threadId-1]) {
             // pass baton to the waiting thread.
             GDB::getInstance().V(action->threadId-1);
             DBG::outlnISR(DBG::GDBDebug, "Passed baton from thread: ",
-              Processor::getApicID() + 1, " to thread: ", action->threadId - 1);
+              Processor::getApicID() + 1, " to thread: ", action->threadId);
             handle_exception(exceptionVector);  // this thread will wait.
           }
 
@@ -620,65 +579,6 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
   }
 }
 
-void updateFlagsOnThreadSwitch() {
-  int threadId = Processor::getApicID();
-  Thread* currThread = Processor::getCurrThread();
-
-  if (bspThreadInfo.thread == nullptr) {
-    bspThreadInfo.thread = currThread;
-    bspThreadInfo.cpuIdx = threadId;
-  } else {
-    if (threadId != bspThreadInfo.cpuIdx && currThread == bspThreadInfo.thread) {
-      DBG::outlnISR(DBG::GDBDebug, "switching from core ", bspThreadInfo.cpuIdx+1, " to core ", threadId+1);
-      coreIdxTable[threadId] = coreIdxTable[bspThreadInfo.cpuIdx];
-      coreIdxTable[bspThreadInfo.cpuIdx] = bspThreadInfo.cpuIdx;      // reset cpuIdx for previous core
-      if (lockHolder == bspThreadInfo.cpuIdx) lockHolder = threadId;
-      bspThreadInfo.thread = currThread;
-      bspThreadInfo.cpuIdx = threadId;
-    } else if (threadId == bspThreadInfo.cpuIdx && currThread != bspThreadInfo.thread) {
-      DBG::outlnISR(DBG::GDBDebug, "thread switched from ", bspThreadInfo.thread, " to ", currThread, " for thread ", threadId+1);
-      bspThreadInfo.thread = currThread;
-    } else if (threadId != bspThreadInfo.cpuIdx && currThread != bspThreadInfo.thread) {
-      bspThreadInfo.thread = currThread;
-      bspThreadInfo.cpuIdx = threadId;
-    }
-  }
-
-  DBG::outlnISR(DBG::GDBDebug, "bspThreadInfo.thread=", bspThreadInfo.thread, " bspThreadInfo.cpuIdx=", bspThreadInfo.cpuIdx+1);
-/*
-  // only queue a thread if it is different than what's queued
-  if (threadsSeen[threadId].currThread != NULL) {
-    if (threadsSeen[threadId].currThread == currThread) {
-      Logger::debugln("queue front ", FmtHex(threadsSeen[threadId].currThread), " curThread: ", FmtHex(currThread));
-      return;
-    }
-  }
-  Logger::debugln("core ", threadId+1, " currThread: ", threadsSeen[threadId].currThread);
-  Logger::debugln("core ", threadId+1, " prevThread: ", threadsSeen[threadId].prevThread);
-  threadsSeen[threadId].currThread = currThread;
-  if (threadsSeen[threadId].prevThread == NULL) threadsSeen[threadId].prevThread = currThread;
-  Logger::debugln("push thread ", currThread, " to core ", threadId+1);
-  bool found = false;
-  for (int i = 0; i < GDB::getInstance().getNumCpusInitialized(); i++) {
-    if (threadId == i) continue;
-    if (threadsSeen[i].currThread != NULL) {
-      Thread* thread = threadsSeen[i].currThread;
-      if (thread == currThread) {   // core i switched to core threadId
-        Logger::debugln("core ", i+1, " switched to core ", threadId+1);
-        coreIdxTable[threadId] = i;
-        if (lockHolder == i) lockHolder = threadId;
-        threadsSeen[threadId].prevThread = threadsSeen[threadId].currThread;
-        threadsSeen[threadId].currThread = threadsSeen[i].currThread;
-        threadsSeen[i].prevThread = threadsSeen[i].currThread;
-        threadsSeen[i].currThread = NULL;
-        found = true;
-        break;
-      }
-    }
-  }
-*/
-}
-
 // does all command processing for interfacing to gdb
 extern "C" void
 handle_exception (int64_t exceptionVector) {
@@ -691,13 +591,20 @@ handle_exception (int64_t exceptionVector) {
   int threadId = Processor::getApicID();
   GDB::getInstance().getCurrentCpuState()->setCpuState(cpuState::BREAKPOINT);
 
+  // initialize gCpuState and cCpuState
+  if (gCpu == nullptr) {
+    gCpu = GDB::getInstance().getCurrentCpuState();
+  }
+  if (cCpu == nullptr) {
+    cCpu = GDB::getInstance().getCurrentCpuState();
+  }
+
+  Thread* currThread = Processor::getCurrThread();
+
   DBG::outlnISR(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
             ", eflags=", FmtHex(*GDB::getInstance().getCurrentCpuState()->getReg32(registers::EFLAGS)),
             ", pc=", FmtHex(*GDB::getInstance().getCurrentCpuState()->getReg64(registers::RIP)),
-            ", thread=", FmtHex(Processor::getCurrThread()));
-
-  // update gdb's internal flags if the thread has been switched between cores.
-  updateFlagsOnThreadSwitch();
+            ", thread=", FmtHex(currThread));
 
   // for int 3, rip pushed by interrupt handling mechanism may not be a correct value
   // decrement rip value back to an instruction causing breakpoint and let it try again with a valid address
@@ -722,10 +629,9 @@ handle_exception (int64_t exceptionVector) {
   DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " trying to enter");
   entry_q.acquireISR();
 
-  if (!isFree && (lockHolder == -1 || lockHolder != threadId)) {
+  if (gdbThread != nullptr && gdbThread != currThread && !isFree && (lockHolder == -1 || lockHolder != threadId)) {
     waiting[threadId] = true;
-    DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1,
-      " is waiting for real lock holder: ", lockHolder+1);
+    DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " is waiting for real lock holder: ", lockHolder+1);
     entry_q.releaseISR();
     GDB::getInstance().P(threadId);
     DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " woke up");
@@ -736,54 +642,36 @@ handle_exception (int64_t exceptionVector) {
       state->setCpuState(cpuState::RUNNING);
       state->restoreRegisters();
     }
+
+    // core is changed. update gCpu and cCpu for this core.
+    gCpu = GDB::getInstance().getCurrentCpuState();
+    cCpu = GDB::getInstance().getCurrentCpuState();
   }
 
   // Got hold of a baton. You are free to enter.
   isFree = false;
-  waiting[coreIdxTable[threadId]] = false;
+  waiting[threadId] = false;
   lockHolder = threadId;
+  gdbThread = currThread;
   DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " got in");
 
   memset(outputBuffer, 0, BUFMAX);      // reset output buffer
 
-  /**
-   * Previous thread executed 'c' (cotinue)
-   * Follow-up thread must send stop reply message
-   * to inform GDB that it is talking to the new thread.
-   */
-  if (isContinue) {
-    sendStopReply(outputBuffer, sigval);
-    clearContinue();
-
-    // TODO handle pending VContAction later??
-    goto begin;
-  }
-
-  DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " is mapped to thread ", getCurrentCoreIdx()+1);
-  if (GDB::getInstance().isEmptyVContActionQueue(getCurrentCoreIdx())) {
-    DBG::outlnISR(DBG::GDBDebug, "vContAction queue is empty for thread ", getCurrentCoreIdx()+1);
-  }
-
-  // Execute a pending operation for previous vCont msg.
-  while (!GDB::getInstance().isEmptyVContActionQueue(getCurrentCoreIdx())) {
+  if (!vContActionQueue.empty()) {
     DBG::outlnISR(DBG::GDBDebug, "there is a pending operation.");
-    // Report to GDB we stopped at current core.
-    if (GDB::getInstance().nextVContAction(getCurrentCoreIdx())->executed) {
-      DBG::outlnISR(DBG::GDBDebug, "pending operation done - ", *GDB::getInstance().nextVContAction(getCurrentCoreIdx()));
-      GDB::getInstance().popVContAction(getCurrentCoreIdx());
-      if (GDB::getInstance().isEmptyVContActionQueue(getCurrentCoreIdx())) {
-        sendStopReply(outputBuffer, sigval);
-        break;
-      }
+    VContAction* action = vContActionQueue.front();
+    if (action->executed) {
+      DBG::outlnISR(DBG::GDBDebug, "pending operation done - ", *action);
+      prevAction = action;              // remember previous action (if 'c' don't increment rip)
+      vContActionQueue.pop();
+      KASSERT0(vContActionQueue.empty());
+      sendStopReply(outputBuffer, sigval);
     } else {
-      // TODO: should I send IPIs here for all-stop mode?
-      DBG::outlnISR(DBG::GDBDebug, "entering consumeVContAction: ",
-        *(GDB::getInstance().nextVContAction(getCurrentCoreIdx())));
+      DBG::outlnISR(DBG::GDBDebug, "entering consumeVContAction: ", *action);
       consumeVContAction();
     }
   }
 
-begin:
   /**
    * All-Stop mode Only.
    *
@@ -870,8 +758,8 @@ begin:
         if (hexToInt(&ptr, &threadId)) {
           if (threadId > 0) {
             switch (op) {
-              case 'g': GDB::getInstance().setGCpu(threadId-1); break;
-              case 'c': GDB::getInstance().setCCpu(threadId-1); break;
+              case 'g': gCpu = GDB::getInstance().getCpuState(threadId-1); break;
+              case 'c': cCpu = GDB::getInstance().getCpuState(threadId-1); break;
               default: ABORT1("Invalid Hop"); break;
             }
           }
@@ -893,14 +781,13 @@ begin:
       case 'g':       // return the value of the CPU registers
       {
         char* ptr = outputBuffer;
-        GdbCpuState* gCpu = GDB::getInstance().getGCpu();
         ptr = mem2hex((char *) gCpu->getRegs64(), ptr, gdb::numRegs64 * sizeof(gdb::reg64), 0);
         ptr = mem2hex((char *) gCpu->getRegs32(), ptr, gdb::numRegs32 * sizeof(gdb::reg32), 0);
       }
       break;
       case 'G':       // set the value of the CPU registers - return OK
-        hex2mem(ptr, (char *) GDB::getInstance().getGCpu()->getRegs64(), gdb::numRegs64 * sizeof(gdb::reg64), 0);
-        hex2mem(ptr+gdb::numRegs64, (char *) GDB::getInstance().getGCpu()->getRegs32(), gdb::numRegs32 * sizeof(gdb::reg32), 0);
+        hex2mem(ptr, (char *) gCpu->getRegs64(), gdb::numRegs64 * sizeof(gdb::reg64), 0);
+        hex2mem(ptr+gdb::numRegs64, (char *) gCpu->getRegs32(), gdb::numRegs32 * sizeof(gdb::reg32), 0);
         strcpy (outputBuffer, "OK");
         break;
       case 'P':       // set the value of a single CPU register - return OK
@@ -908,11 +795,11 @@ begin:
         long regno;
         if (hexToInt (&ptr, &regno) && *ptr++ == '=') {
           if (regno >= 0 && regno < gdb::numRegs64) {
-            hex2mem (ptr, (char *) GDB::getInstance().getGCpu()->getReg64(regno), sizeof(gdb::reg64), 0);
+            hex2mem (ptr, (char *) gCpu->getReg64(regno), sizeof(gdb::reg64), 0);
             strcpy (outputBuffer, "OK");
             break;
           } else if (regno >= gdb::numRegs64 && regno < gdb::numRegs64 + gdb::numRegs32) {
-            hex2mem(ptr, (char *) GDB::getInstance().getGCpu()->getReg32(regno-gdb::numRegs64), sizeof(gdb::reg32), 0);
+            hex2mem(ptr, (char *) gCpu->getReg32(regno-gdb::numRegs64), sizeof(gdb::reg32), 0);
             strcpy(outputBuffer, "OK");
             break;
           }
@@ -992,12 +879,9 @@ void set_debug_traps(bool as) {
 
   waiting = new bool[GDB::getInstance().getNumCpus()];
   shouldReturnFromException = new bool[GDB::getInstance().getNumCpus()];
-  coreIdxTable = new int[GDB::getInstance().getNumCpus()];
-  threadsSeen = new ThreadSeen[GDB::getInstance().getNumCpus()];
   for (int i = 0; i < GDB::getInstance().getNumCpus(); i++) {
     waiting[i] = false;
     shouldReturnFromException[i] = false;
-    coreIdxTable[i] = i;
   }
 
   allstop = as;

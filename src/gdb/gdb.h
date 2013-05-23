@@ -1,8 +1,6 @@
 #ifndef Gdb_h_
 #define Gdb_h_ 1
 
-#include "gdb/VContAction.h"
-
 class Processor;
 class SpinLock;
 
@@ -36,28 +34,12 @@ public:
   int getNumCpus() const;
   int getNumCpusInitialized() const;
 
-  // CPU states for 'g', 'c' operations
-  void setGCpu(int cpuIdx);
-  GdbCpuState* getGCpu() const;
-  void setCCpu(int cpuIdx);
-  GdbCpuState* getCCpu() const;
-
   void sendIPIToAllOtherCores() const;        // sends INT 3 IPI to other available cores
 
   // semaphores to synchronize cores access to GDB interrupt handlers
   void P(int cpuIdx);
   void V(int cpuIdx);
 
-  // vCont related
-  void addVContAction(VContAction* action, int cpuIdx);
-  void addVContAction(VContAction* action);
-  bool isEmptyVContActionQueue() const;
-  bool isEmptyVContActionQueue(int cpuIdx) const;
-  VContAction* nextVContAction(int cpuIdx);
-  const VContAction* nextVContAction(int cpuIdx) const;
-  void popVContAction(int cpuIdx);
-  void setVContActionReply(int signal);
-  VContActionReply* removeVContActionReply();
   void sendINT1(int cpuIdx);
 
 private:
@@ -68,8 +50,6 @@ private:
   int numInitialized;
   int enumIdx;
   Semaphore* sem;                                         // split binary semaphore
-  EmbeddedQueue<VContAction>* vContActionQueue;           // pending vConts queued here
-  VContActionReply* vContActionReply;
 };
 
 } // namespace gdb
