@@ -23,6 +23,8 @@
 #include "world/File.h"
 #include "world/ELFLoader.h"
 
+#include "gdb/gdb.h"
+
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelVM kernelVM;
 Scheduler kernelScheduler;
@@ -87,7 +89,6 @@ void mainLoop(ptr_t) {
 		//Activate Kernel Space again
 		kernelSpace.activate();
 	}
-
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");

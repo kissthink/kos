@@ -53,11 +53,12 @@ public:
   void addVContAction(VContAction* action);
   bool isEmptyVContActionQueue() const;
   bool isEmptyVContActionQueue(int cpuIdx) const;
-  VContAction* nextVContAction();
-  const VContAction* nextVContAction() const;
-  void popVContAction();
+  VContAction* nextVContAction(int cpuIdx);
+  const VContAction* nextVContAction(int cpuIdx) const;
+  void popVContAction(int cpuIdx);
   void setVContActionReply(int signal);
   VContActionReply* removeVContActionReply();
+  void sendINT1(int cpuIdx);
 
 private:
   GDB();

@@ -57,6 +57,14 @@ public:
     print(kendl);
     lk.release();
   }
+
+  template<typename... Args>
+  void outlnISR( const Args&... a ) {
+    lk.acquireISR();
+    print(a...);
+    print(kendl);
+    lk.releaseISR();
+  }
 };
 
 extern KernelOutput StdOut;

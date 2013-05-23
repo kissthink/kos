@@ -64,6 +64,14 @@ public:
     }
   }
 
+  template<typename... Args>
+  static void outlnISR( Level c, const Args&... a ) {
+    if (levels.test(c)) {
+      StdDbg.outlnISR(a...);
+      StdOut.outlnISR(a...);
+    }
+  }
+
   static bool test( Level c ) {
     return levels.test(c);
   }

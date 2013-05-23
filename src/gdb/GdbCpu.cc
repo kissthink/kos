@@ -106,7 +106,7 @@ void GdbCpuState::incrementRip() {
   if (ripDecremented) {
     reg64Buffer[registers::RIP] += 1;
     ripDecremented = false;
-    DBG::outln(DBG::GDBDebug, "rip incremented");
+    DBG::outlnISR(DBG::GDBDebug, "rip incremented");
   }
 }
 
