@@ -14,10 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/Log.h"
-#include "dev/Serial.h"
+#include "util/OutputSafe.h"
 #include "dev/Screen.h"
-#include "extern/stl/outputbuf.h"
+#include "dev/Serial.h"
 
 class ScreenBuffer : public OutputDevice {
   ScreenSegment segment;
@@ -40,16 +39,34 @@ public:
 
 static ScreenBuffer top_screen( 1, 20, 2 );
 static ScreenBuffer bot_screen( 21, 25 );
-static DebugBuffer debug_buffer;
+static DebugBuffer  dbg_buffer;
+
 static OutputBuffer<char> topbuf(top_screen);
 static OutputBuffer<char> botbuf(bot_screen);
-static OutputBuffer<char> dbgbuf(debug_buffer);
+static OutputBuffer<char> dbgbuf(dbg_buffer);
 
-ostream kcout(&topbuf);
-ostream kcerr(&botbuf);
-ostream kcdbg(&dbgbuf);
+KernelOutput::KernelOutput( OutputBuffer<char>& ob ) : os(&ob) {}
+
+KernelOutput StdOut(topbuf);
+KernelOutput StdErr(botbuf);
+KernelOutput StdDbg(dbgbuf);
 
 void kassertprint(const char* const loc, int line, const char* const func) {
-  kcerr << loc << line << " in " << func << " - ";
-  kcdbg << loc << line << " in " << func << " - ";
+  StdErr.out(loc, line, " in ", func, " - ");
+  StdDbg.out(loc, line, " in ", func, " - ");
+}
+
+void kassertprint1(const char* const msg) {
+  StdErr.out(msg);
+  StdDbg.out(msg);
+}
+
+void kassertprint1(const unsigned long long num) {
+  StdErr.out(num);
+  StdDbg.out(num);
+}
+
+void kassertprint1(const FmtHex& ptr) {
+  StdErr.out(ptr);
+  StdDbg.out(ptr);
 }
