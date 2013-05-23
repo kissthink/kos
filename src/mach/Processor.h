@@ -17,17 +17,20 @@
 #ifndef _Processor_h_
 #define _Processor_h_ 1
 
-#include "util/Log.h"
+#include "util/Output.h"
 #include "mach/APIC.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
-#include "gdb/gdb.h"
 
 class Thread;
 class FrameManager;
 
 // would like to use 'offsetof', but asm does not work with 'offsetof'
 // use fs:0 as 'this', then access member: slower, but cleaner?
+
+namespace gdb {
+ class GdbCpuState;
+}
 
 class Processor {
   mword             apicID;
@@ -41,7 +44,7 @@ class Processor {
   gdb::GdbCpuState* gCpuState;
 
   friend class Machine;
-  friend void gdb::GDB::setupGDB(int cpuIdx);
+//  friend void gdb::GDB::setupGDB(int cpuIdx);
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
@@ -64,13 +67,13 @@ class Processor {
   static volatile LAPIC* lapic() {
    return (LAPIC*)lapicAddr;
   }
+
+public:
   void initGdbCpuStates(gdb::GdbCpuState* state) {
     curCpuState = state;
     cCpuState = state;
     gCpuState = state;
   }
-
-public:
   static mword getApicID() {
     mword x; asm volatile("mov %%fs:0, %0" : "=r"(x)); return x;
   }
@@ -93,17 +96,17 @@ public:
     mword x; asm volatile("mov %%fs:32, %0" : "=r"(x)); return (FrameManager*)x;
   }
   static mword getLockCount() {
-    KASSERT(!interruptsEnabled(), "");
+    KASSERT0(!interruptsEnabled());
     mword x; asm volatile("mov %%fs:40, %0" : "=r"(x)); return x;
   }
   static mword incLockCount() {
-    KASSERT(!interruptsEnabled(), "");
+    KASSERT0(!interruptsEnabled());
     mword x; asm volatile("mov %%fs:40, %0" : "=r"(x) :: "memory");
              asm volatile("mov %0, %%fs:40" :: "r"(x+1) : "memory");
    return x+1;
   }
   static mword decLockCount() {
-    KASSERT(!interruptsEnabled(), "");
+    KASSERT0(!interruptsEnabled());
     mword x; asm volatile("mov %%fs:40, %0" : "=r"(x) :: "memory");
              asm volatile("mov %0, %%fs:40" :: "r"(x-1) : "memory");
     return x-1;
@@ -133,22 +136,22 @@ public:
 
   void sendInitIPI() {
     mword err = lapic()->sendInitIPI(apicID);
-    KASSERT(err == 0, FmtHex(err));
+    KASSERT1(err == 0, FmtHex(err));
   }
 
   void sendStartupIPI(uint8_t vector) {
     mword err = lapic()->sendStartupIPI(apicID, vector);
-    KASSERT(err == 0, FmtHex(err));
+    KASSERT1(err == 0, FmtHex(err));
   }
 
   void sendWakeUpIPI() {
     mword err = lapic()->sendIPI(apicID, 0x40 );
-    KASSERT(err == 0, FmtHex(err));
+    KASSERT1(err == 0, FmtHex(err));
   }
 
   void sendTestIPI() {
     mword err = lapic()->sendIPI(apicID, 0x41 );
-    KASSERT(err == 0, FmtHex(err));
+    KASSERT1(err == 0, FmtHex(err));
   }
 
 } __packed;

@@ -17,7 +17,7 @@
 #ifndef _KernelQueues_h_
 #define _KernelQueues_h_ 1
 
-#include "util/Log.h"
+#include "util/Output.h"
 
 #include <array>
 #include <queue>
@@ -37,7 +37,7 @@ public:
   typedef Element ElementType;
   explicit DynamicArray( size_t N, Element* ptr = nullptr )
     : buffer(ptr ? ptr : Allocator().allocate(N)), max(N) {
-    KASSERT( N > 0, N );
+    KASSERT0(N);
   }
   size_t max_size() const { return max; }
   Element& operator[] (size_t i) { return buffer[i]; }
@@ -59,29 +59,29 @@ public:
   size_t size() const { return count; }
   size_t max_size() const { return array.max_size(); }
   Element& front() {
-    KASSERT(count > 0, "front");
+    KASSERT0(count);
     return array[oldest];
   }
   const Element& front() const {
-    KASSERT(count > 0, "front");
+    KASSERT0(count);
     return array[oldest];
   }
   Element& back() {
-    KASSERT(count > 0, "back");
+    KASSERT0(count);
     return array[newest];
   }
   const Element& back() const {
-    KASSERT(count > 0, "back");
+    KASSERT0(count);
     return array[newest];
   }
   void push( const Element& x ) {
-    KASSERT(count < array.max_size(), "push");
+    KASSERT0(count < array.max_size());
     newest = (newest + 1) % array.max_size();
     array[newest] = x;
     count += 1;
   }
   void pop() {
-    KASSERT(count > 0, "pop");
+    KASSERT0(count);
     oldest = (oldest + 1) % array.max_size();
     count -= 1;
   }
@@ -104,7 +104,7 @@ class FiniteQueueBuffer : public std::queue<E,std::deque<E,A>> {
   size_t max;
 public:
   typedef E Element;
-  FiniteQueueBuffer( size_t N ) : max(N) { KASSERT( N > 0, N ); }
+  FiniteQueueBuffer( size_t N ) : max(N) { KASSERT0(N); }
   bool full() const { return std::queue<E,std::deque<E,A>>::size() == max; }
   size_t max_size() const { return max; }
 };

@@ -46,7 +46,7 @@ class FrameManager {
 
   template<bool limit = false>
   laddr alloc( size_t size, vaddr upperlimit = topaddr ) {
-    KASSERT( aligned(size, pagesize<1>()), size );
+    KASSERT1( aligned(size, pagesize<1>()), size );
     vaddr addr = availableMemory.retrieve<limit>(size, upperlimit);
     if (!limit && likely(addr == topaddr)) addr = fc.reclaim(size);
     DBG::outln(DBG::Frame, "FM alloc: ", FmtHex(size), " -> ", FmtHex(addr));
@@ -55,15 +55,15 @@ class FrameManager {
 
   bool reserve( laddr addr, size_t size ) {
     DBG::outln(DBG::Frame, "FM reserve: ", FmtHex(addr), '/', FmtHex(size));
-    KASSERT( aligned(addr, pagesize<1>()), addr );
-    KASSERT( aligned(size, pagesize<1>()), size );
+    KASSERT1( aligned(addr, pagesize<1>()), addr );
+    KASSERT1( aligned(size, pagesize<1>()), size );
     return availableMemory.remove(addr,size);
   }
 
   bool release( laddr addr, size_t size ) {
     DBG::outln(DBG::Frame, "FM release: ", FmtHex(addr), '/', FmtHex(size));
-    KASSERT( aligned(addr, pagesize<1>()), addr );
-    KASSERT( aligned(size, pagesize<1>()), size );
+    KASSERT1( aligned(addr, pagesize<1>()), addr );
+    KASSERT1( aligned(size, pagesize<1>()), size );
     return availableMemory.insert(addr, size);
   }
 

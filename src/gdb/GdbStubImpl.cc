@@ -15,7 +15,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 #include "dev/Serial.h"
-#include "util/Log.h"
 #include "mach/Machine.h"
 
 unsigned int sys_gdb_port;

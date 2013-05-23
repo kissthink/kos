@@ -25,11 +25,11 @@ echo 'menuentry "KOS" {' >> $stage/boot/grub/grub.cfg
 echo -n "  multiboot2 /boot/$kernel" >> $stage/boot/grub/grub.cfg
 echo -n " acpi,boot,dev,frame,libc,pci,vm" >> $stage/boot/grub/grub.cfg
 [ "$1" = "gdb" ] && {
-	echo -n ",gdb" >> $stage/boot/grub/grub.cfg
+	echo -n ",gdbe" >> $stage/boot/grub/grub.cfg
 	shift 1
 }
-[ "$1" = "allstopgdb" ] && {
-	echo -n ",gdb,allstopgdb" >> $stage/boot/grub/grub.cfg
+[ "$1" = "gdba" ] && {
+	echo -n ",gdbe,gdba" >> $stage/boot/grub/grub.cfg
 	shift 1
 }
 echo >> $stage/boot/grub/grub.cfg

@@ -17,7 +17,7 @@
 #ifndef _EmbeddedQueue_h_
 #define _EmbeddedQueue_h_ 1
 
-#include "Log.h"
+#include "Output.h"
 
 template<typename T, int ID = 0> class EmbeddedQueue;
 
@@ -39,15 +39,15 @@ public:
     tail = e;
   }
   T* front() {
-    KASSERT(!empty(), this);
+    KASSERT0(!empty());
     return head;
   }
   const T* front() const {
-    KASSERT(!empty(), this);
+    KASSERT0(!empty());
     return head;
   }
   void pop() {
-    KASSERT(!empty(), this);
+    KASSERT0(!empty());
     head = head->EmbeddedElement<T,ID>::next;
   }
 };

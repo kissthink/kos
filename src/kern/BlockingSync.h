@@ -87,7 +87,7 @@ public:
   }
   void release() {
     lk.acquire();
-    KASSERT(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
+    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
     if likely(waiting()) {
       owner = resume();
     } else {

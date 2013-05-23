@@ -15,21 +15,19 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 #include "util/Debug.h"
-#include "util/Log.h"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
 
 extern "C" void abort() {
-  kcout << "ABORT - ";
-  Reboot();
+  ABORT0();
 }
 
 // for C-style 'assert' (e.g., from malloc.c)
 extern "C" void __assert_func( const char* const file, const char* const line,
   const char* const func, const char* const expr ) {
-  kcerr << file << ':' << line << ' ' << func << ' ' << expr << kendl;
-  kcdbg << file << ':' << line << ' ' << func << ' ' << expr << kendl;
+  StdErr.outln(file, ':', line, ' ', func, ' ', expr);
+  StdDbg.outln(file, ':', line, ' ', func, ' ', expr);
 }
 
 #if 0
@@ -49,15 +47,15 @@ extern "C" void* malloc(size_t s) {
 /******* dummy functions *******/
 
 extern "C" int close(int) {
-  KASSERT(false, "close"); return -1;
+  ABORT1("close"); return -1;
 }
 
 extern "C" void _exit(int) {
-  KASSERT(false, "_exit");
+  ABORT1("_exit");
 }
 
 extern "C" int fstat(int fd, struct stat *buf) {
-  KASSERT(false, "fstat"); return -1;
+  ABORT1("fstat"); return -1;
 }
 
 extern "C" char *getenv(const char *name) {
@@ -66,35 +64,35 @@ extern "C" char *getenv(const char *name) {
 }
 
 extern "C" pid_t getpid() {
-  KASSERT(false, "getpid"); return -1;
+  ABORT1("getpid"); return -1;
 }
 
 extern "C" int isatty(int fd) {
-  KASSERT(false, "isatty"); return -1;
+  ABORT1("isatty"); return -1;
 }
 
 extern "C" int kill(pid_t pid, int sig) {
-  KASSERT(false, "kill"); return -1;
+  ABORT1("kill"); return -1;
 }
 
 extern "C" off_t lseek(int fd, off_t offset, int whence) {
-  KASSERT(false, "lseek"); return -1;
+  ABORT1("lseek"); return -1;
 }
   
 extern "C" int open(const char *path, int oflag, int mode) {
-  KASSERT(false, "close"); return -1;
+  ABORT1("close"); return -1;
 }
 
 extern "C" ssize_t read(int fd, char* buf, int len) {
-  KASSERT(false, "read"); return -1;
+  ABORT1("read"); return -1;
 }
   
 extern "C" void* sbrk(intptr_t increment) {
-  KASSERT(false, "sbrk"); return nullptr;
+  ABORT1("sbrk"); return nullptr;
 }
 
 extern "C" ssize_t write(int fd, char* buf, int len) {
-  KASSERT(false, "write"); return -1;
+  ABORT1("write"); return -1;
 }
 
 void *__dso_handle = nullptr;

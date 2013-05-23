@@ -17,9 +17,7 @@
 #ifndef _PCI_h_
 #define _PCI_h_ 1
 
-#include "util/basics.h"
 #include "util/Debug.h"
-#include "util/Log.h"
 #include "mach/platform.h"
 
 class PCI {
@@ -52,7 +50,7 @@ public:
       case 8:  return  in8(DataPort);
       case 16: return in16(DataPort);
       case 32: return in32(DataPort);
-      default: KASSERT(false, width); return 0;
+      default: ABORT1(width); return 0;
     }
   }
 
@@ -64,7 +62,7 @@ public:
       case 8:   out8( DataPort, value ); break;
       case 16: out16( DataPort, value ); break;
       case 32: out32( DataPort, value ); break;
-      default: KASSERT(false, width);
+      default: ABORT1(width);
     }
   }
 

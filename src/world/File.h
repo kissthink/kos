@@ -17,7 +17,7 @@
 #ifndef _File_h_
 #define _File_h_ 1
 
-#include "util/Log.h"
+#include "util/Output.h"
 #include "mach/platform.h"
 
 #include <errno.h>
@@ -33,8 +33,8 @@ class File {
 public:
   File(vaddr s, size_t l) : length(l), offset(0) {
     start = new char[align_up(l, BlockSize)];
-    KASSERT( vaddr(start) != topaddr && start != nullptr, "out of memory" );
-    kcout << FmtHex(start) << kendl;
+    KASSERT0(vaddr(start) != topaddr);
+    KASSERT0(start != nullptr);
     memcpy(start, bufptr_t(s), l);
   }
 

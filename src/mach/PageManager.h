@@ -17,7 +17,6 @@
 #ifndef _PageManager_h_
 #define _PageManager_h_ 1
 
-#include "util/Log.h"
 #include "util/Debug.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
@@ -117,13 +116,13 @@ private:
     // must allocate frames that are currently identity-mapped -> below boot code
     PageEntry* pml4 = (PageEntry*)fm.alloc<true>(pagetablesize(), kernelBoot);
     DBG::outln(DBG::Paging, "FM/pml4: ", fm );
-    KASSERT(laddr(pml4) != topaddr, pml4);
+    KASSERT1(laddr(pml4) != topaddr, pml4);
     PageEntry* pdpt = (PageEntry*)fm.alloc<true>(pagetablesize(), kernelBoot);
     DBG::outln(DBG::Paging, "FM/pdpt: ", fm );
-    KASSERT(laddr(pdpt) != topaddr, pdpt);
+    KASSERT1(laddr(pdpt) != topaddr, pdpt);
     PageEntry* pd   = (PageEntry*)fm.alloc<true>(pagetablesize(), kernelBoot);
     DBG::outln(DBG::Paging, "FM/pd: ", fm );
-    KASSERT(laddr(pd) != topaddr, pd);
+    KASSERT1(laddr(pd) != topaddr, pd);
     memset(pml4, 0, pagetablesize());
     memset(pdpt, 0, pagetablesize());
     memset(pd,   0, pagetablesize());
@@ -156,7 +155,7 @@ private:
   static inline mword vtolInternal( mword vma ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
-    KASSERT(pe->P, FmtHex(vma));
+    KASSERT1(pe->P, FmtHex(vma));
     if (pe->PS) return (pe->ADDR << pageoffsetbits) + offset<N>(vma);
     else return vtolInternal<N-1>(vma);
   }
@@ -165,7 +164,7 @@ private:
   static void relabel( vaddr vma, Owner owner, PageType type ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
-    KASSERT( pe->P, FmtHex(vma) );
+    KASSERT1( pe->P, FmtHex(vma) );
     pe->c = (pe->c & ~pageMask) | owner | type;
     relabel<N+1>(vma, owner, type);
   }
@@ -181,7 +180,7 @@ protected:
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     maprecursive<N+1>(vma,owner);
     PageEntry* pe = getEntry<N+1>(vma);
-    KASSERT(N+1 == pagelevels || !pe->PS, FmtHex(vma));
+    KASSERT1(N+1 == pagelevels || !pe->PS, FmtHex(vma));
     DBG::out(DBG::Paging, ' ', pe);
     if unlikely(!pe->P) {
       DBG::out(DBG::Paging, 'A');
@@ -194,13 +193,13 @@ protected:
   template <unsigned int N>
   static inline void map( mword vma, mword lma, Owner owner, PageType type ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
-    KASSERT( aligned(vma, pagesize<N>()), FmtHex(vma) );
-    KASSERT( (lma & ~ADDR()) == 0, FmtHex(lma) );
+    KASSERT1( aligned(vma, pagesize<N>()), FmtHex(vma) );
+    KASSERT1( (lma & ~ADDR()) == 0, FmtHex(lma) );
     DBG::outln(DBG::Paging, "mapping: ", FmtHex(vma), '/', FmtHex(pagesize<N>()), " -> ", FmtHex(lma));
     maprecursive<N>(vma,owner);
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, ' ', pe);
-    KASSERT( !pe->P, FmtHex(vma) );
+    KASSERT1( !pe->P, FmtHex(vma) );
     pe->c = owner | type | lma;
     if (N > 1) pe->c |= PS();
   }
@@ -219,7 +218,7 @@ protected:
     static_assert( N >= 1 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, "unmapping ", FmtHex(vma), '/', FmtHex(pagesize<N>()), ": ", pe);
-    KASSERT( pe->P, FmtHex(vma) );
+    KASSERT1( pe->P, FmtHex(vma) );
     pe->P = 0;
     mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before recursion
     if (levels > 0) unmaprecursive<N>(vma, levels - 1);
@@ -250,7 +249,7 @@ template<> inline void PageManager::relabel<pagelevels+1>( vaddr, PageManager::O
 
 template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);
-  KASSERT(pe->P, FmtHex(vma));
+  KASSERT1(pe->P, FmtHex(vma));
   return ADDR(pe->c) + offset<1>(vma);
 }
 

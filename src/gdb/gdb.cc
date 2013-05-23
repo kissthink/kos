@@ -1,17 +1,16 @@
 #include "gdb.h"
 #include "GdbCpu.h"
 #include "Semaphore.h"
-#include "util/Log.h"
-#include "mach/platform.h"
+#include "util/Debug.h"
+#include "util/SpinLock.h"
 #include "mach/CPU.h"
 #include "mach/APIC.h"
 #include "mach/Memory.h"
 #include "mach/Processor.h"
-#include "util/SpinLock.h"
 
 using namespace gdb;
 
-extern void set_debug_traps();      // from x86_64-stub.cc
+extern void set_debug_traps(bool);  // from x86_64-stub.cc
 extern void breakpoint();           // from x86_64-stub.cc
 
 SpinLock mutex;                     // mutex for GDB object
@@ -22,19 +21,15 @@ GDB& GDB::getInstance() {
   return gdb;
 }
 
-GDB::GDB()
-: cpuStates(0), processorTable(0)
-, numCpu(0), numInitialized(0), enumIdx(0)
-, sem(0)
-, vContActionQueue(0), vContActionReply(0)
-{}
+GDB::GDB() : cpuStates(0), processorTable(0) , numCpu(0), numInitialized(0),
+  enumIdx(0), sem(0), vContActionQueue(0), vContActionReply(nullptr) {}
 
 void GDB::init(int numCpu, Processor* processorTable) {
-  KASSERT(numCpu > 0, numCpu);
+  KASSERT0(numCpu);
   this->numCpu = numCpu;
   cpuStates = new GdbCpuState[numCpu];
   this->processorTable = processorTable;
-  kcdbg << "Processor table " << FmtHex(processorTable) << "\n";
+  DBG::outln(DBG::GDBDebug, "Processor table ", FmtHex(processorTable));
   sem = new Semaphore[numCpu];
   vContActionQueue = new EmbeddedQueue<VContAction>[numCpu];
   for (int i = 0; i < numCpu; i++) {
@@ -42,7 +37,7 @@ void GDB::init(int numCpu, Processor* processorTable) {
   }
 
   setupGDB(0);        // install CpuStates needed for GDB in BSP
-  kcdbg << "GDB state initialized for " << numCpu << " cores.\n";
+  DBG::outln(DBG::GDBDebug, "GDB state initialized for ", numCpu, " cores");
 }
 
 GdbCpuState* GDB::getCurrentCpuState() const {
@@ -58,15 +53,15 @@ GdbCpuState* GDB::_getCurrentCpuState() const {
 
 GdbCpuState* GDB::getCpuState(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   return &cpuStates[cpuIdx];
 }
 
 void GDB::setupGDB(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   processorTable[cpuIdx].initGdbCpuStates(&cpuStates[cpuIdx]);
-  kcdbg << "setup cpu: " << cpuIdx+1 << "\n";
+  DBG::outln(DBG::GDBDebug, "setup cpu: ", cpuIdx+1);
   numInitialized = cpuIdx+1;
   cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
 }
@@ -96,14 +91,14 @@ char* GDB::getRegs32() const {
 
 const char* GDB::getCpuId(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   return cpuStates[cpuIdx].getId();
 }
 
-void GDB::startGdb() {
-  KASSERT(numCpu > 0, numCpu);
-  set_debug_traps();
-  kcout << "Waiting for GDB connection\n";
+void GDB::startGdb(bool allstop) {
+  KASSERT0(numCpu);
+  set_debug_traps(allstop);
+  StdOut.outln("Waiting for GDB connection");
   cpuStates[0].setCpuState(cpuState::RUNNING);
   breakpoint();
 }
@@ -120,7 +115,7 @@ int GDB::getNumCpusInitialized() const {
 
 void GDB::setGCpu(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   asm volatile("mov %0, %%fs:64" :: "r"(&cpuStates[cpuIdx]) : "memory");
 }
 
@@ -134,7 +129,7 @@ GdbCpuState* GDB::getGCpu() const {
 
 void GDB::setCCpu(int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
   asm volatile("mov %0, %%fs:56" :: "r"(&cpuStates[cpuIdx]) : "memory");
 }
 
@@ -152,41 +147,41 @@ void GDB::sendIPIToAllOtherCores() const {
     if (cpuStates[i].getCpuState() != cpuState::BREAKPOINT &&
         cpuStates[i].getCpuState() != cpuState::UNKNOWN) {
       LAPIC* lapic = (LAPIC *) lapicAddr;
-      kcdbg << "sending ipi 0x1 from " << curCpuIdx+1 << " to core: " << i+1 << "\n";
-      KASSERT(lapic != 0, "LAPIC is NULL");
+      DBG::outln(DBG::GDBDebug, "sending ipi 0x1 from ", curCpuIdx+1, " to core: ", i+1);
+      KASSERT0(lapic);
       mword err = lapic->sendIPI(i, 0x1);
-      KASSERT(err == 0, FmtHex(err));
+      KASSERT1(!err, FmtHex(err));
     }
   }
 }
 
 void GDB::P(int cpuIdx) {
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  KASSERT(cpuIdx < numInitialized, cpuIdx);
-  kcdbg << "enter P(" << cpuIdx+1 << ")\n";
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx < numInitialized, cpuIdx);
+  DBG::outln(DBG::GDBDebug, "enter P(", cpuIdx+1, ')');
   sem[cpuIdx].P();
-  kcdbg << "leave P(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::GDBDebug, "leave P(", cpuIdx+1, ')');
 }
 
 void GDB::V(int cpuIdx) {
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  KASSERT(cpuIdx < numInitialized, cpuIdx);
-  kcdbg << "enter V(" << cpuIdx+1 << ")\n";
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx < numInitialized, cpuIdx);
+  DBG::outln(DBG::GDBDebug, "enter V(", cpuIdx+1, ')');
   sem[cpuIdx].V();
-  kcdbg << "leave V(" << cpuIdx+1 << ")\n";
+  DBG::outln(DBG::GDBDebug, "leave V(", cpuIdx+1, ')');
 }
 
 void GDB::addVContAction(VContAction* action, int cpuIdx) {
   ScopedLockISR<> so(mutex);
-  KASSERT(action != 0, action);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  KASSERT(cpuIdx < numInitialized, cpuIdx);
+  KASSERT0(action);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx < numInitialized, cpuIdx);
   vContActionQueue[cpuIdx].push(action);
 }
 
 void GDB::addVContAction(VContAction* action) {
   ScopedLockISR<> so(mutex);
-  KASSERT(action != 0, action);
+  KASSERT0(action);
   vContActionQueue[Processor::getApicID()].push(action);
 }
 
@@ -197,8 +192,8 @@ bool GDB::isEmptyVContActionQueue() const {
 
 bool GDB::isEmptyVContActionQueue(int cpuIdx) const {
   ScopedLockISR<> so(mutex);
-  KASSERT(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-  KASSERT(cpuIdx < numInitialized, cpuIdx);
+  KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
+  KASSERT1(cpuIdx < numInitialized, cpuIdx);
   return vContActionQueue[cpuIdx].empty();
 }
 
@@ -219,7 +214,7 @@ void GDB::popVContAction() {
 
 void GDB::setVContActionReply(int signal) {
   ScopedLockISR<> so(mutex);
-  KASSERT(vContActionReply == 0, "Pending vCont stop reply.");
+  KASSERT1(vContActionReply == 0, vContActionReply);
   vContActionReply = new VContActionReply(
       Processor::getApicID(),
       signal
@@ -228,7 +223,7 @@ void GDB::setVContActionReply(int signal) {
 
 VContActionReply* GDB::removeVContActionReply() {
   ScopedLockISR<> so(mutex);
-  KASSERT(vContActionReply, "vCont stop reply not set.");
+  KASSERT0(vContActionReply);
   VContActionReply* reply = vContActionReply;
   vContActionReply = 0;
   return reply;

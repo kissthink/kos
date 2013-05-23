@@ -14,9 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
+#include "util/OutputSafe.h"
 #include "mach/platform.h"
 #include "mach/asm_functions.h"
-#include "util/Log.h"
 
 extern void Breakpoint2(vaddr ia) {
   asm volatile( "nop" ::: "memory" );
@@ -25,12 +25,12 @@ extern void Breakpoint2(vaddr ia) {
 void Reboot(vaddr ia) {
   mword rbp;
   asm volatile("mov %%rbp, %0" : "=r"(rbp) :: "memory");
-  kcout << "Backtrace:";
+  StdOut.out("Backtrace:");
   for (int i = 0; i < 20 && rbp != 0; i += 1) {
-    kcout << ' ' << FmtHex(*(mword*)(rbp + sizeof(mword)));
+    StdOut.out(' ', FmtHex(*(mword*)(rbp + sizeof(mword))));
     rbp = *(mword*)(rbp);
   }
-  kcout << kendl;
+  StdOut.out(kendl);
   Breakpoint(ia);
   asm volatile("cli" ::: "memory");       // disable interrupts
   while (in8(0x64) & 0x01) in8(0x60);     // clear read buffer

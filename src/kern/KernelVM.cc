@@ -17,15 +17,14 @@
 #include "extern/dlmalloc/malloc_glue.h"
 #include "extern/dlmalloc/malloc.h"
 #include "util/Debug.h"
-#include "util/Log.h"
 #include "kern/AddressSpace.h"
 #include "kern/Kernel.h"
 #include "kern/KernelVM.h"
 
 ptr_t operator new(size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }  
 ptr_t operator new[](size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }
-void operator delete(ptr_t p) noexcept { KASSERT(false, "delete" ); }
-void operator delete[](ptr_t p) noexcept { KASSERT(false, "delete[]" ); }
+void operator delete(ptr_t p) noexcept { ABORT1("delete"); }
+void operator delete[](ptr_t p) noexcept { ABORT1("delete[]"); }
 
 void globaldelete(ptr_t addr, size_t size) {
   kernelVM.release<false>((vaddr)addr, size);
@@ -33,7 +32,7 @@ void globaldelete(ptr_t addr, size_t size) {
 
 extern "C" void* mmap(void* addr, size_t len, int, int, int, _off64_t) {
   DBG::out(DBG::VM, "VM/mmap: ", FmtHex(addr), '/', FmtHex(len));
-  KASSERT(!addr, addr);
+  KASSERT1(!addr, addr);
   void* p = (void*)kernelVM.alloc(len);
   DBG::outln(DBG::Libc, " -> ", p);
   return p;
@@ -49,9 +48,9 @@ void KernelVM::expand(size_t size) {
   // allocate/insert pow2-aligned chunk of at least default page size
   size = std::max(pow2(ceilinglog2(size)), pagesize<dpl>());
   vaddr newmem = kernelSpace.allocPages<dpl>(size, AddressSpace::Data);
-  KASSERT( newmem != topaddr, "out of memory?" );
+  KASSERTN(newmem != topaddr, *this);
   bool check = availableMemory.insert(newmem, size);
-  KASSERT( check, newmem );
+  KASSERT1(check, newmem);
 }
 
 void KernelVM::checkExpand(size_t size) {
@@ -64,31 +63,31 @@ void KernelVM::checkExpand(size_t size) {
 }
 
 vaddr KernelVM::allocInternal(size_t size) {
-  KASSERT( aligned(size, pow2(min)), size );
+  KASSERT1(aligned(size, pow2(min)), FmtHex(size));
   ScopedLock<> so(lock);
   checkExpand(size);
   vaddr addr = availableMemory.retrieve(size);
-  KASSERT( addr != topaddr, *this );
+  KASSERTN(addr != topaddr, *this);
   return addr;
 }
 
 void KernelVM::releaseInternal(vaddr p, size_t size) {
-  KASSERT( aligned(p, pow2(min)), p );
-  KASSERT( aligned(size, pow2(min)), size );
+  KASSERTN( aligned(p, pow2(min)), FmtHex(p), '/', FmtHex(size) );
+  KASSERTN( aligned(size, pow2(min)), FmtHex(p), '/', FmtHex(size) );
   ScopedLock<> so(lock);
   availableMemory.insert(p, size);
   // TODO: would be nice to have retrieveMax in BuddyMap
   while ( availableMemory.check(pagesize<dpl>()) ) {
     vaddr addr = availableMemory.retrieve(pagesize<dpl>());
-    KASSERT(addr != topaddr, "internal error");
+    KASSERTN(addr != topaddr, *this);
     bool check = kernelSpace.releasePages<dpl>(addr, pagesize<dpl>());
-    KASSERT( check, addr );
+    KASSERT1( check, addr );
   }
 }
 
 // memory is used to initialize dlmalloc's mspace
 void KernelVM::init(vaddr start, vaddr end) {
-  KASSERT( end - start >= DEFAULT_GRANULARITY, end - start );
+  KASSERTN( end - start >= DEFAULT_GRANULARITY, FmtHex(start), '-', FmtHex(end) );
   kmspace = create_mspace_with_base( (ptr_t)start, end - start, 0 );
 }
 

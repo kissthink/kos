@@ -60,7 +60,7 @@ function build_gcc() {
 	tar xaf $DLDIR/$BINUTILS.tar.bz2 --strip-components 1 || error "$BINUTILS extract"
 	tar xaf $DLDIR/$NEWLIB.tar.gz --strip-components 1 || error "$NEWLIB extract"
 	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
-# for 4.8.0 only:
+# for binutils 2.32.2:
 #	sed -i -e 's/@colophon/@@colophon/' \
 #	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
 	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure

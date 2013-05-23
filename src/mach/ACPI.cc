@@ -17,7 +17,7 @@
 extern "C" {
 #include "extern/acpica/source/include/acpi.h"
 }
-#include "util/Log.h"
+#include "util/Output.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
 #include "mach/PCI.h"
@@ -38,7 +38,7 @@ static void* sciContext = nullptr;
 extern "C" void isr_handler_0x29() { // SCI interrupt
   if (sciHandler) {
     UINT32 retCode = sciHandler(sciContext);
-    KASSERT(retCode == ACPI_INTERRUPT_HANDLED, retCode);
+    KASSERT1(retCode == ACPI_INTERRUPT_HANDLED, retCode);
   }
   Processor::sendEOI();
 }
@@ -49,13 +49,13 @@ void Machine::initACPI(vaddr r) {
 
   // initialize acpi tables
   ACPI_STATUS status = AcpiInitializeTables( NULL, 0, true );
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 
   // FADT is need to check for PS/2 keyboard
   acpi_table_fadt* fadt;
   char FADT[] = "FACP";
   status = AcpiGetTable( FADT, 0, (ACPI_TABLE_HEADER**)&fadt );
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
   DBG::out(DBG::Acpi, "FADT: ", fadt->Header.Length, '/', FmtHex(fadt->BootFlags));
   if (fadt->BootFlags & ACPI_FADT_8042) {
     DBG::out(DBG::Acpi, " - 8042");
@@ -67,7 +67,7 @@ void Machine::initACPI(vaddr r) {
   acpi_table_madt* madt;
   char MADT[] = "APIC";
   status = AcpiGetTable( MADT, 0, (ACPI_TABLE_HEADER**)&madt );
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
   int madtLength = madt->Header.Length - sizeof(acpi_table_madt);
   vaddr apicPhysAddr = madt->Address;
   DBG::out(DBG::Acpi, "MADT: ", madtLength, '/', FmtHex(apicPhysAddr));
@@ -85,7 +85,7 @@ void Machine::initACPI(vaddr r) {
   // walk through subtables and gather information in dynamic maps
   acpi_subtable_header* subtable = (acpi_subtable_header*)(madt + 1);
   while (madtLength > 0) {
-    KASSERT(subtable->Length <= madtLength, "ACPI MADT subtable error");
+    KASSERTN(subtable->Length <= madtLength, subtable->Length, '/', madtLength);
     switch (subtable->Type) {
     case ACPI_MADT_TYPE_LOCAL_APIC: {
       acpi_madt_local_apic* la = (acpi_madt_local_apic*)subtable;
@@ -135,14 +135,14 @@ void Machine::initACPI(vaddr r) {
       DBG::out(DBG::Acpi, " GENERIC_INTERRUPT"); break;
     case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
       DBG::out(DBG::Acpi, " GENERIC_DISTRIBUTOR"); break;
-    default: KASSERT(false, "unknown ACPI MADT subtable");
+    default: ABORT1("unknown ACPI MADT subtable");
     }
     madtLength -= subtable->Length;
     subtable = (acpi_subtable_header*)(((char*)subtable) + subtable->Length);
   }
   DBG::out(DBG::Acpi, kendl);
 
-  KASSERT(apicMap.size() > 0, "no APIC found");
+  KASSERT0(apicMap.size());
 
   // map APIC page and enable local APIC
   MSR::enableAPIC();                // should be enabled by default
@@ -162,7 +162,7 @@ void Machine::initACPI(vaddr r) {
   DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
   // IOAPIC irq range should at leave cover standard PIC irqs
-  KASSERT(irqCount >= PIC::Max, irqCount );
+  KASSERT1(irqCount >= PIC::Max, irqCount );
 
   // fill irqTable
   irqTable = new IrqInfo[irqCount];
@@ -170,7 +170,7 @@ void Machine::initACPI(vaddr r) {
     irqTable[i] = { 0, 0 };
   }
   for (const std::pair<uint32_t,IrqInfo>& i : irqMap) {
-    KASSERT( i.first < irqCount, i.first );
+    KASSERTN( i.first < irqCount, i.first, ' ', irqCount );
     irqTable[i.first] = i.second;
   }
 
@@ -180,7 +180,7 @@ void Machine::initACPI(vaddr r) {
     irqOverrideTable[i] = { i, 0 };
   }
   for (const std::pair<uint32_t,IrqOverrideInfo>& i : irqOverrideMap) {
-    KASSERT( i.first < irqCount, i.first )
+    KASSERTN( i.first < irqCount, i.first, ' ', irqCount )
     irqOverrideTable[i.first] = i.second;
   }
 }
@@ -194,9 +194,9 @@ static ACPI_STATUS display(ACPI_HANDLE handle, UINT32 level, void* ctx, void** r
   path.Length = sizeof(buffer);
   path.Pointer = buffer;
   status = AcpiGetName(handle, ACPI_FULL_PATHNAME, &path);
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
   status = AcpiGetObjectInfo(handle, &info);
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 #ifdef ACPICA_OUTPUT
   char* name = (char*)&info->Name;
   AcpiOsPrintf("%c%c%c%c HID: %s, ADR: %.8X, Status: %x\n",
@@ -210,25 +210,25 @@ void Machine::parseACPI() {
   ACPI_STATUS status;
 
   status = AcpiInitializeSubsystem();
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 //  status = AcpiReallocateRootTable();
-//  KASSERT( status == AE_OK, status );  
+//  KASSERT1( status == AE_OK, status );  
   status = AcpiLoadTables();
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 
   // TODO: install notification handlers
 
   status = AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
   status = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 
   ACPI_HANDLE sysBusHandle = ACPI_ROOT_OBJECT;
   AcpiWalkNamespace(ACPI_TYPE_DEVICE, sysBusHandle, -1, display, NULL, NULL, NULL);
 
   // TODO: in principle, the ACPI subsystem keeps running...
   status = AcpiTerminate();
-  KASSERT( status == AE_OK, status );
+  KASSERT1( status == AE_OK, status );
 
   // clean up ACPI leftover memory allocations
   for (std::pair<vaddr,mword> a : allocations ) {
@@ -300,7 +300,7 @@ ACPI_STATUS AcpiOsDeleteSemaphore(ACPI_SEMAPHORE Handle) {
 ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units,
   UINT16 Timeout) {
 
-  KASSERT(Timeout == 0xFFFF || Timeout == 0, Timeout);
+  KASSERT1(Timeout == 0xFFFF || Timeout == 0, Timeout);
   for (UINT32 x = 0; x < Units; x += 1) reinterpret_cast<Semaphore*>(Handle)->P();
   return AE_OK;
 }
@@ -312,18 +312,18 @@ ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units) {
 
 #if 0
 ACPI_STATUS AcpiOsCreateMutex(ACPI_MUTEX* OutHandle) {
-  KASSERT(false,"");
+  ABORT1(false,"");
   return AE_ERROR;
 }
 
-void AcpiOsDeleteMutex(ACPI_MUTEX Handle) { KASSERT(false,""); }
+void AcpiOsDeleteMutex(ACPI_MUTEX Handle) { ABORT1(false,""); }
 
 ACPI_STATUS AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout) {
-  KASSERT(false,"");
+  ABORT1(false,"");
   return AE_ERROR;
 }
 
-void AcpiOsReleaseMutex(ACPI_MUTEX Handle) { KASSERT(false,""); }
+void AcpiOsReleaseMutex(ACPI_MUTEX Handle) { ABORT1(false,""); }
 #endif
 
 void* AcpiOsAllocate(ACPI_SIZE Size) {
@@ -444,17 +444,17 @@ ACPI_THREAD_ID AcpiOsGetThreadId(void) {
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type,
   ACPI_OSD_EXEC_CALLBACK Function, void* Context) {
 
-  KASSERT(false,"");
+  ABORT0();
   return AE_ERROR;
 }
 
-void AcpiOsWaitEventsComplete(void* Context) { KASSERT(false,""); }
+void AcpiOsWaitEventsComplete(void* Context) { ABORT0(); }
 
-void AcpiOsSleep(UINT64 Milliseconds) { return; KASSERT(false,""); } // HP netbook
+void AcpiOsSleep(UINT64 Milliseconds) { return; ABORT0(); } // HP netbook
 
-void AcpiOsStall(UINT32 Microseconds) { return; KASSERT(false,""); } // AMD 2427
+void AcpiOsStall(UINT32 Microseconds) { return; ABORT0(); } // AMD 2427
 
-void AcpiOsWaitEventsComplete() { KASSERT(false,""); }
+void AcpiOsWaitEventsComplete() { ABORT0(); }
 
 ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32* Value, UINT32 Width) {
   switch (Width) {
@@ -477,12 +477,12 @@ ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Width)
 }
 
 ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64* Value, UINT32 Width) {
-  KASSERT(false,"");
+  ABORT0();
   return AE_ERROR;
 }
 
 ACPI_STATUS AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT32 Width) {
-  KASSERT(false,"");
+  ABORT0();
   return AE_ERROR;
 }
 
@@ -503,22 +503,22 @@ ACPI_STATUS AcpiOsWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Reg,
 }
 
 BOOLEAN AcpiOsReadable(void* Pointer, ACPI_SIZE Length) {
-  KASSERT(false,"");
+  ABORT0();
   return false;
 }
 
 BOOLEAN AcpiOsWritable(void* Pointer, ACPI_SIZE Length) {
-  KASSERT(false,"");
+  ABORT0();
   return false;
 }
 
 UINT64 AcpiOsGetTimer(void) {
-  KASSERT(false,"");
+  ABORT0();
   return 0;
 }
 
 ACPI_STATUS AcpiOsSignal(UINT32 Function, void* Info) {
-  KASSERT(false,"");
+  ABORT0();
   return AE_ERROR;
 }
 
@@ -526,31 +526,31 @@ void ACPI_INTERNAL_VAR_XFACE AcpiOsPrintf(const char* Format, ...) {
 #ifdef ACPICA_OUTPUT
   va_list args;
   va_start(args, Format);
-  kcdbg << Printf(Format, args) << kendl;
+  StdDbg.outln(Printf(Format, args));
 #endif
 }
 
 void AcpiOsVprintf(const char* Format, va_list Args) {
 #ifdef ACPICA_OUTPUT
-  kcdbg << Printf(Format, args) << kendl;
+  StdDbg.outln(Printf(Format, args));
 #endif
 }
 
-void AcpiOsRedirectOutput(void* Destination) { KASSERT(false,""); }
+void AcpiOsRedirectOutput(void* Destination) { ABORT0(); }
 
 ACPI_STATUS AcpiOsGetLine(char* Buffer, UINT32 BufferLength, UINT32* BytesRead) {
-  KASSERT(false,"");
+  ABORT0();
   return AE_ERROR;
 }
 
 void* AcpiOsOpenDirectory(char* Pathname, char* WildcardSpec, char RequestedFileType) {
-  KASSERT(false,"");
+  ABORT0();
   return nullptr;
 }
 
 char* AcpiOsGetNextFilename(void* DirHandle) {
-  KASSERT(false,"");
+  ABORT0();
   return nullptr;
 }
 
-void AcpiOsCloseDirectory(void* DirHandle) { KASSERT(false,""); }
+void AcpiOsCloseDirectory(void* DirHandle) { ABORT0(); }

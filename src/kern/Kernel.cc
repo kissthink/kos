@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/Log.h"
+#include "util/OutputSafe.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
 #include "kern/AddressSpace.h"
@@ -38,8 +38,8 @@ void apIdleLoop() {
 
 void bspIdleLoop() {
   Machine::initBSP2();
-  kcout << "Welcome to KOS!\n";
-  Thread::create(mainLoop, nullptr, kernelSpace)->setName("BSP");
+  StdOut.outln("Welcome to KOS!");
+  Thread::create(mainLoop, nullptr, kernelSpace, "BSP");
   for (;;) Pause();
 }
 
@@ -59,8 +59,8 @@ void mainLoop(ptr_t) {
   for (;;) {
     char c;
     if (f1->read( &c, 1 ) == 0) break;
-    kcout << c;
-    kcdbg << c;
+    StdOut.out(c);
+    StdDbg.out(c);
   }
 
 	File* f = kernelFS.find("testprogram2")->second;
@@ -73,8 +73,7 @@ void mainLoop(ptr_t) {
 
 	//ELF Loader
 	ELFLoader elfLoader;
-	if(elfLoader.loadAndMapELF(f,&userAS))
-	{
+	if (elfLoader.loadAndMapELF(f,&userAS)) {
 		//Clone and Activate Address Space
 		userAS.clonePagetable(kernelSpace);
 		userAS.activate();
@@ -82,8 +81,8 @@ void mainLoop(ptr_t) {
 		//Execute Program
 		int (*func_ptr)(void);
 		func_ptr = (int (*)(void))elfLoader.findMainAddress();
-		KASSERT(vaddr(func_ptr) != topaddr, "main not found");
-		kcerr << "return value: "<< func_ptr() << kendl;
+		KASSERT0(vaddr(func_ptr) != topaddr);
+		StdOut.outln("return value: ", func_ptr());
 
 		//Activate Kernel Space again
 		kernelSpace.activate();
@@ -91,30 +90,30 @@ void mainLoop(ptr_t) {
 
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
-  Thread::create(task, nullptr, kernelSpace)->setName("A");
-  Thread::create(task, nullptr, kernelSpace)->setName("B");
-  Thread::create(task, nullptr, kernelSpace)->setName("C");
-  Thread::create(task, nullptr, kernelSpace)->setName("D");
-  Thread::create(task, nullptr, kernelSpace)->setName("E");
-  Thread::create(task, nullptr, kernelSpace)->setName("F");
-  Thread::create(task, nullptr, kernelSpace)->setName("G");
-  Thread::create(task, nullptr, kernelSpace)->setName("H");
-  Thread::create(task, nullptr, kernelSpace)->setName("I");
-  Thread::create(task, nullptr, kernelSpace)->setName("J");
-  Thread::create(task, nullptr, kernelSpace)->setName("K");
-  Thread::create(task, nullptr, kernelSpace)->setName("L");
-  Thread::create(task, nullptr, kernelSpace)->setName("M");
-  Thread::create(task, nullptr, kernelSpace)->setName("N");
-  Thread::create(task, nullptr, kernelSpace)->setName("O");
-  Thread::create(task, nullptr, kernelSpace)->setName("P");
-  Thread::create(task, nullptr, kernelSpace)->setName("Q");
-  Thread::create(task, nullptr, kernelSpace)->setName("R");
-  Thread::create(task, nullptr, kernelSpace)->setName("S");
-  Thread::create(task, nullptr, kernelSpace)->setName("T");
-  Thread::create(task, nullptr, kernelSpace)->setName("U");
-  Thread::create(task, nullptr, kernelSpace)->setName("V");
-  Thread::create(task, nullptr, kernelSpace)->setName("W");
-  Thread::create(task, nullptr, kernelSpace)->setName("X");
+  Thread::create(task, nullptr, kernelSpace, "A");
+  Thread::create(task, nullptr, kernelSpace, "B");
+  Thread::create(task, nullptr, kernelSpace, "C");
+  Thread::create(task, nullptr, kernelSpace, "D");
+  Thread::create(task, nullptr, kernelSpace, "E");
+  Thread::create(task, nullptr, kernelSpace, "F");
+  Thread::create(task, nullptr, kernelSpace, "G");
+  Thread::create(task, nullptr, kernelSpace, "H");
+  Thread::create(task, nullptr, kernelSpace, "I");
+  Thread::create(task, nullptr, kernelSpace, "J");
+  Thread::create(task, nullptr, kernelSpace, "K");
+  Thread::create(task, nullptr, kernelSpace, "L");
+  Thread::create(task, nullptr, kernelSpace, "M");
+  Thread::create(task, nullptr, kernelSpace, "N");
+  Thread::create(task, nullptr, kernelSpace, "O");
+  Thread::create(task, nullptr, kernelSpace, "P");
+  Thread::create(task, nullptr, kernelSpace, "Q");
+  Thread::create(task, nullptr, kernelSpace, "R");
+  Thread::create(task, nullptr, kernelSpace, "S");
+  Thread::create(task, nullptr, kernelSpace, "T");
+  Thread::create(task, nullptr, kernelSpace, "U");
+  Thread::create(task, nullptr, kernelSpace, "V");
+  Thread::create(task, nullptr, kernelSpace, "W");
+  Thread::create(task, nullptr, kernelSpace, "X");
   task(nullptr);
 }
 
@@ -124,8 +123,8 @@ void task(ptr_t) {
   mword id = Processor::getApicID();
   for (;;) {
     lk.acquire();
-    kcout << Processor::getCurrThread()->getName() << id << ' ';
-//    kcdbg << Processor::getCurrThread()->getName() << id << ' ';
+    StdOut.out(Processor::getCurrThread()->getName(), id, ' ');
+//    StdDbg.out(Processor::getCurrThread()->getName(), id, ' ');
     lk.release();
     mword newid;
     do {

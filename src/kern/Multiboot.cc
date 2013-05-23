@@ -26,8 +26,8 @@
   tag = (multiboot_tag*)(vaddr(tag) + ((tag->size + 7) & ~7)))
 
 vaddr Multiboot::init( mword magic, vaddr mbi ) {
-  KASSERT(magic == MULTIBOOT2_BOOTLOADER_MAGIC, magic);
-  KASSERT( !(mbi & 7), mbi );
+  KASSERT1(magic == MULTIBOOT2_BOOTLOADER_MAGIC, magic);
+  KASSERT1( !(mbi & 7), FmtHex(mbi) );
   // mbiEnd = mbi + ((multiboot_header_tag*)mbi)->size;
   mbiStart = mbi + sizeof(multiboot_header_tag);
   mbiEnd = mbi + *(uint32_t*)mbi;
@@ -79,7 +79,7 @@ void Multiboot::parseAll(laddr& modStart, laddr& modEnd) {
       DBG::out(DBG::Boot, "mmap:");
       for (mword mm = (mword)tmm->entries; mm < end; mm += tmm->entry_size ) {
         multiboot_memory_map_t* mmap = (multiboot_memory_map_t*)mm;
-        KASSERT(mmap->type <= MULTIBOOT_MEMORY_BADRAM, mmap->type);
+        KASSERT1(mmap->type <= MULTIBOOT_MEMORY_BADRAM, mmap->type);
         DBG::out(DBG::Boot, ' ', FmtHex(mmap->addr), '/', FmtHex(mmap->len), '/', memtype[mmap->type]);
       }
       DBG::out(DBG::Boot, kendl);
@@ -131,7 +131,7 @@ vaddr Multiboot::getRSDP() {
       return vaddr(((multiboot_tag_new_acpi*)tag)->rsdp);
     }
   }
-  KASSERT(false, "RSDP not found");
+  ABORT1("RSDP not found");
   return 0;
 }
 

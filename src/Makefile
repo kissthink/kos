@@ -16,7 +16,10 @@ LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
-.PHONY: all run debug rgdb rgdballstop bochs pxe lpxe rpxe qpxe usb usbtest libs tests defines dep depend echo clean vclean distclean
+.PHONY: all libs clean dep depend vclean distclean run\
+	debug rgdb rgdba rgdbdebug rgdbadebug\
+	bochs pxe lpxe rpxe qpxe\
+	usb usbtest tests defines echo
 
 .PHONY: Makefile.state
 
@@ -49,25 +52,25 @@ rgdb:
 	$(QEMURGDB) & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
 
-rgdballstop:
-	$(MAKE) RGDB=allstopgdb $(IMAGE)
+rgdba:
+	$(MAKE) RGDB=gdba $(IMAGE)
 	$(QEMURGDB) & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
 
-tgdb:
-	$(GDB) -x gdbinit.ttyS0 kernel.sys.debug
-
-gdbdebug:
+rgdbdebug:
 	$(MAKE) RGDB=gdb $(IMAGE)
 	xterm -e $(GDB) -x gdbinit.qemu kernel.sys.debug &
 	$(QEMURGDB) -s -S & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
 
-gdballstopdebug:
-	$(MAKE) RGDB=allstopgdb $(IMAGE)
+rgdbadebug:
+	$(MAKE) RGDB=gdba $(IMAGE)
 	xterm -e $(GDB) -x gdbinit.qemu kernel.sys.debug &
 	$(QEMURGDB) -s -S & sleep 1
 	$(GDB) -x gdbinit.rgdb kernel.sys.debug
+
+tgdb:
+	$(GDB) -x gdbinit.ttyS0 kernel.sys.debug
 
 bochs: $(IMAGE)
 	$(TOOLSDIR)/bin/bochs -f bochsrc -rc bochsrc.dbg -q

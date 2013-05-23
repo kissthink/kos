@@ -34,14 +34,13 @@ class Thread : public EmbeddedElement<Thread> {
   int prio;
   const char* name;
 
-  Thread(AddressSpace& as, vaddr sp, size_t s) : addressSpace(&as), stackPointer(sp), stackSize(s), prio(0), name(nullptr) {}
+  Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr) : addressSpace(&as), stackPointer(sp), stackSize(s), prio(0), name(n) {}
   ~Thread() { /* join */ }
   static void invoke( function_t func, ptr_t data );
 
 public:
   Thread* setPrio(int p) { prio = p; return this; }
   int getPrio() const { return prio; }
-  Thread* setName(const char *n) { name = n; return this; }
   const char* getName() const { return name; }
   AddressSpace& getAddressSpace() const { return *addressSpace; }
 
@@ -49,8 +48,17 @@ public:
     vaddr mem = kernelVM.alloc(stackSize) + stackSize - sizeof(Thread);
     return new (ptr_t(mem)) Thread(as, mem, stackSize);
   }
+  static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack) {
+    vaddr mem = kernelVM.alloc(stackSize) + stackSize - sizeof(Thread);
+    return new (ptr_t(mem)) Thread(as, mem, stackSize, n);
+  }
   static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize = defaultStack) {
     Thread* t = create(as, stackSize);
+    t->run(func, data);
+    return t;
+  }
+  static Thread* create(function_t func, ptr_t data, AddressSpace& as, const char *n, size_t stackSize = defaultStack) {
+    Thread* t = create(as, n, stackSize);
     t->run(func, data);
     return t;
   }

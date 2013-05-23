@@ -32,7 +32,7 @@ public:
   char* getRegs32() const;                  // a buffer storing 32-bit registers
 
   const char* getCpuId(int cpuIdx);         // returns CPU name used by GDB
-  void startGdb();                          // starts initial breakpoint
+  void startGdb(bool allstop);              // starts initial breakpoint
   int getNumCpus() const;
   int getNumCpusInitialized() const;
 

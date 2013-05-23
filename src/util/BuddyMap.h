@@ -18,7 +18,7 @@
 #define _BuddyMap_h_ 1
 
 #include "util/Bitmask.h"
-#include "util/Log.h"
+#include "util/Debug.h"
 
 #include <map>
 
@@ -48,8 +48,8 @@ private:
 
   // insert region and merge memory regions, if possible
   size_t insertAuto( vaddr addr, size_t logsize ) {
-    KASSERT( logsize < max-min, logsize );
-    KASSERT( aligned(addr, pow2(logsize)), FmtHex(addr) );
+    KASSERTN( logsize < max-min, FmtHex(addr), '/', logsize );
+    KASSERTN( aligned(addr, pow2(logsize)), FmtHex(addr), '/', logsize );
     for (;;) {
       // set least relevant bit to zero to search for buddy
       vaddr search = addr & ~pow2(logsize);
@@ -82,8 +82,8 @@ private:
 
   // allocate region and reinsert leftover memory, if necessary
   size_t removeAuto( vaddr addr, size_t logsize ) {
-    KASSERT( logsize < max-min, logsize );
-    KASSERT( aligned(addr, pow2(logsize)), FmtHex(addr) );
+    KASSERTN( logsize < max-min, FmtHex(addr), '/', logsize );
+    KASSERTN( aligned(addr, pow2(logsize)), FmtHex(addr), '/', logsize );
     // go through all levels to find region that covers request
     for ( size_t idx = logsize; ; idx += 1 ) {
       idx = bitmask.find(idx);
@@ -104,8 +104,8 @@ private:
 
   // test, if region is available
   size_t testAuto( vaddr addr, size_t logsize ) {
-    KASSERT( logsize < max-min, logsize );
-    KASSERT( aligned(addr, pow2(logsize)), FmtHex(addr) );
+    KASSERTN( logsize < max-min, FmtHex(addr), '/', logsize );
+    KASSERTN( aligned(addr, pow2(logsize)), FmtHex(addr), '/', logsize );
     for ( size_t idx = logsize; ; idx += 1 ) {
       idx = bitmask.find(idx);
       if unlikely( idx >= max-min ) return max;
@@ -179,16 +179,16 @@ public:
     length = length >> min;
     upperlimit = upperlimit >> min;
     size_t logsize = ceilinglog2( length );
-    KASSERT( logsize < max-min, length );
+    KASSERT1( logsize < max-min, length );
 
     for (;;) {
       // find closest region with available space
       size_t index = bitmask.find(logsize);
       if unlikely(index >= max-min) return topaddr;
-      KASSERT( index < max-min, index );
+      KASSERT1( index < max-min, index );
 
       // pick first available region
-      KASSERT( !buddyLevel[index].empty(), index );
+      KASSERT1( !buddyLevel[index].empty(), index );
       iterator it = buddyLevel[index].begin();
       vaddr addr = *it;
 
@@ -209,7 +209,7 @@ public:
   }
 
   bool checkCond( size_t length, size_t baselength ) {
-    KASSERT(check(baselength), "checkCond assumes that baselength is available");
+    KASSERT0(check(baselength));
     size_t baseidx = bitmask.find(ceilinglog2(baselength >> min));
     size_t idx = bitmask.find(ceilinglog2(length >> min));
     if (idx >= max-min) return false;
@@ -222,7 +222,7 @@ public:
     std::map<vaddr,size_t,std::less<vaddr>,PrintAllocator> printMap;
     // store all memory regions in printMap, sorted by start
     for ( size_t idx = 0; idx < max-min; ++idx ) {
-      KASSERT( bitmask.test(idx) == !buddyLevel[idx].empty(), idx );
+      KASSERT1( bitmask.test(idx) == !buddyLevel[idx].empty(), idx );
       for ( vaddr b : buddyLevel[idx] ) {
         printMap.insert( {b << min, pow2(idx + min)} );
       }

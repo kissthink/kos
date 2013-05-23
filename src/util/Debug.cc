@@ -20,14 +20,15 @@
 
 static const char* options[] = {
   "acpi",
-  "allstopgdb",
   "boot",
   "basic",
   "libc",
   "devices",
   "error",
   "frame",
-  "gdb",
+  "gdballstop",
+  "gdbdebug",
+  "gdbenable",
   "memacpi",
   "paging",
   "pci",
@@ -36,7 +37,6 @@ static const char* options[] = {
   "warning",
 };
 
-SpinLock DBG::lk;
 Bitmask DBG::levels;               // stored in .bss, initialized early enough!
 
 static_assert( sizeof(options)/sizeof(char*) == DBG::MaxLevel, "debug options mismatch" );
@@ -54,16 +54,16 @@ void DBG::init( char* dstring, bool msg ) {
       if ( !strncmp(wordstart,options[i],wordend - wordstart) ) {
         if ( level == size_t(-1) ) level = i;
         else {
-          if (msg) kcerr << "multi-match for debug option: " << wordstart << '\n';
+          if (msg) StdErr.outln("multi-match for debug option: ", wordstart);
           goto nextoption;
         }
       }
     }
     if ( level != size_t(-1) ) {
-      if (msg) kcdbg << "matched debug option: " << wordstart << '=' << options[level] << '\n';
+      if (msg) StdDbg.outln("matched debug option: ", wordstart, '=', options[level]);
       levels.set(level);
     } else {
-      if (msg) kcerr << "unknown debug option: " << wordstart << '\n';
+      if (msg) StdErr.outln("unknown debug option: ", wordstart);
     }
 nextoption:
   if ( wordend == end ) break;

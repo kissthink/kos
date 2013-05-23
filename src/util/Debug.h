@@ -18,20 +18,21 @@
 #define _Debug_h_ 1
 
 #include "util/Bitmask.h"
-#include "util/SpinLock.h"
+#include "util/OutputSafe.h"
 
 class DBG {
 public:
   enum Level : size_t {
     Acpi = 0,
-    AllStopGDB,
     Boot,
     Basic,
     Libc,
     Devices,
     Error,
     Frame,
-    GDB,
+    GDBAllStop,
+    GDBDebug,
+    GDBEnable,
     MemAcpi,
     Paging,
     PCI,
@@ -42,42 +43,35 @@ public:
   };
 
 private:
-  static SpinLock lk;
-
   static Bitmask levels;
-
-  template<typename T>
-  static void print( const T& msg ) {
-    kcout << msg;
-    kcdbg << msg;
-  }
-
-  template<typename T, typename... Args>
-  static void print( const T& msg, const Args&... a ) {
-    kcout << msg;
-    kcdbg << msg;
-    if (sizeof...(a)) print(a...);
-  }
 
 public:
   static void init( char* dstring, bool msg );
 
   template<typename... Args>
   static void out( Level c, const Args&... a ) {
-    if (levels.test(c)) print(a...);
+    if (levels.test(c)) {
+      StdDbg.out(a...);
+      StdOut.out(a...);
+    }
   }
 
   template<typename... Args>
   static void outln( Level c, const Args&... a ) {
-    lk.acquire();
-    out(c, a...);
-    out(c, kendl);
-    lk.release();
+    if (levels.test(c)) {
+      StdDbg.outln(a...);
+      StdOut.outln(a...);
+    }
   }
 
   static bool test( Level c ) {
     return levels.test(c);
   }
 };
+
+#if defined(KASSERTN)
+#error macro collision: KASSERTN
+#endif
+#define KASSERTN(expr,args...)  { if unlikely(!(expr)) { kassertprint( "KASSERT: " #expr " in " __FILE__ ":", __LINE__, __func__); StdErr.outln(args); StdDbg.outln(args); Reboot(); } }
 
 #endif /* _Debug_h_ */

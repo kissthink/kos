@@ -50,20 +50,20 @@ private:
   template<size_t N, bool alloc, bool virt>
   vaddr mapPagesInternal( size_t size, Type t, vaddr lma, vaddr vma ) {
     static_assert( N < pagelevels, "page level template violation" );
-    KASSERT( aligned(vma, pagesize<N>()), vma );
-    KASSERT( aligned(size, pagesize<N>()), size );
+    KASSERT1( aligned(vma, pagesize<N>()), vma );
+    KASSERT1( aligned(size, pagesize<N>()), size );
     ScopedLock<> lo(lock);
     if (virt) {
       bool check = availableMemory.remove(vma, size);
-      KASSERT(check, (ptr_t)vma);
+      KASSERT1(check, (ptr_t)vma);
     } else {
       vma = availableMemory.retrieve(size);
-      KASSERT(vma != topaddr, size);
+      KASSERT1(vma != topaddr, size);
     }
     vaddr ret = vma;
     for (; size > 0; size -= pagesize<N>()) {
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
-      KASSERT(lma != topaddr, size);
+      KASSERT1(lma != topaddr, size);
       PageManager::map<N>(vma, lma, owner, t);
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();
@@ -74,12 +74,12 @@ private:
   template<size_t N, bool alloc>
   bool unmapPagesInternal( vaddr vma, size_t size ) {
     static_assert( N < pagelevels, "page level template violation" );
-    KASSERT( aligned(vma, pagesize<N>()), vma );
-    KASSERT( aligned(size, pagesize<N>()), size );
+    KASSERT1( aligned(vma, pagesize<N>()), vma );
+    KASSERT1( aligned(size, pagesize<N>()), size );
     ScopedLock<> lo(lock);
     for (; size > 0; size -= pagesize<N>()) {
       size_t idx = availableMemory.insert2(vma, pagesizebits<N>());
-      KASSERT((idx >= pagesizebits<N>() && idx < pagebits), (ptr_t)vma)
+      KASSERTN((idx >= pagesizebits<N>() && idx < pagebits), FmtHex(vma), '/', idx)
       laddr lma = PageManager::unmap<N>(vma, (idx - pagesizebits<N>()) / pagetablebits);
       if (alloc) Processor::getFrameManager()->release(lma, pagesize<N>());
       vma += pagesize<N>();

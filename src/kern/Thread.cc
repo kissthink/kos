@@ -18,7 +18,7 @@
 #include "kern/Thread.h"
 
 void Thread::invoke(function_t func, ptr_t data) {
-  KASSERT(Processor::getLockCount() == 1, Processor::getLockCount());
+  KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
   kernelScheduler.lk.release();
   func(data);
   /* sync/lock with join */

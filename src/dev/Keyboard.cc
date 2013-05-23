@@ -455,11 +455,11 @@ void Keyboard::init() {
 
 		enc_send_cmd(KYBRD_ENC_CMD_RESETWAIT);         // stop keyboard scanning
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data) );
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data) );
 		ctrl_send_cmd(KYBRD_CTRL_CMD_MOUSE_WRITE);     // send next byte to mouse
 		enc_send_cmd(KYBRD_ENC_CMD_RESETWAIT);         // stop mouse scanning
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data) );
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data) );
 		drain_buffer();
 	}
 
@@ -467,24 +467,24 @@ void Keyboard::init() {
 		DBG::out(DBG::Devices, " keyboard");
 		ctrl_send_cmd(KYBRD_CTRL_CMD_INTERFACE_TEST); // test keyboard
 		data = enc_read_buf();
-		KASSERT( data == 0x00, FmtHex(data));
+		KASSERT1( data == 0x00, FmtHex(data));
 		enc_send_cmd(KYBRD_ENC_CMD_RESET);            // reset keyboard
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data));
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data));
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_BAT, FmtHex(data));
+		KASSERT1( data == KYBRD_ERR_BAT, FmtHex(data));
 		DBG::out(DBG::Devices, "/reset");
 
 		enc_send_cmd(KYBRD_ENC_CMD_SCAN_CODE_SET);    // get/set scancode set
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data));
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data));
 		enc_send_cmd(0x02);                           // set scancode set 2 (AT)
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data));
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data));
 		DBG::out(DBG::Devices, "/scan");
 		enc_send_cmd(KYBRD_ENC_CMD_SCAN_CODE_SET);    // get/set scancode set
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data));
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data));
 		enc_send_cmd(0x00);                           // get scancode set
 		data = enc_read_buf();
 		DBG::out(DBG::Devices, '/', FmtHex(data));
@@ -512,13 +512,13 @@ void Keyboard::init() {
 		DBG::out(DBG::Devices, " mouse");
 		ctrl_send_cmd(KYBRD_CTRL_CMD_MOUSE_PORT_TEST); // test mouse
 		data = enc_read_buf();
-		KASSERT( data == 0x00, FmtHex(data) );
+		KASSERT1( data == 0x00, FmtHex(data) );
 		ctrl_send_cmd(KYBRD_CTRL_CMD_MOUSE_WRITE);     // send next byte to moouse
 		enc_send_cmd(KYBRD_ENC_CMD_RESET);             // reset mouse
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_ACK, FmtHex(data) );
+		KASSERT1( data == KYBRD_ERR_ACK, FmtHex(data) );
 		data = enc_read_buf();
-		KASSERT( data == KYBRD_ERR_BAT, FmtHex(data) );
+		KASSERT1( data == KYBRD_ERR_BAT, FmtHex(data) );
 
 		ctrl_send_cmd(KYBRD_CTRL_CMD_MOUSE_WRITE);     // send next byte to mouse
 		enc_send_cmd(KYBRD_ENC_CMD_ENABLE);            // enable mouse scanning
@@ -541,7 +541,7 @@ void Keyboard::staticInterruptHandler() {
 	// read scan code while the output buffer is full (scan code is in it)
 	while (read_buffer()) {
 		KeyCode code = enc_read_buf();          // read the scan code
-		KASSERT(acks >= 0, "unexpected ACK from keyboard");
+		KASSERT1(acks >= 0, "unexpected ACK from keyboard");
 		switch (code) {                     // watch for errors
 			case 0xE0: case 0xE1:       extended =   true; continue;
 			case KYBRD_ERR_ACK:         acks -= 1;         continue;
@@ -560,7 +560,7 @@ void Keyboard::staticInterruptHandler() {
 				is_break = true;
 	continue;
 			} else {
-				KASSERT(code >= 0 && code < 0x80, code);
+				KASSERT1(code >= 0 && code < 0x80, code);
 				code = scanCodeTable[code];     // translate to XT scancode set
 			}
 		}

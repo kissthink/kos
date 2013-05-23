@@ -26,11 +26,11 @@ public:
     return sizeof(GdbSpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(GdbSpinLock);
   }
   void acquireISR() volatile {
-    KASSERT(!Processor::interruptsEnabled(), "interrupt must be disabled");
+    KASSERT0(!Processor::interruptsEnabled());
     acquireInternal();
   }
   void releaseISR() volatile {
-    KASSERT(!Processor::interruptsEnabled(), "interrupt must be disabled");
+    KASSERT0(!Processor::interruptsEnabled());
     releaseInternal();
   }
 };

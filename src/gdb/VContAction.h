@@ -1,7 +1,6 @@
 #ifndef VContAction_h_
 #define VContAction_h_ 1
 
-#include "mach/platform.h"      // for Reboot from KASSERT
 #include "util/EmbeddedQueue.h"
 
 namespace gdb {

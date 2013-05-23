@@ -11,80 +11,56 @@
 #include "extern/elfio/elfio.hpp"
 
 class ELFLoader {
+
 private:
 	ELFIO::elfio elfReader;
 	bool initialized;
+
 public:
 	ELFLoader () : initialized(false) {}
 
-	bool loadAndMapELF(File* elfFile, AddressSpace* addSpace ){
-		// Load ELF data
-		if (!elfReader.load(elfFile->startptr(), elfFile->size())) {
-			kcerr << "Can't find or process ELF file ";
-			return false;
-		} else {
-			kcout << "ELF file Loaded Successfully!   ";
-			initialized = true;
-			if (elfReader.get_class() == ELFCLASS32)
-				kcdbg << "Type: " << "32 Bit  ";
-			else
-				kcdbg << "Type: " << "64 Bit  ";
-		}
+	bool loadAndMapELF( File* elfFile, AddressSpace* addSpace ) {
+		if (!elfReader.load(elfFile->startptr(), elfFile->size())) return false;
+		initialized = true;
+		KASSERT1(elfReader.get_class() == ELFCLASS64, elfReader.get_class());
 
-		//ELF file segments
-		int seg_num = elfReader.segments.size();
-		for (int i = 0; i < seg_num; ++i) {
+		for (int i = 0; i < elfReader.segments.size(); ++i) { // iterate segments
 			const ELFIO::segment* pseg = elfReader.segments[i];
 
-			//Not loadable Segment
-			if (pseg->get_type() != PT_LOAD){	continue;	}
+			if (pseg->get_type() != PT_LOAD) continue;      // not a loadable segment
+			if (pseg->get_file_size() == 0)  continue;      // empty segment
 
-			//Filesize > Memsize
-			if (pseg->get_file_size() > pseg->get_memory_size()) {
-				kcerr << " image_load:: p_filesz > p_memsz ";
-				return false;
-			}
-			//Empty Segment
-			if (!pseg->get_file_size()){	continue;	}
+			KASSERTN(pseg->get_file_size() <= pseg->get_memory_size(), pseg->get_file_size(), ' ', pseg->get_memory_size());
 
-			vaddr seg_va = pseg->get_virtual_address();//Virtual Address
-			seg_va = align_down(seg_va,pagesize<1>());//Align it
-			vaddr offset = (vaddr) (pseg->get_data_offset()+elfFile->startptr());//Segment Offset in file
-			offset = align_down(offset,pagesize<1>());//Padd offset back
-			vaddr seg_la = offset;//Finally this padded offset is our linear address
-			seg_la = PageManager::vtol(seg_la);
-			seg_la = align_down(seg_la, pagesize<1>());//Align Linear address as well
+			vaddr offset = vaddr(elfFile->startptr()) + pseg->get_data_offset(); // get segment offset in file
+			offset = align_down(offset, pagesize<1>());     // align it
+			vaddr seg_la = PageManager::vtol(offset);       // get linear address
+			seg_la = align_down(seg_la, pagesize<1>());     // align it
 
-			size_t padding = pseg->get_virtual_address() & 0xfff;//How much we padded?
-			//kcdbg <<std::hex<<"la:"<<seg_la<<"  aligned:"<<aligned(seg_la,pagesize<1>())<<"   ";
-			size_t aligned_size = align_up(pseg->get_file_size()+padding, pagesize<1>());
-			//kcout <<std::hex<<"i is:"<<i<<"   aligned:"<<aligned_size<<"  vma:"<<seg_va<<"  lma:"<<seg_la<<"  non-aligned-size:"<<(pseg->get_file_size()+padding);
+			vaddr seg_va = pseg->get_virtual_address();     // get virtual address
+			seg_va = align_down(seg_va, pagesize<1>());     // align it
+			size_t padding = pseg->get_virtual_address() & 0xfff;
+			size_t size = align_up(pseg->get_file_size() + padding, pagesize<1>());
 
-			PageManager::PageType permissionType;
-
-			/*
-			 * There is actually a problem here.
-			 * ELF segments contain several sections, and we know that permissions can be assigned only to the pages.
-			 * Therefore, if the .rodata and .text are in the same segment and small enough to be in the same page! then the page should be Read+Execute!
-			 * and .rodata are also executable, this usually happens in small programs.
-			 */
-			if (!(pseg->get_flags() & PF_W)) {	permissionType = PageManager::PageType::Data; }
-			if (pseg->get_flags() & PF_X) {	permissionType = PageManager::PageType::Code; }
-
-			addSpace->mapPages<1>(seg_la,seg_va,aligned_size,permissionType);//MapPages
+			/* ELF segments contain several sections, while permissions are
+			 * assigned to the pages.  If .rodata and .text are in the same
+			 * segment and small enough to be in the same page, then .rodata ends
+			 * up executable.  */
+			AddressSpace::PageType permType = AddressSpace::RoData; // most restrictive
+			if (!(pseg->get_flags() & PF_W))	permType = AddressSpace::Data;
+			if (pseg->get_flags() & PF_X) permType = AddressSpace::Code;
+			addSpace->mapPages<1>(seg_la, seg_va, size, permType);
 
 			if (pseg->get_memory_size() > pseg->get_file_size()) {//zero out BSS
-				//BSS --> should be zeroed out
-				vaddr bssStart = seg_va+pseg->get_file_size()+1;
-				memset((void*)bssStart,0,pseg->get_memory_size() - pseg->get_file_size());
+				vaddr bssStart = seg_va + pseg->get_file_size() + 1;
+				memset( (void*)bssStart, 0, pseg->get_memory_size() - pseg->get_file_size() );
 			}
 		}
 		return true;
 	}
 
 	vaddr findMainAddress() {
-		if(!initialized) return topaddr;
-		//Find Main Method
+		if (!initialized) return topaddr;
 		ELFIO::Elf_Half sec_num = elfReader.sections.size();
 		for (int i = 0; i < sec_num; ++i) {
 			ELFIO::section* psec = elfReader.sections[i];

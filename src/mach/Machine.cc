@@ -92,15 +92,14 @@ static_assert(sizeof(InterruptDescriptor) == 2 * sizeof(mword), "sizeof(Interrup
 static_assert(sizeof(SegmentDescriptor) == sizeof(mword), "sizeof(SegmentDescriptor) != sizeof(mword)" );
 
 // simple thread to print keycode on screen
-static void screenThread(ptr_t) {
-  kcerr << ' ';
+static void keybThread(ptr_t) {
+  StdErr.out(' ');
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
-//    if (keycode > 0 && keycode < 0x80) kcerr << (char)keycode;
 #if KEYBOARD_RAW
-    kcerr << ' ' << FmtHex(keycode);
+    StdErr.out(' ', FmtHex(keycode));
 #else
-    if (keycode > 0 && keycode < 0x80) kcerr << (char)keycode;
+    if (keycode > 0 && keycode < 0x80) StdErr.out((char)keycode);
 #endif
   }
 }
@@ -108,24 +107,23 @@ static void screenThread(ptr_t) {
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
   // setup IDT, GDT, address space
-  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().setupGDB(apIndex);
-
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
 //  loadTR(tssSelector * sizeof(SegmentDescriptor)); // TODO: separate cache-aligned TSS per core?
-
   clearLDT();
   PageManager::configure();
   kernelSpace.activate();
 
-  // print brief message -> confirm startup
-  DBG::out(DBG::Basic, ' ', apIndex);
-
-  // configure local processor with idle thread
+  // configure local processor with idle thread -> enable interrupts
   processorTable[apIndex].install();
-  Thread* apIdleThread = Thread::create(kernelSpace, pagesize<1>());
-  apIdleThread->setName("AP/idle");
+  Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
   processorTable[apIndex].initThread(*apIdleThread);
+
+  // enable GDB on this core
+  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().setupGDB(apIndex);
+
+  // print brief message -> confirm startup, output *after* interrupts enabled
+  DBG::out(DBG::Basic, ' ', apIndex);
 
   // leave boot stack & invoke idle thread -> 'func' will call initAP2
   apIdleThread->runDirect(func);
@@ -160,7 +158,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   multiboot.initDebug(false);
 
   // initialize basic (no interrupts) serial device and qemu debug device
-  SerialDevice0::init(DBG::test(DBG::GDB));
+  SerialDevice0::init(DBG::test(DBG::GDBEnable));
   DebugDevice::init();
 
   // dummy processor to manage interrupts: no locking before this point!
@@ -185,15 +183,15 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // check CPU capabilities
   DBG::out(DBG::Basic, "checking capabilities:");
-  KASSERT(__atomic_always_lock_free(sizeof(mword),0), "mword not lock-free");
-  KASSERT(RFlags::hasCPUID(), ""); DBG::out(DBG::Basic, " CPUID");
-  KASSERT(CPUID::hasAPIC(), "");   DBG::out(DBG::Basic, " APIC");
-  KASSERT(CPUID::hasMSR(), "");    DBG::out(DBG::Basic, " MSR");
-  KASSERT(CPUID::hasNX(), "");     DBG::out(DBG::Basic, " NX");
-  if (CPUID::hasMWAIT())           DBG::out(DBG::Basic, " MWAIT");
-  if (CPUID::hasARAT())            DBG::out(DBG::Basic, " ARAT");
-  if (CPUID::hasTSC_Deadline())    DBG::out(DBG::Basic, " TSC");
-  if (CPUID::hasX2APIC())          DBG::out(DBG::Basic, " X2A");
+  KASSERT0(__atomic_always_lock_free(sizeof(mword),0));
+  KASSERT0(RFlags::hasCPUID()); DBG::out(DBG::Basic, " CPUID");
+  KASSERT0(CPUID::hasAPIC());   DBG::out(DBG::Basic, " APIC");
+  KASSERT0(CPUID::hasMSR());    DBG::out(DBG::Basic, " MSR");
+  KASSERT0(CPUID::hasNX());     DBG::out(DBG::Basic, " NX");
+  if (CPUID::hasMWAIT())        DBG::out(DBG::Basic, " MWAIT");
+  if (CPUID::hasARAT())         DBG::out(DBG::Basic, " ARAT");
+  if (CPUID::hasTSC_Deadline()) DBG::out(DBG::Basic, " TSC");
+  if (CPUID::hasX2APIC())       DBG::out(DBG::Basic, " X2A");
   DBG::out(DBG::Basic, kendl);
 
   // print boot memory information
@@ -239,12 +237,12 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // reserve initial kernel memory
   bool check = frameManager.reserve(vaddr(&__Boot) - kernelBase, kernelEnd - vaddr(&__Boot));
-  KASSERT( check, "cannot allocate static kernel memory" );
+  KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(kernelEnd - vaddr(&__Boot)) );
   DBG::outln(DBG::Basic, "FM/alloc: ", frameManager);
 
   // copy boot code for APs
   check = frameManager.reserve( BOOT16, pagesize<1>() );
-  KASSERT( check, "cannot allocate AP boot memory" );
+  KASSERTN( check, FmtHex(BOOT16), '-', FmtHex(pagesize<1>()) );
   memcpy((char*)BOOT16, &boot16Begin, vaddr(&boot16End) - vaddr(&boot16Begin));
   DBG::outln(DBG::Basic, "FM/boot16: ", frameManager);
 
@@ -271,10 +269,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   modStart = align_down(modStart, pagesize<2>());
   modEnd = align_up(modEnd, pagesize<2>());
   vaddr modMapped = kernelSpace.mapPages<2>(modStart, modEnd - modStart, AddressSpace::Data);
-  KASSERT(modMapped != topaddr, "internal memory error");
+  KASSERTN(modMapped != topaddr, FmtHex(modStart), '-', FmtHex(modEnd));
   multiboot.readModules(modMapped - modStart, frameManager, pagesize<2>());
   check = kernelSpace.unmapPages<2>(modMapped, modEnd - modStart);
-  KASSERT(check, "internal memory error");
+  KASSERTN(check, FmtHex(modMapped), '-', FmtHex(modEnd - modStart));
   DBG::outln(DBG::Basic, "FM/modules: ", kernelSpace);
   DBG::outln(DBG::Basic, "AS/modules: ", kernelSpace);
 
@@ -286,15 +284,14 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   initACPI(rsdp);
 
   // initialize gdb object
-  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().init(cpuCount, processorTable);
+  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().init(cpuCount, processorTable);
 
   // configure BSP processor with main thread 
   processorTable[bspIndex].install();
-  Thread* bspIdleThread = Thread::create(kernelSpace);
-  bspIdleThread->setName("BSP/idle");
+  Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
   processorTable[bspIndex].initThread(*bspIdleThread);
 
-  if (DBG::test(DBG::GDB)) gdb::GDB::getInstance().startGdb();
+  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().startGdb(DBG::test(DBG::GDBAllStop));
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
@@ -336,7 +333,7 @@ void Machine::initBSP2() {
   tipiReceived = false;
   processorTable[bspIndex].sendTestIPI();
   rtc.wait(5);
-  KASSERT(tipiReceived, "test IPI not received");
+  KASSERT0(tipiReceived);
 
   // start up APs -> serialized, APs go into long mode and then halt
   DBG::out(DBG::Basic, "AP init:");
@@ -361,14 +358,14 @@ void Machine::initBSP2() {
     PageManager::unmap<2>(x);
   }
   bool check = frameManager.release(vaddr(&__Boot) - kernelBase, vaddr(&__KernelCode) - vaddr(&__Boot));
-  KASSERT( check, "cannot free kernel boot memory" );
+  KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(vaddr(&__KernelCode) - vaddr(&__Boot)) );
 //  DBG::outln(DBG::Basic, "FM/free: ", frameManager);
 //  DBG::outln(DBG::Basic, "AS/free: ", kernelSpace);
 //  DBG::outln(DBG::Basic, "VM/free: ", kernelVM);
 
   // free AP boot code
   check = frameManager.release(BOOT16, pagesize<1>());
-  KASSERT( check, "cannot free AP boot memory" );
+  KASSERTN( check, FmtHex(BOOT16), '-', FmtHex(pagesize<1>()) );
   DBG::outln(DBG::Basic, "FM/free16: ", frameManager);
   DBG::outln(DBG::Basic, "AS/free16: ", kernelSpace);
   DBG::outln(DBG::Basic, "VM/free16: ", kernelVM);
@@ -379,11 +376,11 @@ void Machine::initBSP2() {
   }
 
   // create simple keyboard-to-screen thread
-  Thread::create(screenThread, nullptr, kernelSpace)->setName("screen")->setPrio(1);
+  Thread::create(keybThread, nullptr, kernelSpace, "keyb")->setPrio(1);
 }
 
 void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
-  KASSERT( irqnum < PIC::Max, irqnum );
+  KASSERT1(irqnum < PIC::Max, irqnum);
   irqnum = irqOverrideTable[irqnum].global;
   // TODO: handle irq override flags
   volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>( irqTable[irqnum].ioApicAddr, pagesize<1>(), AddressSpace::Data );
@@ -398,22 +395,22 @@ inline void Machine::timerInterrupt(mword counter) {
 }
 
 extern "C" void isr_handler_0x08() { // double fault
-  kcerr << "\nDOUBLE FAULT";
+  StdErr.outln("\nDOUBLE FAULT");
   Reboot( 1 );
 }
 
 extern "C" void isr_handler_0x0c(mword errcode, vaddr iAddr) { // stack fault
-  kcerr << "\nSTACK FAULT - ia: " << FmtHex(iAddr) << " / sp: " << FmtHex(CPU::readRSP()) << " / flags: " << FmtHex(errcode);
+  StdErr.out("\nSTACK FAULT - ia: ", FmtHex(iAddr), " / sp: ", FmtHex(CPU::readRSP()), " / flags: ", FmtHex(errcode));
   Reboot( iAddr );
 }
 
 extern "C" void isr_handler_0x0d(mword errcode, vaddr iAddr) { // GP fault
-  kcerr << "\nGENERAL PROTECTION FAULT - ia: " << FmtHex(iAddr) << " / flags: " << FmtHex(errcode);
+  StdErr.outln("\nGENERAL PROTECTION FAULT - ia: ", FmtHex(iAddr), " / flags: ", FmtHex(errcode));
   Reboot( iAddr );
 }
 
 extern "C" void isr_handler_0x0e(mword errcode, vaddr iAddr) { // page fault
-  kcerr << "\nPAGE FAULT - ia: " << FmtHex(iAddr) << " / da: " << FmtHex(CPU::readCR2()) << " / flags: " << FmtHex(errcode);
+  StdErr.outln("\nPAGE FAULT - ia: ", FmtHex(iAddr), " / da: ", FmtHex(CPU::readCR2()), " / flags: ", FmtHex(errcode));
   Reboot( iAddr );
 }
 
@@ -428,7 +425,7 @@ extern "C" void isr_handler_0x21() { // keyboard interrupt
 }
 
 extern "C" void isr_handler_0x27() { // parallel interrupt, spurious no problem
-  kcerr << " parallel";
+  StdErr.out(" parallel");
   Processor::sendEOI();
 }
 
@@ -439,7 +436,7 @@ extern "C" void isr_handler_0x28() { // RTC interrupt
 }
 
 extern "C" void isr_handler_0x2c() { // mouse interrupt
-  kcerr << " mouse";
+  StdErr.out(" mouse");
   Processor::sendEOI();
 }
 
@@ -449,36 +446,35 @@ extern "C" void isr_handler_0x40() {
 }
 
 extern "C" void isr_handler_0x41() {
-  kcerr << " TIPI";
-  kcerr << (RFlags::interruptsEnabled() ? 'e' : 'd');
+  StdErr.out(" TIPI", (RFlags::interruptsEnabled() ? 'e' : 'd'));
   tipiReceived = true;
   Processor::sendEOI();
 }
 
 extern "C" void isr_handler_0xf8() {
-  kcerr << " spurious";
+  StdErr.out(" spurious");
   Processor::sendEOI();
 }
 
 extern "C" void isr_handler_0xff() {
-  kcerr << " 0xFF";
+  StdErr.out(" 0xFF");
   Processor::sendEOI();
 }
 
 extern "C" void isr_handler_gen(mword num) {
-  kcerr << "\nUNEXPECTED INTERRUPT: " << FmtHex(num) << '/' << FmtHex(CPU::readCR2()) << '\n';
+  StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
   Processor::sendEOI();
 //  Reboot();
 }
 
 extern "C" void isr_handler_gen_err(mword num, mword errcode) {
-  kcerr << "\nUNEXPECTED INTERRUPT: " << FmtHex(num) << '/' << FmtHex(CPU::readCR2()) << '/' << FmtHex(errcode) << '\n';
+  StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()), '/', FmtHex(errcode));
   Processor::sendEOI();
 //  Reboot();
 }
 
 void Machine::setupIDT(unsigned int number, laddr address) {
-  KASSERT(number < maxIDT, number);
+  KASSERT1(number < maxIDT, number);
   idt[number].Offset00 = (address & 0x000000000000FFFF);
   idt[number].Offset16 = (address & 0x00000000FFFF0000) >> 16;
   idt[number].Offset32 = (address & 0xFFFFFFFF00000000) >> 32;
@@ -488,8 +484,8 @@ void Machine::setupIDT(unsigned int number, laddr address) {
 }
 
 void Machine::setupGDT(unsigned int number, unsigned int dpl, uint32_t address, bool code) {
-  KASSERT(number < maxGDT, number);
-  KASSERT(dpl < 4, dpl);
+  KASSERT1(number < maxGDT, number);
+  KASSERT1(dpl < 4, dpl);
   gdt[number].Base00 = (address & 0x0000FFFF);
   gdt[number].Base16 = (address & 0x00FF0000) >> 16;
   gdt[number].Base24 = (address & 0xFF000000) >> 24;
@@ -513,7 +509,7 @@ void Machine::setupTSS(unsigned int number, laddr address) {
 }
 
 void Machine::setupAllIDTs() {
- 	KASSERT(!RFlags::interruptsEnabled(), "");
+  KASSERT0(!RFlags::interruptsEnabled());
   memset(idt, 0, sizeof(idt));
   setupIDT(0x00, (vaddr)&isr_wrapper_0x00);
   setupIDT(0x01, (vaddr)&isr_wrapper_0x01);

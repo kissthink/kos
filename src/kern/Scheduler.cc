@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/Log.h"
+#include "util/Debug.h"
 #include "mach/Processor.h"
 #include "mach/stack.h"
 #include "kern/Scheduler.h"
@@ -38,7 +38,7 @@ void Scheduler::schedule() {
     nextThread = Processor::getIdleThread();
   }
   Processor::setCurrThread(nextThread);
-  KASSERT(Processor::getLockCount() == 1, Processor::getLockCount());
+  KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
   DBG::out(DBG::Scheduler, "CPU ", Processor::getApicID(), " switch: ");
   if (prevThread->getName()) DBG::out(DBG::Scheduler, prevThread->getName());
   else DBG::out(DBG::Scheduler, prevThread);

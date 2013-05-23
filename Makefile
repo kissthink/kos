@@ -5,12 +5,13 @@ help:
 	@echo "$(MAKE) run      build and run (qemu)"
 	@echo "$(MAKE) debug    build, run (qemu), and debug (qemu/gdb)"
 	@echo "$(MAKE) rgdb     build, run (qemu), and debug (remote gdb)"
-	@echo "$(MAKE) rgdballstop     build, run (qemu), and debug (remote gdb all-stop)"
+	@echo "$(MAKE) rgdba    build, run (qemu), and debug (remote gdb all-stop)"
 	@echo "$(MAKE) qpxe     build, run (qemu) via simulated PXE"
 	@echo "$(MAKE) bochs    build and run/debug (bochs)"
 	@echo "$(MAKE) dep      build dependencies"
 
-all clean vclean distclean run debug pxe lpxe rpxe qpxe rgdb rgdballstop gdbdebug gdballstopdebug bochs dep depend usb:
+
+all libs clean dep depend vclean distclean run debug rgdb rgdba rgdbdebug rgdbadebug bochs pxe lpxe rpxe qpxe usb usbtest tests defines echo:
 	nice -10 $(MAKE) -I $(CURDIR)/src -C src -j $(shell fgrep processor /proc/cpuinfo|wc -l) $@
 
 tgz: distclean

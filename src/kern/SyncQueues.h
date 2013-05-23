@@ -17,7 +17,7 @@
 #ifndef _SyncQueues_h_
 #define _SyncQueues_h_ 1
 
-#include "util/Log.h"
+#include "util/Output.h"
 #include "util/SpinLock.h"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
@@ -52,7 +52,7 @@ public:
     ScopedLock<> lo(lk);
     if likely(unclaimedElements == elementQueue.max_size()) suspend();
     else if unlikely(!resume()) unclaimedElements += 1;
-    else KASSERT(elementQueue.empty(), elementQueue.size());
+    else KASSERT1(elementQueue.empty(), elementQueue.size());
     elementQueue.push(elem);
   }
 
@@ -60,7 +60,7 @@ public:
     ScopedLockISR<> lo(lk);
     if likely(unclaimedElements == elementQueue.max_size()) return false;
     else if unlikely(!resume()) unclaimedElements += 1;
-    else KASSERT(elementQueue.empty(), elementQueue.size());
+    else KASSERT1(elementQueue.empty(), elementQueue.size());
     elementQueue.push(elem);
     return true;
   }
@@ -69,7 +69,7 @@ public:
     ScopedLock<> lo(lk);
     if unlikely(unclaimedElements == 0) suspend();
     else if unlikely(!resume()) unclaimedElements -= 1;
-    else KASSERT(elementQueue.full(), elementQueue.size());
+    else KASSERT1(elementQueue.full(), elementQueue.size());
     Element elem = elementQueue.front();
     elementQueue.pop();
     return elem;
