@@ -23,7 +23,7 @@ GdbCpuState::GdbCpuState()
 , state(cpuState::UNKNOWN)
 , ripDecremented(false) {
   memset(cpuId, 0, sizeof(char) * 20);
-  memset(stack, 0, bufferSize);
+  memset(stack, 0, sizeof(uint64_t) * bufferSize);
   memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
   memset(reg32Buffer, 0, numRegs32 * sizeof(reg32));
 }
@@ -60,7 +60,7 @@ cpuState::cpuStateEnum GdbCpuState::getCpuState() {
 
 uint64_t* GdbCpuState::stackPtr() {
   ScopedLockISR<> so(mutex);
-  return stack + bufferSize/sizeof(uint64_t);
+  return stack + bufferSize;
 }
 
 reg64* GdbCpuState::getRegs64() {

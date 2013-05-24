@@ -33,13 +33,13 @@ namespace cpuState {
 
 const int numRegs64 = 17;
 const int numRegs32 = 7;
-static const int bufferSize = 10000;
+static const unsigned long bufferSize = 1000000;
 
 class GdbCpuState {
   // *do NOT change orders for these 4 variables*
   reg64 reg64Buffer[numRegs64];       // gdb_asm_functions.S requires this here
   reg32 reg32Buffer[numRegs32];
-  uint64_t stack[bufferSize/sizeof(uint64_t)];
+  uint64_t stack[bufferSize];
   int64_t gdbErrorCode;
 
   char cpuId[20];         // in format (Core %d) [State]

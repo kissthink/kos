@@ -40,14 +40,44 @@ static int lockHolder = -1;                // used for holding baton.
 static bool* waiting;                      // represents a CPU waiting on entry queue.
 static bool* shouldReturnFromException;    // return from interrupt handler right away (used for allstop mode)
 static gdb::Semaphore entry_q;
-static gdb::GdbCpuState* cCpu = nullptr;
-static gdb::GdbCpuState* gCpu = nullptr;
+static gdb::GdbCpuState** cCpu = nullptr;
+static gdb::GdbCpuState** gCpu = nullptr;
 
 static EmbeddedQueue<VContAction> vContActionQueue;
 static Thread* gdbThread = nullptr;        // thread talking to gdb (remember because it moves among cores)
 static VContAction* prevAction = nullptr;  // previous vContAction
 
 static bool allstop = false;
+
+/**
+ * cCpu, gCPu related functions
+ * Only one thread can call this function
+ */
+static void setGCpu(int cpuIdx) {
+  int currCpuIdx = Processor::getApicID();
+  gCpu[currCpuIdx] = GDB::getInstance().getCpuState(cpuIdx);
+}
+
+static void setCCpu(int cpuIdx) {
+  int currCpuIdx = Processor::getApicID();
+  cCpu[currCpuIdx] = GDB::getInstance().getCpuState(cpuIdx);
+}
+
+static GdbCpuState* getGCpu() {
+  int cpuIdx = Processor::getApicID();
+  if (gCpu[cpuIdx] == nullptr) {
+    setGCpu(cpuIdx);
+  }
+  return gCpu[cpuIdx];
+}
+
+static GdbCpuState* getCCpu() {
+  int cpuIdx = Processor::getApicID();
+  if (cCpu[cpuIdx] == nullptr) {
+    setCCpu(cpuIdx);
+  }
+  return cCpu[cpuIdx];
+}
 
 /**
  * Returns from the exception handler.
@@ -589,14 +619,6 @@ handle_exception (int64_t exceptionVector) {
   int threadId = Processor::getApicID();
   GDB::getInstance().getCurrentCpuState()->setCpuState(cpuState::BREAKPOINT);
 
-  // initialize gCpuState and cCpuState
-  if (gCpu == nullptr) {
-    gCpu = GDB::getInstance().getCurrentCpuState();
-  }
-  if (cCpu == nullptr) {
-    cCpu = GDB::getInstance().getCurrentCpuState();
-  }
-
   Thread* currThread = Processor::getCurrThread();
 
   DBG::outlnISR(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
@@ -640,10 +662,6 @@ handle_exception (int64_t exceptionVector) {
       state->setCpuState(cpuState::RUNNING);
       state->restoreRegisters();
     }
-
-    // core is changed. update gCpu and cCpu for this core.
-    gCpu = GDB::getInstance().getCurrentCpuState();
-    cCpu = GDB::getInstance().getCurrentCpuState();
   }
 
   // Got hold of a baton. You are free to enter.
@@ -756,8 +774,8 @@ handle_exception (int64_t exceptionVector) {
         if (hexToInt(&ptr, &threadId)) {
           if (threadId > 0) {
             switch (op) {
-              case 'g': gCpu = GDB::getInstance().getCpuState(threadId-1); break;
-              case 'c': cCpu = GDB::getInstance().getCpuState(threadId-1); break;
+              case 'g': setGCpu(threadId-1); break;
+              case 'c': setCCpu(threadId-1); break;
               default: ABORT1("Invalid Hop"); break;
             }
           }
@@ -779,18 +797,23 @@ handle_exception (int64_t exceptionVector) {
       case 'g':       // return the value of the CPU registers
       {
         char* ptr = outputBuffer;
+        GdbCpuState* gCpu = getGCpu();
         ptr = mem2hex((char *) gCpu->getRegs64(), ptr, gdb::numRegs64 * sizeof(gdb::reg64), 0);
         ptr = mem2hex((char *) gCpu->getRegs32(), ptr, gdb::numRegs32 * sizeof(gdb::reg32), 0);
       }
       break;
       case 'G':       // set the value of the CPU registers - return OK
+      {
+        GdbCpuState* gCpu = getGCpu();
         hex2mem(ptr, (char *) gCpu->getRegs64(), gdb::numRegs64 * sizeof(gdb::reg64), 0);
         hex2mem(ptr+gdb::numRegs64, (char *) gCpu->getRegs32(), gdb::numRegs32 * sizeof(gdb::reg32), 0);
         strcpy (outputBuffer, "OK");
+      }
         break;
       case 'P':       // set the value of a single CPU register - return OK
       {
         long regno;
+        GdbCpuState* gCpu = getGCpu();
         if (hexToInt (&ptr, &regno) && *ptr++ == '=') {
           if (regno >= 0 && regno < gdb::numRegs64) {
             hex2mem (ptr, (char *) gCpu->getReg64(regno), sizeof(gdb::reg64), 0);
@@ -877,9 +900,13 @@ void set_debug_traps(bool as) {
 
   waiting = new bool[GDB::getInstance().getNumCpus()];
   shouldReturnFromException = new bool[GDB::getInstance().getNumCpus()];
+  gCpu = new GdbCpuState*[GDB::getInstance().getNumCpus()];
+  cCpu = new GdbCpuState*[GDB::getInstance().getNumCpus()];
   for (int i = 0; i < GDB::getInstance().getNumCpus(); i++) {
     waiting[i] = false;
     shouldReturnFromException[i] = false;
+    gCpu[i] = nullptr;
+    cCpu[i] = nullptr;
   }
   entry_q.resetCounter(1);  // simulate mutex
 
