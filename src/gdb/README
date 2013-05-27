@@ -1,38 +1,106 @@
 GDB Stub Documentation
 ======================
 
-Intel Vol1: 6.4.6 Interrupt and Exception Behaviour in 64-bit Mode
-------------------------------------------------------------
-- all interrupt handlers pointed by IDT is 64-bit code
-- size of interrupt stack pushes is fixed at 64-bit
-- stack pointer (SS:RSP) is pushed unconditionally on interrupts
-- new SS is set to NULL if CPL changes
-- IRET behaviour changed
-- interrupt stack-switch mechanism changed
-- alignment of interrupt stack frame is changed
+Function stubs required for Gdb stub
+------------------------------------
+void putDebugChar(unsigned char ch);
+int getDebugChar();
+void exceptionHandler(int exceptionHandler, void (*exceptionHandlerAddr)());
 
-Intel Vol3: 6.14.3 IRET in IA-32e mode
--------------------------------------- 
-- IRET pops SS:RSP unconditionally off the interrupt stack frame only when executed in 64-bit mode
-- if in 64-bit mode and target CPL for IRET is <> 3, SS is allowed to be set to NULL
+Basics
+------
+Gdb stub keeps track of current register values and stack information for each CPU core.
+Gdb stub understands the remote serial protocol used by gdb to receive instructions
+and sends information.
+In basics, the Gdb stub connects to a gdb instance via serial line specified in src/gdbinit.rgdb file.
+Remote baudrate should be set to 38400 and currently remote port 2345 is open from gdb for the Gdb stub
+to connect.
+handle_exception() function in x86_64-stub.cc implements protocol communication logic.
+Stub always receives an instruction from gdb and replies to gdb after gathering required information or
+processing required work.
+Gdb stub starts up by rasing software interrupt 3.
+Interrupt handler for interrupt 1,3 are installed by the Gdb stub during initialization.
+When interrupt 3 is raised, the installed handler directs code to handle_exception.
+After communicating with gdb, the code returns from the handler and continues on executing.
+For stepping, TF in eflags is set, which causes interrupt 1 to be raised after executing a following
+instruction.
 
-Intel Vol3: 6.14.4 Stack switching in IA-32e mode
--------------------------------------------------
-- a stack switch in IA-32e mode works like the legacy stack switch, except new SS selector is set to NULL
-- old SS and RSP are saved on the new stack and restored on subsequent IRET
----------
-SS    +40
----------
-RSP   +32
----------
-RFLAGS+24
----------
-CS    +16
----------
-RIP   +8
----------
-ErrorCode       <-- RSP points to here in interrupt handler
----------
+gdb_asm_functions.S
+-------------------
+This file has interrupt handlers for the Gdb stub.
+Register save/restore routines are defined as GdbCpuState class' member methods.
+Registers are saved on a separate stack (int array) inside GdbCpuState.
+For x86-64bit machine, the stack will look like following after interrupt is raised.
+
+------
+rip
+------
+cs
+------
+eflags
+------
+rsp
+------
+ss
+------
+
+For more information, refer to Intel Volume3: 6.14
+
+Gdb
+---
+It is a singleton object that handles most of operations Gdb stub requires.
+void init(int numCpu, Processor* procTable) needs to be called after initAPCI();
+inside Machine.cc to initialize multicore Gdb stub.
+Call void startGdb(bool allstop) to start Gdb.
+Each GdbCpuState (register values) are saved on processor specific area via fs register.
+Each methods is protected by a SpinLock. Make sure to use ISR version of locking/unlocking
+as Gdb is assumed to be used inside interrupt handler where interrupts are disabled.
+
+GdbCpu
+------
+There is a GdbCpu object for each CPU core. Call void setupGdb(int cpuIdx) to initialize
+the Gdb stub for use for the current CPU core. Do not set a breakpoint in initAP before
+setupGdb is called, because Gdb stub is not initialized for use on that CPU yet.
+GdbCpu object has 2 buffers for storing register values for the CPU core it represents.
+Also, it has an int array to use as a stack inside interrupt handler.
+It keeps track of CpuStates, register values, stacks, CpuNames, and CpuIds.
+Each method is protected by a SpinLock. Make sure to use ISR version of locking/unlocking
+as Gdb is assumed to be used iniside interrupt handler where interrupts are disabled.
+
+NonBlockSemaphore
+-----------------
+Semaphores are used in Gdb stub to control access to a critical section, where communication
+to gdb happens. It is used as a mean of multiplexing communication to gdb.
+Gdb stub uses its own version of Non-Blocking semaphore because the regular Semaphore requires
+integration with the Scheduler. The NonBlockSemaphore uses SpinLock and c++11 atomics to
+spin until counter value goes above 0.
+Access the semaphores via Gdb::P(int cpuIdx), Gdb::V(int cpuIdx). In x86_64-stub.cc, waiting[]
+boolean flags are used to note which CPU core is currently waiting on a semaphore or not.
+The semaphores are used for the baton passing.
+
+VContAction
+-----------
+VContAction represents an action (stepping, continue) that gdb instructs the Gdb stub to perform.
+gdb instructs the stub via sending vCont packets. The stub must support vCont packets for fluent
+multithreading support.
+x86_64-stub.cc's vCont packet parsing implementation is based on qemu's gdbstub.c code.
+The gdb documentation is not very specific on how the packets should be handled and for now,
+qemu's approach is used as a safe bet.
+Please refer to http://sourceware.org/gdb/onlinedocs/gdb/Packets.html#vCont%20packet for further information.
+Stop Reply is the reply format used by gdb to recognize that the asked vCont operations are performed correctly.
+Stop Reply's specification can be found at http://sourceware.org/gdb/onlinedocs/gdb/Stop-Reply-Packets.html#Stop-Reply-Packets
+
+For quick example, suppose gdb sent vCont;s:1;c. It turns on TF on core 1 for stepping and returns from the
+interrupt handler. The trap causes interrupt 1 and core 1 enters the interrupt handler. For 's', baton is not
+passed to other cores and entry lock is held by core 1. Therefore, core 1 enters the critical section and sends
+stop reply to gdb, informing that the step has been performed.
+For vCont;c, Gdb stub does not turn on TF bit on the current core before returning from the interrupt handler.
+vCont;c is send by gdb in 2 cases.
+1. For continue
+2. For next
+For both cases, gdb will not gain control until a next breakpoint is hit. Therefore, the Gdb stub releases
+the baton before returning from the interrupt handler, which allows any core that hits a next breakpoint first,
+to talk to gdb.
 
 GDB Commands Supported
 ----------------------
@@ -44,42 +112,112 @@ next
 disassemble
 list
 info registers
-,etc ...
+info threads
+backtrace (where)
 
 GDB Commands NOT Supported
 --------------------------
-info threads
 trace
+watch
 
-Commands Supported
+Packets Supported
 ------------------
-qSupported: Report the features supported by the RSP (remote serial protocol) server.
-            As a minimum, just the packet size can be reported.
-
-qC:         Report the current thread. (return an empty response for this barebone implementation)
-
-qAttached:  Not used.
-
-qOffsets:   Report the offsets to use when relocating downloaded code.
-            As a minimum, return "Text=0;Data=0;Bss=0"
-
-qSymbol::   Request any symbol table data.
-            A minimum implementation should return no data. (return "OK")
-
-qTStatus    Ask the stub if there is a trace experiement running right now.
-            Return 'T0' for not running (from documentation) But, empty response works actually.
-
-Hc-1:       Do future step/continue operations work on all threads?
-            As a minimum, return "OK"
-
-Hc0:        ???
-            Return OK
-
-Hg-1:       All other future operations should apply to all threads.
-            As a minimum, return "OK"
-
-Hg0:        ???
-            Return OK
+qSupported
+qC
+qOffsets
+qfThreadInfo
+qsThreadInfo
+qThreadExtraInfo
+vCont
+T thread-id
+Hc thread-id, Hg thread-id
+?
+g
+G
+P
+m
+M
+k
 
 LINK to GDB REMOTE SERIAL PROTOCOL
 www.embecosm.com/appnotes/ean4/embecosm-howto-rsp-server-ean4-issue-2.html
+
+Entering critical section
+-------------------------
+void handle_exception(int error) is divided into two parts. The first part is multiplexing to gdb. The second
+part handles parsing/replying and operating on gdb instructions. The multiplexing is implemented as following.
+A non-blocking semaphore, entry_q, is used as a lock guarding variables used for baton passing.
+isFree boolean variable is a baton that gives exclusive access to the critical section.
+Since a thread can move arounds different CPU cores, the logic for baton passing is little complex.
+1. If I am not the first thread entering the critical section, and the last thread to enter was not me, and
+baton is currently held by someone and the holder is not me, wait until a baton is passed from the holder.
+2. If any of the condition in 1 is false, I am free to enter the critical section.
+
+handle_exception
+----------------
+Handling exception happens in the following order:
+1. Update cpu's state to BREAKPOINT
+2. If interrupt 3 and TF was not set, decrement rip.
+-> when int 3 is inserted, the return address pushed to the stack from interrupt handling mechanism on x86_64 machines
+may be wrong. (It assumes the instruction with int 3 inserted, is a one byte instruction and pushes next byte address
+to the stack) If TF is not set, it means int 3 is from hitting a breakpoint user set. Therefore, we decrement return address
+stored on stack, so that when the program returns from the interrupt handler, Gdb stub will try again with correct instruction.
+3. Baton passing. (Only allow one thread running on some CPU core to talk to gdb)
+4. Check if there is any completed vContAction. If there is one, reply to gdb with Stop Reply packet. If there is non-executed
+vContAction, consume it from the vContAction queue.
+5. If in allstop mode, wake up all other cores that are not in unknown state nor already waiting in an interrupt handler.
+6. Waits for a request packet from gdb and perform required action. Send reply.
+7. For vCont packets, parse incoming packet, put into queue and return from the interrupt handler.
+8. 'Hg', 'Hc' packets specify for which thread, following 'g' or 'c' will needs to work on. Each CPU core has gCpu, cCpu variables
+so that even during thread changes, gCpu, cCpu set from previous 'H' packets will be remembered.
+
+Returning from interrupt handler
+--------------------------------
+If a vContAction queued on a vContAction queue is not executed yet, the Gdb stub consumes it on entering handle_exception next time.
+If vContAction was 's' packet (stepping), TF is set before returning from the interrupt handler.
+If in allstop mode, all other cores waiting in the interrupt handler is woken up by V() on semaphore. shouldReturnFromException flag
+is set before V, to directly return from interrupt handler.
+
+Optimization
+------------
+Currently -fno-omit-frame-pointer compile flag should not be set when running rgdb.
+
+Start/Stop logic for Gdb stub
+-----------------------------
+Each CPU core will enter the installed interrupt handler, catchException3, when an interrupt 3 is raised from reaching a breakpoint.
+When a breakpoint is set, gdb will replace first byte of the current instruction to "int 3". When code returns from the interrupt handler,
+"int 3" is replaced back to original byte. GdbCpuState::saveRegisters() method saves register values to software stack in GdbCpuState object
+before entering handle_exception. First part of handle_exception is to check if a baton is free. A thread that picks up a baton freely enters
+a critical section, talking to gdb. A baton is held by a thread until vCont;c; packet is executed. When a thread executes 'c', a baton is passed
+on to a waiting thread or released if there is no waiting thread. waiting flag is used to let other threads know that a thread on a CPU core
+is currently waiting for a baton to enter the critical section to have a chance to talk with gdb. Each CPU core has a non-blocking semaphore
+to make a core wait or proceed into the critical section. To wake a core, check if a core is waiting inside interrupt handler from waiting flag,
+and do V(). To make a core wait for a baton, set waiting flag to true and do P().
+
+'step' command
+--------------
+For step command, gdb will send 's' packet for each assembly instruction until next source line. Each 's' packet will perform a single stepping
+on assembly line level. For single-stepping, TF is set on eflags before restoring saved register values on returning from the interrupt handler.
+After executing next assembly line instruction, this causes interrupt 1 to be raised by the system and the code returns back to handle_exception.
+For 's', since we know the thread will need to re-enter the handle_exception(), we do not release a baton when returning from interrupt handler.
+lockHolder variable is set so that when the thread enters the interrupt handler next time, it is recognized as a baton holder and enter the 
+critical section without blocking. For allstop mode, all waiting cores are woken up by sending int 1 IPI after TF is set; however, because of
+the lockHolder variable, other threads will always wait on re-entering the handle_exception.
+
+'continue' command
+------------------
+For continue command, gdb sends a single vCont packet, 'c'. 'c' packet requires gdb to give up control by returning a core in interrupt handler
+to return with out TF set. Execution will continue on normal code until next breakpoint will be hit. When 'c' packet is received, the Gdb stub
+will release the baton or pass the baton if there is already a waiting thread. For allstop mode, all waiting threads are woken up
+and returns to the normal code.  However, if a baton is passed, that thread will gain access to talk to gdb. The thread with baton will
+send IPI to other threads to stop them from execution. (For allstop mode, all threads should be inside interrupt handler, or none)
+
+'next' command
+--------------
+'next' command is only different from 'step' command for its last packet. For its last packet, 'c' packet is sent by gdb.
+gdb inserts 'int 3' on next source line before sending 'c' packet. This makes sure to continue to next source line and stop, instead of stepping on assembly lines.
+
+TODO
+----
+1. Make thread change less frequent for allstop mode.
+2. Add interrupt handlers for interrupt 13, 14 that handles faults from accessing invalid memory addresses gracefully.
