@@ -24,7 +24,7 @@
 #include "dev/PIT.h"
 #include "dev/RTC.h"
 #include "dev/Screen.h"
-#include "gdb/gdb.h"
+#include "gdb/Gdb.h"
 #include "kern/FrameManager.h"
 #include "kern/Kernel.h"
 #include "kern/Multiboot.h"
@@ -120,7 +120,7 @@ void Machine::initAP(funcvoid_t func) {
   processorTable[apIndex].initThread(*apIdleThread);
 
   // enable GDB on this core
-  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().setupGDB(apIndex);
+  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().setupGdb(apIndex);
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
@@ -284,14 +284,14 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   initACPI(rsdp);
 
   // initialize gdb object
-  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().init(cpuCount, processorTable);
+  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().init(cpuCount, processorTable);
 
   // configure BSP processor with main thread 
   processorTable[bspIndex].install();
   Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
   processorTable[bspIndex].initThread(*bspIdleThread);
 
-  if (DBG::test(DBG::GDBEnable)) gdb::GDB::getInstance().startGdb(DBG::test(DBG::GDBAllStop));
+  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().startGdb(DBG::test(DBG::GDBAllStop));
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);

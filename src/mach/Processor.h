@@ -28,9 +28,7 @@ class FrameManager;
 // would like to use 'offsetof', but asm does not work with 'offsetof'
 // use fs:0 as 'this', then access member: slower, but cleaner?
 
-namespace gdb {
- class GdbCpuState;
-}
+class GdbCpuState;
 
 class Processor {
   mword             apicID;
@@ -39,10 +37,10 @@ class Processor {
   Thread*           idleThread;
   FrameManager*     frameManager;
   mword					    lockCount;
-  gdb::GdbCpuState* curCpuState;
+  GdbCpuState* curCpuState;
 
   friend class Machine;
-//  friend void gdb::GDB::setupGDB(int cpuIdx);
+//  friend void GDB::setupGDB(int cpuIdx);
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
@@ -66,7 +64,7 @@ class Processor {
   }
 
 public:
-  void initGdbCpuStates(gdb::GdbCpuState* state) {
+  void initGdbCpuStates(GdbCpuState* state) {
     curCpuState = state;
   }
   static mword getApicID() {

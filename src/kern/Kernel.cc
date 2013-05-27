@@ -23,8 +23,6 @@
 #include "world/File.h"
 #include "world/ELFLoader.h"
 
-#include "gdb/gdb.h"
-
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelVM kernelVM;
 Scheduler kernelScheduler;

@@ -2,8 +2,8 @@
 #define VContAction_h_ 1
 
 #include "util/EmbeddedQueue.h"
-
-namespace gdb {
+#include <cstring>
+#include <ostream>
 
 /**
  * Represents a pending action for a thread.
@@ -39,20 +39,12 @@ struct VContAction : public EmbeddedElement<VContAction> {
   friend std::ostream& operator<<(std::ostream &, const VContAction &);
 };
 
-class VContActionReply {
-public:
-  VContActionReply(int threadId, int signal)
-  : threadId(threadId)
-  , signal(signal) {}
-
-  void serialize(char* buffer) const;
-
-private:
-  static const char hexchars[];
-  int threadId;
-  int signal;
-};
-
-} // namespace gdb
+std::ostream& operator<<(std::ostream& os, const VContAction& va) {
+  os << "action: " << va.action
+     << " threadId: " << va.threadId
+     << " threadAssigned: " << va.threadAssigned
+     << " executed: " << va.executed;
+  return os;
+}
 
 #endif // VContAction_h_

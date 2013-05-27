@@ -1,12 +1,12 @@
 .text
 .align  8
 
-# gdb::GdbCpuState::saveRegisters()
-.globl _ZN3gdb11GdbCpuState13saveRegistersEv
-# gdb::GdbCpuState::stackPtr()
-.globl _ZN3gdb11GdbCpuState8stackPtrEv
-# gdb::GdbCpuState::restoreRegisters()
-.globl _ZN3gdb11GdbCpuState16restoreRegistersEv
+# GdbCpuState::saveRegisters()
+.globl _ZN11GdbCpuState13saveRegistersEv
+# GdbCpuState::stackPtr()
+.globl _ZN11GdbCpuState8stackPtrEv
+# GdbCpuState::restoreRegisters()
+.globl _ZN11GdbCpuState16restoreRegistersEv
 
 .globl handle_exception
 
@@ -17,7 +17,7 @@
 # fs, gs are not modified by GDB and must be set by wrmsr instruction
 
 # requires reg64Buffer to be first member variable (access via $rdi)
-_ZN3gdb11GdbCpuState13saveRegistersEv:
+_ZN11GdbCpuState13saveRegistersEv:
     mov %rax,    (%rdi)
     mov %rbx,   8(%rdi)
     mov %rcx,  16(%rdi)
@@ -60,12 +60,12 @@ _ZN3gdb11GdbCpuState13saveRegistersEv:
     mov %rsi, %rbx           # exception number
 
 # _remcomHandler
-    call _ZN3gdb11GdbCpuState8stackPtrEv
+    call _ZN11GdbCpuState8stackPtrEv
     mov %rax, %rsp
     mov %rbx, %rdi
     call handle_exception
 
-_ZN3gdb11GdbCpuState16restoreRegistersEv:
+_ZN11GdbCpuState16restoreRegistersEv:
     mov   8(%rdi), %rbx
     mov  16(%rdi), %rcx
     mov  24(%rdi), %rdx
@@ -122,7 +122,7 @@ CatchEx_TOP \ex_num
 #    mov currentCpu, %rdi
     mov %fs:48, %rdi
     mov $\ex_num, %rsi
-    call _ZN3gdb11GdbCpuState13saveRegistersEv
+    call _ZN11GdbCpuState13saveRegistersEv
 .endm
 
 CatchEx 0

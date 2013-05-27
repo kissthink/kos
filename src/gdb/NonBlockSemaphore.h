@@ -1,5 +1,5 @@
-#ifndef Semaphore_h_
-#define Semaphore_h_ 1
+#ifndef NonBlockSemaphore_h_
+#define NonBlockSemaphore_h_ 1
 
 #include "util/SpinLock.h"
 #include <atomic>
@@ -7,17 +7,15 @@
 /**
  * Non-blocking semaphore used by gdb code.
  */
-namespace gdb {
-
-class Semaphore {
+class NonBlockSemaphore {
   SpinLock lk;
   std::atomic<int> counter;
 public:
-  Semaphore(int counter = 0): counter(counter) {}
-  ptr_t operator new(std::size_t) { return ::operator new(Semaphore::size()); }
-  void operator delete(ptr_t ptr) { globaldelete(ptr, Semaphore::size()); }
+  NonBlockSemaphore(int counter = 0): counter(counter) {}
+  ptr_t operator new(std::size_t) { return ::operator new(NonBlockSemaphore::size()); }
+  void operator delete(ptr_t ptr) { globaldelete(ptr, NonBlockSemaphore::size()); }
   static constexpr size_t size() {
-    return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(Semaphore);
+    return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(NonBlockSemaphore);
   }
   void P() volatile {
     for(;;) {
@@ -43,6 +41,4 @@ public:
   }
 };
 
-} // namespace gdb
-
-#endif // Semaphore_h_
+#endif // NonBlockSemaphore_h_
