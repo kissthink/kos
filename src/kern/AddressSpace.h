@@ -35,13 +35,13 @@ public:
   using Type  = PageManager::PageType;
 
 private:
-  friend std::ostream& operator<<(std::ostream&, const AddressSpace&);
+  friend ostream& operator<<(ostream&, const AddressSpace&);
 
   SpinLock lock;
   laddr pagetable;  // page table address (physical)
   Owner owner;
 
-  using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
+  using BuddySet = set<vaddr,less<vaddr>,KernelAllocator<vaddr>>;
   BuddyMap<pagesizebits<1>(),pagebits,BuddySet> availableMemory;
 
   AddressSpace(const AddressSpace&) = delete;                  // no copy

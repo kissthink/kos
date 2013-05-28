@@ -30,6 +30,6 @@ extern Scheduler kernelScheduler;
 
 class File;
 typedef basic_string<char,char_traits<char>,KernelAllocator<char>> kstring;
-extern map<kstring,File*,std::less<kstring>,KernelAllocator<kstring>> kernelFS;
+extern map<kstring,File*,less<kstring>,KernelAllocator<kstring>> kernelFS;
 
 #endif /* _Kernel_h_ */

@@ -40,7 +40,7 @@ class Processor {
   GdbCpuState* curCpuState;
 
   friend class Machine;
-//  friend void GDB::setupGDB(int cpuIdx);
+  friend class Gdb;
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
@@ -62,11 +62,11 @@ class Processor {
   static volatile LAPIC* lapic() {
    return (LAPIC*)lapicAddr;
   }
-
-public:
   void initGdbCpuStates(GdbCpuState* state) {
     curCpuState = state;
   }
+
+public:
   static mword getApicID() {
     mword x; asm volatile("mov %%fs:0, %0" : "=r"(x)); return x;
   }

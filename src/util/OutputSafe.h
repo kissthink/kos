@@ -26,7 +26,7 @@
 #include <cstdarg>
 
 class KernelOutput {
-  std::ostream os;
+  ostream os;
   SpinLock lk;
 
   template<typename T>

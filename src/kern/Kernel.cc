@@ -26,7 +26,7 @@
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelVM kernelVM;
 Scheduler kernelScheduler;
-map<kstring,File*,std::less<kstring>,KernelAllocator<kstring>> kernelFS;
+map<kstring,File*,less<kstring>,KernelAllocator<kstring>> kernelFS;
 
 static void mainLoop(ptr_t); // forward declaration
 static void task(ptr_t);     // forward declaration

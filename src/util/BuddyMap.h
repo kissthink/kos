@@ -218,8 +218,8 @@ public:
   }
 
   template<typename PrintAllocator = typename Set::allocator_type>
-  void print(std::ostream& os) const {
-    std::map<vaddr,size_t,std::less<vaddr>,PrintAllocator> printMap;
+  void print(ostream& os) const {
+    map<vaddr,size_t,less<vaddr>,PrintAllocator> printMap;
     // store all memory regions in printMap, sorted by start
     for ( size_t idx = 0; idx < max-min; ++idx ) {
       KASSERT1( bitmask.test(idx) == !buddyLevel[idx].empty(), idx );
@@ -229,7 +229,7 @@ public:
     }
     // print continuous regions in compact representation
     vaddr end = topaddr;
-    for ( const std::pair<vaddr,size_t>& d : printMap ) {
+    for ( const pair<vaddr,size_t>& d : printMap ) {
       if ( d.first != end ) {
         if ( end != topaddr ) os << FmtHex(end) << ' ';
         os << FmtHex(d.first) << '-';

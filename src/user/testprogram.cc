@@ -16,10 +16,12 @@
 ******************************************************************************/
 #include <iostream>
 
+using namespace std;
+
 class XYZ {
 public:
   ~XYZ() {
-    std::cout << "hello world!" << std::endl;
+    cout << "hello world!" << endl;
   }
 };
 

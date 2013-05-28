@@ -16,12 +16,12 @@
 ******************************************************************************/
 #include "kern/FrameManager.h"
 
-std::ostream& operator<<(std::ostream& os, const FileCache& fc) {
+ostream& operator<<(ostream& os, const FileCache& fc) {
   fc.availableMemory.print<KernelAllocator<vaddr>>(os);
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const FrameManager& fm) {
+ostream& operator<<(ostream& os, const FrameManager& fm) {
   fm.availableMemory.print(os);
   return os;
 }

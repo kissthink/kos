@@ -70,7 +70,7 @@ uint32_t Machine::bspIndex = ~0;
 uint32_t Machine::bspApicID = ~0;
 
 // used to enumerate APs during bootstrap
-static std::atomic<mword> apIndex;
+static atomic<mword> apIndex;
 
 // IRQ information
 uint32_t Machine::irqCount = 0;

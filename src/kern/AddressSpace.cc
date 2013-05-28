@@ -16,7 +16,7 @@
 ******************************************************************************/
 #include "kern/AddressSpace.h"
 
-std::ostream& operator<<(std::ostream& os, const AddressSpace& as) {
+ostream& operator<<(ostream& os, const AddressSpace& as) {
   as.availableMemory.print(os);
   return os;
 }

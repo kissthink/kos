@@ -20,6 +20,8 @@
 #include <cstddef>
 #include <cstdint>
 
+using namespace std;
+
 #if defined(likely) || defined(unlikely)
 #error macro collision: 'likely' or 'unlikely'
 #endif

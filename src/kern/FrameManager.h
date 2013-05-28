@@ -24,7 +24,7 @@
 #include <set>
 
 class FileCache {
-  friend std::ostream& operator<<(std::ostream&, const FileCache&);
+  friend ostream& operator<<(ostream&, const FileCache&);
   static const mword min = pagesizebits<1>();
   using BuddySet = InPlaceSet<vaddr,min>;
   BuddyMap<min,framebits,BuddySet> availableMemory;
@@ -33,7 +33,7 @@ public:
 };
 
 class FrameManager {
-  friend std::ostream& operator<<(std::ostream&, const FrameManager&);
+  friend ostream& operator<<(ostream&, const FrameManager&);
   friend class Machine;
   friend class Multiboot;
   friend class AddressSpace;
@@ -41,7 +41,7 @@ class FrameManager {
 
   FileCache fc;
 
-  using BuddySet = std::set<vaddr,std::less<vaddr>,KernelAllocator<vaddr>>;
+  using BuddySet = set<vaddr,less<vaddr>,KernelAllocator<vaddr>>;
   BuddyMap<pagesizebits<1>(),framebits,BuddySet> availableMemory;
 
   template<bool limit = false>

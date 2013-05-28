@@ -31,7 +31,7 @@ class SpinLock {
   }
 public:
   SpinLock() : locked(false) {}
-  ptr_t operator new(std::size_t) { return ::operator new(SpinLock::size()); }
+  ptr_t operator new(size_t) { return ::operator new(SpinLock::size()); }
   void operator delete(ptr_t ptr) { globaldelete(ptr, SpinLock::size()); }
   static constexpr size_t size() {
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(SpinLock);

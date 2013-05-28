@@ -27,7 +27,7 @@
 template<typename T> class KernelAllocator;
 
 class KernelVM {
-  friend std::ostream& operator<<(std::ostream&, const KernelVM&);
+  friend ostream& operator<<(ostream&, const KernelVM&);
 
   static const mword min = pagesizebits<1>();
   static const mword max = ceilinglog2_c(kernelRange);
@@ -74,12 +74,12 @@ public:
 
 extern KernelVM kernelVM;
 
-template<typename T> class KernelAllocator : public std::allocator<T> {
+template<typename T> class KernelAllocator : public allocator<T> {
 public:
   template<typename U> struct rebind { typedef KernelAllocator<U> other; };
   KernelAllocator() = default;
   KernelAllocator(const KernelAllocator& x) = default;
-  template<typename U> KernelAllocator (const KernelAllocator<U>& x) : std::allocator<T>(x) {}
+  template<typename U> KernelAllocator (const KernelAllocator<U>& x) : allocator<T>(x) {}
   ~KernelAllocator() = default;
   T* allocate(size_t n, const void* = 0) {
     return (T*)(kernelVM.alloc(n * sizeof(T)));

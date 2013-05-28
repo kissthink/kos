@@ -36,10 +36,10 @@ struct VContAction : public EmbeddedElement<VContAction> {
     return false;
   }
 
-  friend std::ostream& operator<<(std::ostream &, const VContAction &);
+  friend ostream& operator<<(ostream &, const VContAction &);
 };
 
-std::ostream& operator<<(std::ostream& os, const VContAction& va) {
+ostream& operator<<(ostream& os, const VContAction& va) {
   os << "action: " << va.action
      << " threadId: " << va.threadId
      << " threadAssigned: " << va.threadAssigned

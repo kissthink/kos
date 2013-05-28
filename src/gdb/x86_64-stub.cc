@@ -17,8 +17,6 @@
 #undef __STRICT_ANSI__
 #include <cstdio>
 
-using namespace std;
-
 // function stubs for Gdb remote serial protocol
 void putDebugChar(unsigned char ch) {
   SerialDevice0::write(ch);

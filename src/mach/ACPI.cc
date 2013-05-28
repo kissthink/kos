@@ -29,8 +29,8 @@ extern "C" {
 
 static vaddr rsdp = 0;
 
-static std::map<vaddr,mword,std::less<vaddr>,KernelAllocator<std::pair<vaddr,mword>>> allocations;
-static std::map<vaddr,size_t,std::less<vaddr>,KernelAllocator<std::pair<vaddr,size_t>>> mappings;
+static map<vaddr,mword,less<vaddr>,KernelAllocator<pair<vaddr,mword>>> allocations;
+static map<vaddr,size_t,less<vaddr>,KernelAllocator<pair<vaddr,size_t>>> mappings;
 
 static ACPI_OSD_HANDLER sciHandler = nullptr;
 static void* sciContext = nullptr;
@@ -78,9 +78,9 @@ void Machine::initACPI(vaddr r) {
     PIC::disable();
   }
 
-  std::map<uint32_t,uint32_t,std::less<uint32_t>,KernelAllocator<std::pair<uint32_t,uint32_t>>> apicMap;
-  std::map<uint32_t,IrqInfo,std::less<uint32_t>,KernelAllocator<std::pair<uint32_t,IrqInfo>>> irqMap;
-  std::map<uint32_t,IrqOverrideInfo,std::less<uint32_t>,KernelAllocator<std::pair<uint32_t,IrqOverrideInfo>>> irqOverrideMap;
+  map<uint32_t,uint32_t,less<uint32_t>,KernelAllocator<pair<uint32_t,uint32_t>>> apicMap;
+  map<uint32_t,IrqInfo,less<uint32_t>,KernelAllocator<pair<uint32_t,IrqInfo>>> irqMap;
+  map<uint32_t,IrqOverrideInfo,less<uint32_t>,KernelAllocator<pair<uint32_t,IrqOverrideInfo>>> irqOverrideMap;
 
   // walk through subtables and gather information in dynamic maps
   acpi_subtable_header* subtable = (acpi_subtable_header*)(madt + 1);
@@ -154,7 +154,7 @@ void Machine::initACPI(vaddr r) {
   cpuCount = apicMap.size();
   processorTable = new Processor[cpuCount];
   int idx = 0;
-  for (const std::pair<uint32_t,uint32_t>& ap : apicMap) {
+  for (const pair<uint32_t,uint32_t>& ap : apicMap) {
     processorTable[idx].init(ap.second, ap.first, *Processor::getFrameManager());
     if (ap.second == bspApicID) bspIndex = idx;
     idx += 1;
@@ -169,7 +169,7 @@ void Machine::initACPI(vaddr r) {
   for (uint32_t i = 0; i < irqCount; i += 1) {
     irqTable[i] = { 0, 0 };
   }
-  for (const std::pair<uint32_t,IrqInfo>& i : irqMap) {
+  for (const pair<uint32_t,IrqInfo>& i : irqMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount );
     irqTable[i.first] = i.second;
   }
@@ -179,7 +179,7 @@ void Machine::initACPI(vaddr r) {
   for (uint32_t i = 0; i < irqCount; i += 1) {
     irqOverrideTable[i] = { i, 0 };
   }
-  for (const std::pair<uint32_t,IrqOverrideInfo>& i : irqOverrideMap) {
+  for (const pair<uint32_t,IrqOverrideInfo>& i : irqOverrideMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount )
     irqOverrideTable[i.first] = i.second;
   }
@@ -231,11 +231,11 @@ void Machine::parseACPI() {
   KASSERT1( status == AE_OK, status );
 
   // clean up ACPI leftover memory allocations
-  for (std::pair<vaddr,mword> a : allocations ) {
+  for (pair<vaddr,mword> a : allocations ) {
     kernelVM.free(ptr_t(a.first));
   }
   allocations.clear();
-  for (std::pair<vaddr,size_t> m : mappings ) {
+  for (pair<vaddr,size_t> m : mappings ) {
     kernelSpace.unmapPages<1>(m.first, m.second);
   }
   mappings.clear();
@@ -355,7 +355,7 @@ void* AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS Where, ACPI_SIZE Length) {
     size = align_up(Length + laddr(Where) - lma, pagesize<1>());
     vma = kernelSpace.mapPages<1>(lma, size, AddressSpace::Data);
   }
-  mappings.insert( std::pair<vaddr,size_t>(vma,size) );
+  mappings.insert( pair<vaddr,size_t>(vma,size) );
   DBG::outln(DBG::MemAcpi, " -> ", FmtHex(vma));
   return (void*)(vma + Where - lma);
 }

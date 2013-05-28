@@ -6,12 +6,12 @@
 #undef __STRICT_ANSI__ // to get access to vsnprintf
 #include <cstdio>
 
-std::ostream& operator<<(std::ostream &os, const FmtHex& hex) {
-  os << std::setw(hex.digits) << hex.ptr;
+ostream& operator<<(ostream &os, const FmtHex& hex) {
+  os << setw(hex.digits) << hex.ptr;
   return os;
 }
 
-std::ostream& operator<<(std::ostream &os, const Printf& pf) {
+ostream& operator<<(ostream &os, const Printf& pf) {
   char* buffer = nullptr;
   int size = vsnprintf(buffer, 0, pf.format, pf.args);
   if (size >- 1) {

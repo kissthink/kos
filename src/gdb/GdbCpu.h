@@ -6,7 +6,7 @@
 
 #include <cstring>
 #include <string>
-#undef __STRICT_ANSI__
+#undef __STRICT_ANSI__ // get declaration of 'snprintf' 
 #include <cstdio>
 
 typedef uint64_t reg64;
@@ -51,7 +51,7 @@ class GdbCpuState {
   int64_t gdbErrorCode;
 
   char cpuId[20];                     // in format (Core %d) [State]
-  std::string cpuInfo;                // used by GDB RSP (remote serial protocol)
+  string cpuInfo;                // used by GDB RSP (remote serial protocol)
   int cpuIndex;
 
   cpuState::cpuStateEnum state;
@@ -117,7 +117,7 @@ public:
    * Returns CPU's info, used by GDB.
    * (e.g. m1,m2,m3,m4)
    */
-  inline std::string getCpuInfo() {
+  inline string getCpuInfo() {
     ScopedLockISR<> so(mutex);
     return cpuInfo;
   }

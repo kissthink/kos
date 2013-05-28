@@ -104,7 +104,7 @@ void KernelVM::free(ptr_t p) {
   mspace_free(kmspace, p);
 }
 
-std::ostream& operator<<(std::ostream& os, const KernelVM& vm ) {
+ostream& operator<<(ostream& os, const KernelVM& vm ) {
   vm.availableMemory.print<KernelAllocator<vaddr>>(os);
   return os;
 }

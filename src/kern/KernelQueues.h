@@ -23,7 +23,7 @@
 #include <queue>
 
 template<typename Element, size_t N>
-class StaticArray : public std::array<Element,N> {
+class StaticArray : public array<Element,N> {
 public:
   typedef Element ElementType;
   explicit StaticArray( size_t ) {}
@@ -100,12 +100,12 @@ public:
 };
 
 template<typename E, typename A>
-class FiniteQueueBuffer : public std::queue<E,std::deque<E,A>> {
+class FiniteQueueBuffer : public queue<E,deque<E,A>> {
   size_t max;
 public:
   typedef E Element;
   FiniteQueueBuffer( size_t N ) : max(N) { KASSERT0(N); }
-  bool full() const { return std::queue<E,std::deque<E,A>>::size() == max; }
+  bool full() const { return queue<E,deque<E,A>>::size() == max; }
   size_t max_size() const { return max; }
 };
 

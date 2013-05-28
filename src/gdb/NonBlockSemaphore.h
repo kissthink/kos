@@ -9,10 +9,10 @@
  */
 class NonBlockSemaphore {
   SpinLock lk;
-  std::atomic<int> counter;
+  atomic<int> counter;
 public:
   NonBlockSemaphore(int counter = 0): counter(counter) {}
-  ptr_t operator new(std::size_t) { return ::operator new(NonBlockSemaphore::size()); }
+  ptr_t operator new(size_t) { return ::operator new(NonBlockSemaphore::size()); }
   void operator delete(ptr_t ptr) { globaldelete(ptr, NonBlockSemaphore::size()); }
   static constexpr size_t size() {
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(NonBlockSemaphore);

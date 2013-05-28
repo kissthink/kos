@@ -12,7 +12,7 @@ struct Printf {
   va_list& args;
   Printf(const char *f, va_list& a) : format(f), args(a) {}
 };
-extern std::ostream& operator<<(std::ostream &os, const Printf& pf);
+extern ostream& operator<<(ostream &os, const Printf& pf);
 
 struct FmtHex {
   ptr_t ptr;
@@ -21,7 +21,7 @@ struct FmtHex {
   FmtHex(ptr_t p,       int d = 0) : ptr((ptr_t)p), digits(d) {}
   FmtHex(const char* p, int d = 0) : ptr((ptr_t)p), digits(d) {}
 };
-extern std::ostream& operator<<(std::ostream &os, const FmtHex& hex);
+extern ostream& operator<<(ostream &os, const FmtHex& hex);
 
 static const char kendl = '\n';
 
