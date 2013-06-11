@@ -12,6 +12,8 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
+DRIVER_OBJECTS=extern/linux-3.9.4/drivers/net/ethernet/intel/e1000/e1000.o
+STUB_OBJECTS=driver-stub/stubs.o
 LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
@@ -104,7 +106,7 @@ kernel.sys: kernel.sys.debug
 	$(STRIP) $@.debug -o $@
 
 # rebuild binary from scratch to enforce file order: boot.o must be first
-kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS)
+kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS) $(STUB_OBJECTS) $(DRIVER_OBJECTS)
 	rm -f $@
 	$(LD) -nodefaultlibs -T linker.ld -o $@ $(filter-out $<,$^) $(LDFLAGS)
 
@@ -134,6 +136,14 @@ extern/acpica/libacpica.a: extern/acpica/Makefile
 extern/dlmalloc/malloc.o: extern/dlmalloc/Makefile
 	$(MAKE) -C extern/dlmalloc $(notdir $@)
 
+$(DRIVER_OBJECTS): extern/linux-3.9.4/Makefile
+	$(MAKE) -C extern/linux-3.9.4 defconfig
+	$(MAKE) -C extern/linux-3.9.4 prepare
+	$(MAKE) -C extern/linux-3.9.4 scripts
+	$(MAKE) -C extern/linux-3.9.4 SUBDIRS=drivers/net/ethernet/intel/e1000
+
+$(STUB_OBJECTS): driver-stub/stubs.c
+
 $(USERLIB):
 	$(MAKE) -C ulib $(notdir $@)
 
@@ -151,10 +161,13 @@ echo:
 clean:
 	$(MAKE) -C extern/dlmalloc $@
 	$(MAKE) -C extern/acpica $@
+	$(MAKE) -C extern/linux-3.9.4 $@
+	$(MAKE) -C extern/linux-3.9.4 mrproper
+	$(MAKE) -C extern/linux-3.9.4 distclean
 	$(MAKE) -C user $@
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\
-		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS)
+		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS) $(STUB_OBJECTS)
 	rm -rf $(STAGE)
 	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep
 
