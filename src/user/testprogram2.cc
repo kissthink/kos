@@ -18,5 +18,6 @@ int a = 2;
 int b = 33;
 
 int main() {
-  return a * b;
+	asm("SYSCALL");
+  return 11;
 };

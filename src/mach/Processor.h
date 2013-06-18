@@ -21,12 +21,15 @@
 #include "mach/APIC.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
+#include "mach/isr_wrapper.h"
+
 
 class Thread;
 class FrameManager;
 
 // would like to use 'offsetof', but asm does not work with 'offsetof'
 // use fs:0 as 'this', then access member: slower, but cleaner?
+
 
 class GdbCpuState;
 
@@ -53,9 +56,22 @@ class Processor {
     cpuID = cpu;
     frameManager = &fm;
   }
+
   void install() {
    MSR::write(MSR::FS_BASE, mword(this));
+   //Prepare Syscall/Sysret Registers
+   initSysCall();
   }
+
+	void initSysCall() {
+		MSR::enableSYSCALL();
+		MSR::write(MSR::SYSCALL_CSTAR, 0x0);
+		MSR::write(MSR::SYSCALL_SFMASK, 0x0);
+		MSR::write(MSR::SYSCALL_LSTAR, mword(syscall_handler));
+		//uint64_t star = ((((uint64_t)Machine::userCodeSelector|0x3) - 16)<<48)|((uint64_t)Machine::userCodeSelector<<32);
+		MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
+	}
+
   void initThread(Thread& t) {
    currThread = idleThread = &t;
   }

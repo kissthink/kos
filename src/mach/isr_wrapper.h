@@ -17,6 +17,9 @@
 #ifndef _isr_wrapper_h_
 #define _isr_wrapper_h_ 1
 
+
+extern "C" void syscall_handler(void);
+
 extern "C" void isr_wrapper_0x00(void);
 extern "C" void isr_wrapper_0x01(void);
 extern "C" void isr_wrapper_0x02(void);
