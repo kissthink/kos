@@ -104,12 +104,27 @@ static void keybThread(ptr_t) {
   }
 }
 
+void Machine::loadTSSRSP(uint8_t privilegeLevel,vaddr RSP)
+{
+	if(privilegeLevel > 2)
+	{
+		StdErr.outln("Invalid Privilege Level!");
+		return;
+	}
+
+	tss.rsp[privilegeLevel] = RSP;
+}
+
+extern "C" void handleSysCall(){
+	StdErr.outln("YEAAHHHHH it's workinggggggg");
+  }
+
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
   // setup IDT, GDT, address space
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-//  loadTR(tssSelector * sizeof(SegmentDescriptor)); // TODO: separate cache-aligned TSS per core?
+
   clearLDT();
   PageManager::configure();
   kernelSpace.activate();
@@ -134,12 +149,12 @@ void Machine::initAP2() {
   // enable APIC
   MSR::enableAPIC();                // should be enabled by default
   Processor::enableAPIC(0xf8);      // confirm spurious vector at 0xf8
-
   // enable interrupts, sync with BSP, then halt
   processorTable[apIndex].startInterrupts();
   DBG::out(DBG::Basic, 'H');
   apIndex = bspIndex;
 //  StoreBarrier();
+
   Halt();
 }
 
@@ -473,6 +488,8 @@ extern "C" void isr_handler_gen_err(mword num, mword errcode) {
 //  Reboot();
 }
 
+
+
 void Machine::setupIDT(unsigned int number, laddr address) {
   KASSERT1(number < maxIDT, number);
   idt[number].Offset00 = (address & 0x000000000000FFFF);
@@ -501,7 +518,7 @@ void Machine::setupTSS(unsigned int number, laddr address) {
   SystemDescriptor* tssDesc = (SystemDescriptor*)&gdt[number];
   tssDesc->Base00 = (address & 0x000000000000FFFF);
   tssDesc->Base16 = (address & 0x0000000000FF0000) >> 16;
-  tssDesc->Type = 0x9;
+  tssDesc->Type = 0x9;//Available 64-bit TSS
   tssDesc->DPL = 3;
   tssDesc->P = 1;
   tssDesc->Base24 = (address & 0x00000000FF000000) >> 24;
