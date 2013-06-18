@@ -92,3 +92,10 @@ Contributors (in alphabetical order)
 - Behrooz Shafiee (keyboard, pit drivers)
 - Alex Szlavik (bootstrap code)
 - Cameron White (clang support)
+
+
+TODO: explain 3rd-party packages, licensing...
+- acpica
+- elfio
+- multiboot
+- dlmalloc
