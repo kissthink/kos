@@ -1,4 +1,6 @@
-#include "types.h"
+#include "linux/types.h"
+
+extern "C" {
 
 // forward decl
 struct sk_buff;
@@ -76,7 +78,6 @@ int dev_close(struct net_device *dev) { return 0; }
 int dev_open(struct net_device *dev) { return 0; }
 
 // kernel/workqueue.c
-typedef _Bool bool;
 bool schedule_delayed_work(struct delayed_work *dwork, unsigned long delay) { return 0; }
 bool cancel_work_sync(struct work_struct *work) { return 0; }
 bool cancel_delayed_work_sync(struct delayed_work *dwork) { return 0; }
@@ -152,7 +153,6 @@ void *__kmalloc(size_t size, gfp_t flags) { return 0; }
 #define __iomem
 #endif
 void iounmap(volatile void __iomem *addr) {}
-typedef u64 phys_addr_t;
 typedef phys_addr_t resource_size_t;
 void __iomem *ioremap_nocache(resource_size_t phys_addr, unsigned long size) { return 0; }
 
@@ -276,3 +276,5 @@ struct module_kobject;
 typedef long ssize_t;
 ssize_t __modver_version_show(struct module_attribute *mattr,
           struct module_kobject *mk, char *buf) { return 0; }
+
+}

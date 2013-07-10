@@ -2,7 +2,7 @@ SRCDIR:=$(CURDIR)
 include $(SRCDIR)/Makefile.config
 -include Makefile.state
 
-SOURCEDIRS=util dev mach kern gdb
+SOURCEDIRS=util dev mach kern gdb driver
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
 BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)
@@ -13,7 +13,6 @@ AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
 DRIVER_OBJECTS=extern/linux-3.9.4/drivers/net/ethernet/intel/e1000/e1000.o
-STUB_OBJECTS=driver-stub/stubs.o
 LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
@@ -106,7 +105,7 @@ kernel.sys: kernel.sys.debug
 	$(STRIP) $@.debug -o $@
 
 # rebuild binary from scratch to enforce file order: boot.o must be first
-kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS) $(STUB_OBJECTS) $(DRIVER_OBJECTS)
+kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS) $(DRIVER_OBJECTS)
 	rm -f $@
 	$(LD) -nodefaultlibs -T linker.ld -o $@ $(filter-out $<,$^) $(LDFLAGS)
 
@@ -142,8 +141,6 @@ $(DRIVER_OBJECTS): extern/linux-3.9.4/Makefile
 	$(MAKE) -C extern/linux-3.9.4 scripts
 	$(MAKE) -C extern/linux-3.9.4 SUBDIRS=drivers/net/ethernet/intel/e1000
 
-$(STUB_OBJECTS): driver-stub/stubs.c
-
 $(USERLIB):
 	$(MAKE) -C ulib $(notdir $@)
 
@@ -167,7 +164,7 @@ clean:
 	$(MAKE) -C user $@
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\
-		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS) $(STUB_OBJECTS)
+		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS)
 	rm -rf $(STAGE)
 	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep
 
