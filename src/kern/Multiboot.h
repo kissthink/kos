@@ -20,7 +20,6 @@
 #include "mach/platform.h"
 
 class FrameManager;
-class KernelVM;
 
 class Multiboot {
   vaddr mbiStart;

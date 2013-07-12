@@ -45,11 +45,11 @@ public:
   AddressSpace& getAddressSpace() const { return *addressSpace; }
 
   static Thread* create(AddressSpace& as, size_t stackSize = defaultStack) {
-    vaddr mem = kernelVM.alloc(stackSize) + stackSize - sizeof(Thread);
+    vaddr mem = kernelHeap.alloc(stackSize) + stackSize - sizeof(Thread);
     return new (ptr_t(mem)) Thread(as, mem, stackSize);
   }
   static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack) {
-    vaddr mem = kernelVM.alloc(stackSize) + stackSize - sizeof(Thread);
+    vaddr mem = kernelHeap.alloc(stackSize) + stackSize - sizeof(Thread);
     return new (ptr_t(mem)) Thread(as, mem, stackSize, n);
   }
   static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize = defaultStack) {
@@ -65,7 +65,7 @@ public:
   static void destroy(Thread* t) {
     t->~Thread();
     vaddr mem = vaddr(t) + sizeof(Thread) - t->stackSize;
-    kernelVM.release(mem, t->stackSize);
+    kernelHeap.release(mem, t->stackSize);
   }
   void run(function_t func, ptr_t data) {
     stackPointer = stackInitIndirect(stackPointer, func, data, (void*)Thread::invoke);

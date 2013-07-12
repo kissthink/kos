@@ -18,14 +18,14 @@
 #define _Kernel_h_ 1
 
 #include "kern/AddressSpace.h"
-#include "kern/KernelVM.h"
+#include "kern/KernelHeap.h"
 #include "kern/Scheduler.h"
 
 #include <map>
 #include <string>
 
 extern AddressSpace kernelSpace;
-extern KernelVM kernelVM;
+extern KernelHeap kernelHeap;
 extern Scheduler kernelScheduler;
 
 class File;

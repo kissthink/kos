@@ -232,7 +232,7 @@ void Machine::parseACPI() {
 
   // clean up ACPI leftover memory allocations
   for (pair<vaddr,mword> a : allocations ) {
-    kernelVM.free(ptr_t(a.first));
+    kernelHeap.free(ptr_t(a.first));
   }
   allocations.clear();
   for (pair<vaddr,size_t> m : mappings ) {
@@ -328,7 +328,7 @@ void AcpiOsReleaseMutex(ACPI_MUTEX Handle) { ABORT1(false,""); }
 
 void* AcpiOsAllocate(ACPI_SIZE Size) {
   DBG::out(DBG::MemAcpi, "acpi alloc: ", Size);
-  void* ptr = kernelVM.malloc(Size);
+  void* ptr = kernelHeap.malloc(Size);
   DBG::outln(DBG::MemAcpi, " -> ", ptr);
   memset(ptr, 0, Size); // zero out memory to play it safe...
   allocations.insert( {vaddr(ptr), Size} );
@@ -337,7 +337,7 @@ void* AcpiOsAllocate(ACPI_SIZE Size) {
 
 void AcpiOsFree(void* Memory) {
   DBG::outln(DBG::MemAcpi, "acpi free: ", Memory);
-  kernelVM.free(Memory);
+  kernelHeap.free(Memory);
   allocations.erase( vaddr(Memory) );
 }
 
@@ -399,13 +399,13 @@ ACPI_STATUS AcpiOsPurgeCache(ACPI_CACHE_T* Cache) {
 }
 
 void* AcpiOsAcquireObject(ACPI_CACHE_T* Cache) {
-  void* addr = (void*)kernelVM.alloc((UINT16)(uintptr_t)Cache);
+  void* addr = (void*)kernelHeap.alloc((UINT16)(uintptr_t)Cache);
   memset((void*)addr, 0, (UINT16)(uintptr_t)Cache);
   return (void*)addr;
 }
 
 ACPI_STATUS AcpiOsReleaseObject(ACPI_CACHE_T* Cache, void* Object) {
-  kernelVM.release((vaddr)Object, (UINT16)(uintptr_t)Cache);
+  kernelHeap.release((vaddr)Object, (UINT16)(uintptr_t)Cache);
   return AE_OK;
 }
 

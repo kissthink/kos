@@ -19,7 +19,7 @@
 
 #include "util/basics.h"
 
-// implemented in KernelVM.cc
+// implemented in KernelHeap.cc
 extern void globaldelete(ptr_t, size_t);
 
 #endif /* _globals_h_ */

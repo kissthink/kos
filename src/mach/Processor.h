@@ -21,18 +21,16 @@
 #include "mach/APIC.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
-#include "mach/isr_wrapper.h"
 
+#include "mach/isr_wrapper.h"
 
 class Thread;
 class FrameManager;
+class GdbCpuState;
 
 // would like to use 'offsetof', but asm does not work with 'offsetof'
 // use fs:0 as 'this', then access member: slower, but cleaner?
-
-
-class GdbCpuState;
-
+// see http://stackoverflow.com/questions/3562697/whats-use-of-c-in-x86-64-inline-assembly
 class Processor {
   mword             apicID;
   mword             cpuID;
@@ -84,6 +82,7 @@ class Processor {
 
 public:
   static mword getApicID() {
+//    mword x; asm volatile("mov %%fs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID))); return x;
     mword x; asm volatile("mov %%fs:0, %0" : "=r"(x)); return x;
   }
   static mword getCpuID() {

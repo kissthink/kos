@@ -17,7 +17,6 @@
 #ifndef _CPU_h_
 #define _CPU_h_ 1
 
-
 #include "util/basics.h"
 #include "mach/platform.h"
 
@@ -171,18 +170,18 @@ struct MSR {
 
   enum {
     IA32_APIC_BASE    = 0x0000001B,
+
+    SYSENTER_CS       = 0x00000174,
+    SYSENTER_ESP      = 0x00000175,
+    SYSENTER_EIP      = 0x00000176,
+
     IA32_EFER         = 0xC0000080,
     IA32_TSC_DEADLINE = 0x000006E0,
 
-    SYSENTER_CS 	  = 0x00000174,
-    SYSENTER_ESP	  = 0x00000175,
-    SYSENTER_EIP 	  = 0x00000176,
-
-    SYSCALL_STAR	  = 0xC0000081,
-    SYSCALL_LSTAR	  = 0xC0000082,
-    SYSCALL_CSTAR	  = 0xC0000083,
-    SYSCALL_SFMASK	  = 0xC0000084,
-
+    SYSCALL_STAR      = 0xC0000081,
+    SYSCALL_LSTAR     = 0xC0000082,
+    SYSCALL_CSTAR     = 0xC0000083,
+    SYSCALL_SFMASK    = 0xC0000084,
 
     FS_BASE           = 0xC0000100,
     GS_BASE           = 0xC0000101
@@ -224,11 +223,11 @@ class CPUID {
   static const BitSeg<uint32_t, 3,1> MWAIT;
   static const BitSeg<uint32_t, 5,1> MSR;
   static const BitSeg<uint32_t, 9,1> APIC;
+  static const BitSeg<uint32_t,11,1> SYSENTER;
   static const BitSeg<uint32_t,20,1> NX;
   static const BitSeg<uint32_t,21,1> X2APIC;
   static const BitSeg<uint32_t,24,1> TSC_Deadline;
   static const BitSeg<uint32_t,24,8> LAPIC_ID;
-  static const BitSeg<uint32_t,11,1> SYSENTER;
 
   static inline void cpuid( uint32_t ia, uint32_t& a, uint32_t& b, uint32_t& c, uint32_t& d ) {
     asm volatile("cpuid" : "=a"(a),"=b"(b),"=c"(c),"=d"(d) : "a"(ia) : "memory");
@@ -283,14 +282,14 @@ public:
     return d & NX();
   }
   static inline bool hasSYSENTER() {
-	uint32_t a,b,c,d;
+    uint32_t a,b,c,d;
     cpuid( 0x01, a, b, c, d );
     return d & SYSENTER();
   }
   static inline bool hasSYSCALL() {
-	uint32_t a,b,c,d;
-	cpuid( 0x80000001, a, b, c, d );
-	return d & SYSENTER();
+    uint32_t a,b,c,d;
+    cpuid( 0x80000001, a, b, c, d );
+    return d & SYSENTER();
   }
 
   void getCacheInfo()                                 __section(".boot.text");

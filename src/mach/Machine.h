@@ -29,8 +29,8 @@ class Machine {
   static const unsigned int userDataSelector = 4; // 4th descriptor by convention?
   static const unsigned int tssSelector      = 5; // uses 2 entries
   static const unsigned int maxGDT           = 7;
-
   static SegmentDescriptor gdt[maxGDT];
+
   static const unsigned int maxIDT = 256;
   static InterruptDescriptor idt[maxIDT];
 

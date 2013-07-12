@@ -149,12 +149,12 @@ void Machine::initAP2() {
   // enable APIC
   MSR::enableAPIC();                // should be enabled by default
   Processor::enableAPIC(0xf8);      // confirm spurious vector at 0xf8
+
   // enable interrupts, sync with BSP, then halt
   processorTable[apIndex].startInterrupts();
   DBG::out(DBG::Basic, 'H');
   apIndex = bspIndex;
 //  StoreBarrier();
-
   Halt();
 }
 
@@ -180,11 +180,11 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   Processor dummyProcessor;
   dummyProcessor.install();
 
-  // detemine end addresses of kernel overall (except modules)
+  // determine end addresses of kernel overall (except modules)
   vaddr kernelEnd = align_up(mbiEnd, pagesize<2>());
 
   // give kernel heap pre-allocated memory -> limited dynamic memory available
-  kernelVM.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
+  kernelHeap.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
 
   // call global constructors: %rbx is callee-saved, thus safe to use
   // ostream output cannot be used before this point (i.e. not DBG::out)
@@ -269,8 +269,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "FM/bootstrap: ", frameManager);
 
   // release all mapped memory (excl. multiboot) to heap
-  kernelVM.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
-  DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelVM);
+  kernelHeap.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
+  DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelHeap);
 
   // init AddressSpace
   kernelSpace.setPagetable(pml4addr);
@@ -292,8 +292,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "AS/modules: ", kernelSpace);
 
   // release multiboot memory to heap
-  kernelVM.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
-  DBG::outln(DBG::Basic, "VM/mbi: ", kernelVM);
+  kernelHeap.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
+  DBG::outln(DBG::Basic, "VM/mbi: ", kernelHeap);
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);
@@ -324,7 +324,7 @@ void Machine::initBSP2() {
 //  kernelSpace.unmapPages<1>(lapicAddr, pagesize<1>()); // debugging only
   DBG::outln(DBG::Basic, "FM/acpi: ", frameManager);
   DBG::outln(DBG::Basic, "AS/acpi: ", kernelSpace);
-  DBG::outln(DBG::Basic, "VM/acpi: ", kernelVM);
+  DBG::outln(DBG::Basic, "VM/acpi: ", kernelHeap);
 
   // find PCI devices
   PCI::probeAll();
@@ -376,14 +376,14 @@ void Machine::initBSP2() {
   KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(vaddr(&__KernelCode) - vaddr(&__Boot)) );
 //  DBG::outln(DBG::Basic, "FM/free: ", frameManager);
 //  DBG::outln(DBG::Basic, "AS/free: ", kernelSpace);
-//  DBG::outln(DBG::Basic, "VM/free: ", kernelVM);
+//  DBG::outln(DBG::Basic, "VM/free: ", kernelHeap);
 
   // free AP boot code
   check = frameManager.release(BOOT16, pagesize<1>());
   KASSERTN( check, FmtHex(BOOT16), '-', FmtHex(pagesize<1>()) );
   DBG::outln(DBG::Basic, "FM/free16: ", frameManager);
   DBG::outln(DBG::Basic, "AS/free16: ", kernelSpace);
-  DBG::outln(DBG::Basic, "VM/free16: ", kernelVM);
+  DBG::outln(DBG::Basic, "VM/free16: ", kernelHeap);
 
   // wake up APs
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
@@ -487,8 +487,6 @@ extern "C" void isr_handler_gen_err(mword num, mword errcode) {
   Processor::sendEOI();
 //  Reboot();
 }
-
-
 
 void Machine::setupIDT(unsigned int number, laddr address) {
   KASSERT1(number < maxIDT, number);

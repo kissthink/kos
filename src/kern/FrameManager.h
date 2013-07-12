@@ -19,7 +19,7 @@
 
 #include "util/BuddyMap.h"
 #include "util/Debug.h"
-#include "kern/KernelVM.h"
+#include "kern/KernelHeap.h"
 
 #include <set>
 

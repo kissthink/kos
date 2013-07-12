@@ -19,32 +19,32 @@
 #include "util/Debug.h"
 #include "kern/AddressSpace.h"
 #include "kern/Kernel.h"
-#include "kern/KernelVM.h"
+#include "kern/KernelHeap.h"
 
-ptr_t operator new(size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }  
-ptr_t operator new[](size_t s) { return (ptr_t)kernelVM.alloc<false>(s); }
+ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }  
+ptr_t operator new[](size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }
 void operator delete(ptr_t p) noexcept { ABORT1("delete"); }
 void operator delete[](ptr_t p) noexcept { ABORT1("delete[]"); }
 
 void globaldelete(ptr_t addr, size_t size) {
-  kernelVM.release<false>((vaddr)addr, size);
+  kernelHeap.release<false>((vaddr)addr, size);
 }
 
 extern "C" void* mmap(void* addr, size_t len, int, int, int, _off64_t) {
   DBG::out(DBG::VM, "VM/mmap: ", FmtHex(addr), '/', FmtHex(len));
   KASSERT1(!addr, addr);
-  void* p = (void*)kernelVM.alloc(len);
+  void* p = (void*)kernelHeap.alloc(len);
   DBG::outln(DBG::Libc, " -> ", p);
   return p;
 }
 
 extern "C" int munmap(void* addr, size_t len) {
   DBG::outln(DBG::VM, "VM/munmap: ", FmtHex(addr), '/', FmtHex(len));
-  kernelVM.release((vaddr)addr, len);
+  kernelHeap.release((vaddr)addr, len);
   return 0;
 }
 
-void KernelVM::expand(size_t size) {
+void KernelHeap::expand(size_t size) {
   // allocate/insert pow2-aligned chunk of at least default page size
   size = std::max(pow2(ceilinglog2(size)), pagesize<dpl>());
   vaddr newmem = kernelSpace.allocPages<dpl>(size, AddressSpace::Data);
@@ -53,7 +53,7 @@ void KernelVM::expand(size_t size) {
   KASSERT1(check, newmem);
 }
 
-void KernelVM::checkExpand(size_t size) {
+void KernelHeap::checkExpand(size_t size) {
   if (!availableMemory.check(DEFAULT_GRANULARITY)) {
     expand(DEFAULT_GRANULARITY);
   }
@@ -62,7 +62,7 @@ void KernelVM::checkExpand(size_t size) {
   }
 }
 
-vaddr KernelVM::allocInternal(size_t size) {
+vaddr KernelHeap::allocInternal(size_t size) {
   KASSERT1(aligned(size, pow2(min)), FmtHex(size));
   ScopedLock<> so(lock);
   checkExpand(size);
@@ -71,7 +71,7 @@ vaddr KernelVM::allocInternal(size_t size) {
   return addr;
 }
 
-void KernelVM::releaseInternal(vaddr p, size_t size) {
+void KernelHeap::releaseInternal(vaddr p, size_t size) {
   KASSERTN( aligned(p, pow2(min)), FmtHex(p), '/', FmtHex(size) );
   KASSERTN( aligned(size, pow2(min)), FmtHex(p), '/', FmtHex(size) );
   ScopedLock<> so(lock);
@@ -86,25 +86,25 @@ void KernelVM::releaseInternal(vaddr p, size_t size) {
 }
 
 // memory is used to initialize dlmalloc's mspace
-void KernelVM::init(vaddr start, vaddr end) {
+void KernelHeap::init(vaddr start, vaddr end) {
   KASSERTN( end - start >= DEFAULT_GRANULARITY, FmtHex(start), '-', FmtHex(end) );
   kmspace = create_mspace_with_base( (ptr_t)start, end - start, 0 );
 }
 
 // memory is marked as available
-void KernelVM::addMemory(vaddr start, vaddr end) {
+void KernelHeap::addMemory(vaddr start, vaddr end) {
   availableMemory.insert(start, (end - start));
 }
 
-ptr_t KernelVM::malloc(size_t s) {
+ptr_t KernelHeap::malloc(size_t s) {
   return mspace_malloc(kmspace, s);
 }
 
-void KernelVM::free(ptr_t p) {
+void KernelHeap::free(ptr_t p) {
   mspace_free(kmspace, p);
 }
 
-ostream& operator<<(ostream& os, const KernelVM& vm ) {
+ostream& operator<<(ostream& os, const KernelHeap& vm ) {
   vm.availableMemory.print<KernelAllocator<vaddr>>(os);
   return os;
 }
