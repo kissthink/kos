@@ -29,3 +29,15 @@ void SpinLockRelease(void **lockImpl) {
   SpinLock* lock = (SpinLock *)(*lockImpl);
   lock->release();
 }
+
+void SpinLockAcquireISR(void **lockImpl) {
+  KASSERT0(*lockImpl != nullptr);   // FIXME change to atomic allocation later
+  SpinLock* lock = (SpinLock *)(*lockImpl);
+  lock->acquireISR();
+}
+
+void SpinLockReleaseISR(void **lockImpl) {
+  KASSERT0(*lockImpl != nullptr);
+  SpinLock* lock = (SpinLock *)(*lockImpl);
+  lock->releaseISR();
+}
