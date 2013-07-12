@@ -4,7 +4,8 @@
 
 // spin_lock()
 void __raw_spin_lock(raw_spinlock_t *lock) {
-  SpinLockAcquire(&(lock->lockImpl));
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  SpinLockAcquire(lock->lockImpl);
 }
 void _raw_spin_lock(raw_spinlock_t *lock) {
   __raw_spin_lock(lock);
@@ -13,8 +14,9 @@ void _raw_spin_lock(raw_spinlock_t *lock) {
 // spin_lock_irqsave()
 unsigned long __raw_spin_lock_irqsave(raw_spinlock_t *lock) {
   unsigned long flags;
-  local_irq_save(flags);
-  SpinLockAcquire(&(lock->lockImpl));
+  local_irq_save(flags);    // FIXME need to use KOS version
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  SpinLockAcquire(lock->lockImpl);
   return flags;
 }
 unsigned long _raw_spin_lock_irqsave(raw_spinlock_t *lock) {
@@ -24,7 +26,8 @@ unsigned long _raw_spin_lock_irqsave(raw_spinlock_t *lock) {
 // spin_lock_irq()
 void __raw_spin_lock_irq(raw_spinlock_t *lock) {
   local_irq_disable();
-  SpinLockAcquire(&(lock->lockImpl));
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  SpinLockAcquire(lock->lockImpl);
 }
 void _raw_spin_lock_irq(raw_spinlock_t *lock) {
   __raw_spin_lock_irq(lock);
@@ -33,7 +36,8 @@ void _raw_spin_lock_irq(raw_spinlock_t *lock) {
 // spin_lock_bh()
 void __raw_spin_lock_bh(raw_spinlock_t *lock) {
 //  local_bh_disable(); FIXME when bottom half is implemented
-  SpinLockAcquire(&(lock->lockImpl));
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  SpinLockAcquire(lock->lockImpl);
 }
 void _raw_spin_lock_bh(raw_spinlock_t *lock) {
   __raw_spin_lock_bh(lock);
@@ -41,7 +45,8 @@ void _raw_spin_lock_bh(raw_spinlock_t *lock) {
 
 // spin_trylock()
 int __raw_spin_trylock(raw_spinlock_t *lock) {
-  return SpinLockTryAcquire(&(lock->lockImpl));
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  return SpinLockTryAcquire(lock->lockImpl);
 }
 int _raw_spin_trylock(raw_spinlock_t *lock) {
   return __raw_spin_trylock(lock);
@@ -50,7 +55,8 @@ int _raw_spin_trylock(raw_spinlock_t *lock) {
 // spin_trylock_bh()
 int __raw_spin_trylock_bh(raw_spinlock_t *lock) {
 //  local_bh_disable(); FIXME when bottom half is implemented
-  return SpinLockTryAcquire(&(lock->lockImpl));
+  if (lock->lockImpl == NULL) lock->lockImpl = SpinLockCreate();
+  return SpinLockTryAcquire(lock->lockImpl);
 }
 int _raw_spin_trylock_bh(raw_spinlock_t *lock) {
   return __raw_spin_trylock_bh(lock);
@@ -58,7 +64,7 @@ int _raw_spin_trylock_bh(raw_spinlock_t *lock) {
 
 // spin_unlock()
 void __raw_spin_unlock(raw_spinlock_t *lock) {
-  SpinLockRelease(&(lock->lockImpl));
+  SpinLockRelease(lock->lockImpl);
 }
 void _raw_spin_unlock(raw_spinlock_t *lock) {
   __raw_spin_unlock(lock);
@@ -66,7 +72,7 @@ void _raw_spin_unlock(raw_spinlock_t *lock) {
 
 // spin_unlock_irqrestore()
 void __raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags) {
-  SpinLockRelease(&(lock->lockImpl));
+  SpinLockRelease(lock->lockImpl);
   local_irq_restore(flags);
 }
 void _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags) {
@@ -75,7 +81,7 @@ void _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags) {
 
 // spin_unlock_irq()
 void __raw_spin_unlock_irq(raw_spinlock_t *lock) {
-  SpinLockRelease(&(lock->lockImpl));
+  SpinLockRelease(lock->lockImpl);
   local_irq_enable();
 }
 void _raw_spin_unlock_irq(raw_spinlock_t *lock) {
@@ -84,7 +90,7 @@ void _raw_spin_unlock_irq(raw_spinlock_t *lock) {
 
 // spin_unlock_bh()
 void __raw_spin_unlock_bh(raw_spinlock_t *lock) {
-  SpinLockRelease(&(lock->lockImpl));
+  SpinLockRelease(lock->lockImpl);
 //  local_bh_enable_ip(); FIXME when bottom half is implemented
 }
 void _raw_spin_unlock_bh(raw_spinlock_t *lock) {

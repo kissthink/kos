@@ -1,43 +1,34 @@
 #include "capi/SpinLock.h"
 #include "util/SpinLock.h"
 
+void *SpinLockCreate() {
+  return new SpinLock();
+}
+
 // Initialize SpinLock if lockImpl is invalid
 // Since initializing lockImpl from Linux's C functions
 // is complicated, I decided to take lazy approach
-void SpinLockAcquire(void **lockImpl) {
-  SpinLock* lock;
-  if (*lockImpl == nullptr) {
-    lock = new SpinLock();
-    *lockImpl = (void *)lock;
-  }
-  lock = (SpinLock *)(*lockImpl);
-  lock->acquire();
+void SpinLockAcquire(void *lockImpl) {
+  KASSERT0(lockImpl != nullptr);
+  ((SpinLock *)lockImpl)->acquire();
 }
 
-int SpinLockTryAcquire(void **lockImpl) {
-  SpinLock* lock;
-  if (*lockImpl == nullptr) {
-    lock = new SpinLock();
-    *lockImpl = (void *)lock;
-  }
-  lock = (SpinLock *)(*lockImpl);
-  return lock->tryAcquire() ? 1 : 0;
+int SpinLockTryAcquire(void *lockImpl) {
+  KASSERT0(lockImpl != nullptr);
+  return ((SpinLock *)lockImpl)->tryAcquire() ? 1 : 0;
 }
 
-void SpinLockRelease(void **lockImpl) {
-  KASSERT0(*lockImpl != nullptr);
-  SpinLock* lock = (SpinLock *)(*lockImpl);
-  lock->release();
+void SpinLockRelease(void *lockImpl) {
+  KASSERT0(lockImpl != nullptr);
+  ((SpinLock *)lockImpl)->release();
 }
 
-void SpinLockAcquireISR(void **lockImpl) {
-  KASSERT0(*lockImpl != nullptr);   // FIXME change to atomic allocation later
-  SpinLock* lock = (SpinLock *)(*lockImpl);
-  lock->acquireISR();
+void SpinLockAcquireISR(void *lockImpl) {
+  KASSERT0(lockImpl != nullptr);   // FIXME change to atomic allocation later
+  ((SpinLock *)lockImpl)->acquireISR();
 }
 
-void SpinLockReleaseISR(void **lockImpl) {
-  KASSERT0(*lockImpl != nullptr);
-  SpinLock* lock = (SpinLock *)(*lockImpl);
-  lock->releaseISR();
+void SpinLockReleaseISR(void *lockImpl) {
+  KASSERT0(lockImpl != nullptr);
+  ((SpinLock *)lockImpl)->releaseISR();
 }
