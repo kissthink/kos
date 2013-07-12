@@ -2,7 +2,7 @@ SRCDIR:=$(CURDIR)
 include $(SRCDIR)/Makefile.config
 -include Makefile.state
 
-SOURCEDIRS=util dev mach kern gdb driver
+SOURCEDIRS=util dev mach kern gdb capi
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
 BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)
@@ -12,7 +12,11 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
-DRIVER_OBJECTS=extern/linux-3.9.4/drivers/net/ethernet/intel/e1000/e1000.o
+DRIVERDIRS=linux linux/lib linux/driver linux/driver/base linux/driver/pci
+DRIVER_WRAPPER_SOURCES=$(wildcard $(addsuffix /*.c,$(DRIVERDIRS)))
+DRIVER_WRAPPER_BSOURCES=$(notdir $(DRIVER_WRAPPER_SOURCES))
+DRIVER_WRAPPER_OBJECTS=$(DRIVER_WRAPPER_BSOURCES:%.c=%.o)
+DRIVER_OBJECTS=extern/linux-$(LINUXVER)/drivers/net/ethernet/intel/e1000/e1000.o
 LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
@@ -25,6 +29,7 @@ STAGE=stage
 .PHONY: Makefile.state
 
 vpath %.cc $(SOURCEDIRS)
+vpath %.c $(DRIVERDIRS)
 vpath %.S mach boot gdb
 vpath %.asm boot
 vpath %.cpp test
@@ -105,7 +110,7 @@ kernel.sys: kernel.sys.debug
 	$(STRIP) $@.debug -o $@
 
 # rebuild binary from scratch to enforce file order: boot.o must be first
-kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS) $(DRIVER_OBJECTS)
+kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS) $(DRIVER_WRAPPER_OBJECTS) $(DRIVER_OBJECTS)
 	rm -f $@
 	$(LD) -nodefaultlibs -T linker.ld -o $@ $(filter-out $<,$^) $(LDFLAGS)
 
@@ -124,7 +129,10 @@ $(SOBJECTS): %.s: %.cc
 $(EOBJECTS): %.e: %.cc
 	$(CXX) -E $(PREFLAGS) $< > $@
 
-$(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(SOBJECTS) $(EOBJECTS): Makefile.config
+$(DRIVER_WRAPPER_OBJECTS): %.o: %.c $(LINUX_AUTOCONF_INCLUDE)
+	$(CC) -c $(CDRIVERFLAGS) $<
+
+$(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(SOBJECTS) $(EOBJECTS) $(DRIVER_WRAPPER_OBJECTS): Makefile.config
 
 libs: $(LIBS)
 
@@ -135,11 +143,13 @@ extern/acpica/libacpica.a: extern/acpica/Makefile
 extern/dlmalloc/malloc.o: extern/dlmalloc/Makefile
 	$(MAKE) -C extern/dlmalloc $(notdir $@)
 
-$(DRIVER_OBJECTS): extern/linux-3.9.4/Makefile
-	$(MAKE) -C extern/linux-3.9.4 defconfig
-	$(MAKE) -C extern/linux-3.9.4 prepare
-	$(MAKE) -C extern/linux-3.9.4 scripts
-	$(MAKE) -C extern/linux-3.9.4 SUBDIRS=drivers/net/ethernet/intel/e1000
+$(LINUX_AUTOCONF_INCLUDE): extern/linux-$(LINUXVER)/Makefile
+	$(MAKE) -C extern/linux-$(LINUXVER) defconfig
+	$(MAKE) -C extern/linux-$(LINUXVER) prepare
+
+$(DRIVER_OBJECTS): $(LINUX_AUTOCONF_INCLUDE)
+	$(MAKE) -C extern/linux-$(LINUXVER) scripts
+	$(MAKE) -C extern/linux-$(LINUXVER) SUBDIRS=drivers/net/ethernet/intel/e1000
 
 $(USERLIB):
 	$(MAKE) -C ulib $(notdir $@)
@@ -154,17 +164,18 @@ echo:
 	@echo SOURCES: $(SOURCES)
 	@echo BSOURCES: $(BSOURCES)
 	@echo OBJECTS: $(OBJECTS)
+	@echo DRIVER_WRAPPER_OBJECTS: $(DRIVER_WRAPPER_OBJECTS)
 
 clean:
 	$(MAKE) -C extern/dlmalloc $@
 	$(MAKE) -C extern/acpica $@
-	$(MAKE) -C extern/linux-3.9.4 $@
-	$(MAKE) -C extern/linux-3.9.4 mrproper
-	$(MAKE) -C extern/linux-3.9.4 distclean
+	$(MAKE) -C extern/linux-$(LINUXVER) $@
+	$(MAKE) -C extern/linux-$(LINUXVER) mrproper
+	$(MAKE) -C extern/linux-$(LINUXVER) distclean
 	$(MAKE) -C user $@
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\
-		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS)
+		$(OBJECTS) $(SOBJECTS) $(EOBJECTS) $(AS_OBJECTS) $(DRIVER_WRAPPER_OBJECTS)
 	rm -rf $(STAGE)
 	rm -f Makefile.o.dep Makefile.s.dep Makefile.e.dep
 

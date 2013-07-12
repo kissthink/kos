@@ -1,0 +1,19 @@
+--- ../src/extern/linux-3.9.4/include/linux/compiler.h	2013-07-11 02:37:18.879888554 -0400
++++ linux/compiler.h	2013-07-11 02:39:17.755888759 -0400
+@@ -54,7 +54,16 @@
+ #include <linux/compiler-gcc.h>
+ #endif
+ 
++/* no_instrument_function needs to be place at function declaration for C++.
++ * many linux headers place at function definitions, instead. Since, I could
++ * not find -finstrument-functions flag in linux directory, just disable it
++ * for C++ build.
++ */
++#ifndef __cplusplus
+ #define notrace __attribute__((no_instrument_function))
++#else
++#define notrace
++#endif
+ 
+ /* Intel compiler defines __GNUC__. So we will overwrite implementations
+  * coming from above header files here

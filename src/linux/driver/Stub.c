@@ -1,6 +1,8 @@
 #include "linux/types.h"
+#include "linux/pci.h"
+#include "linux/jiffies.h"
 
-extern "C" {
+//extern "C" {
 
 // forward decl
 struct sk_buff;
@@ -14,10 +16,10 @@ struct mutex;
 struct lock_class_key;
 struct skb_shared_hwtstamps;
 struct page;
-struct device;
+//struct device;
 struct pci_dev;
 struct dql;
-unsigned long jiffies;
+//unsigned long jiffies;
 unsigned long phys_base;
 
 struct dma_map_ops;
@@ -29,8 +31,8 @@ typedef unsigned short u16;
 typedef u16 word;
 struct pci_bus;
 typedef unsigned long long u64;
-struct device {};
-struct device x86_dma_fallback_dev;
+//struct device {};
+//struct device x86_dma_fallback_dev;
 int cpu_number = 0;
 struct pci_driver;
 struct module;
@@ -88,11 +90,13 @@ void delayed_work_timer_fn(unsigned long __data) {}
 void synchronize_irq(unsigned int irq) {}
 void disable_irq(unsigned int irq) {}
 void enable_irq(unsigned int irq) {}
+/*
 enum irqreturn {
   IRQ_NONE        = (0 << 0),
   IRQ_HANDLED     = (1 << 0),
   IRQ_WAKE_THREAD = (1 << 1),
 };
+*/
 typedef enum irqreturn irqreturn_t;
 typedef irqreturn_t (*irq_handler_t)(int, void *);
 int request_threaded_irq(unsigned int irq, irq_handler_t handler,
@@ -140,8 +144,8 @@ struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order) { return 0; }
 void put_page(struct page *page) {}
 
 // drivers/base/dd.c
-void *dev_get_drvdata(const struct device *dev) { return 0; }
-int dev_set_drvdata(struct device *dev, void *data) { return 0; }
+//void *dev_get_drvdata(const struct device *dev) { return 0; }
+//int dev_set_drvdata(struct device *dev, void *data) { return 0; }
 
 // mm/slab.c or mm/slob.c or mm/slub.c
 void kfree(const void *x) {}
@@ -209,7 +213,7 @@ int pcix_get_mmrbc(struct pci_dev *dev) { return 0; }
 int pcix_set_mmrbc(struct pci_dev *dev, int mmrbc) { return 0; }
 
 // drivers/pci/access.c
-int pci_bus_read_config_word(struct pci_bus *bus, unsigned int devfn, int pos, word *value) { return 0; }
+//int pci_bus_read_config_word(struct pci_bus *bus, unsigned int devfn, int pos, word *value) { return 0; }
 
 // arch/x86/kernel/pci-dma.c
 int dma_set_mask(struct device *dev, u64 mask) { return 0; }
@@ -239,6 +243,7 @@ void __const_udelay(unsigned long xloops) {}
 void __udelay(unsigned long usecs) {}
 
 // include/linux/kernel.h
+/*
 enum system_states {
   SYSTEM_BOOTING,
   SYSTEM_RUNNING,
@@ -246,6 +251,7 @@ enum system_states {
   SYSTEM_POWER_OFF,
   SYSTEM_RESTART,
 } system_state;
+*/
 
 // net/core/rtnetlink.c
 int rtnl_is_locked(void) { return 0; }
@@ -259,8 +265,10 @@ void iowrite16_rep(void __iomem *addr, const void *src, unsigned long count) {}
 
 // drivers/pci/pci-driver.c
 void pci_unregister_driver(struct pci_driver *drv) {}
+/*
 void __pci_register_driver(struct pci_driver *drv, struct module *owner,
         const char *mod_name) {}
+*/
 
 // net/core/ethtool.c
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info) { return 0; }
@@ -277,4 +285,4 @@ typedef long ssize_t;
 ssize_t __modver_version_show(struct module_attribute *mattr,
           struct module_kobject *mk, char *buf) { return 0; }
 
-}
+//}

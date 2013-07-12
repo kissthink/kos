@@ -1,0 +1,29 @@
+--- ../src/extern/linux-3.9.4/include/linux/mod_devicetable.h	2013-07-10 20:33:13.303850717 -0400
++++ mod_devicetable.h	2013-07-11 01:11:11.075879603 -0400
+@@ -17,7 +17,7 @@
+ struct pci_device_id {
+ 	__u32 vendor, device;		/* Vendor and device ID or PCI_ANY_ID*/
+ 	__u32 subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
+-	__u32 class, class_mask;	/* (class,subclass,prog-if) triplet */
++	__u32 c_class, class_mask;	/* (class,subclass,prog-if) triplet */
+ 	kernel_ulong_t driver_data;	/* Data private to the driver */
+ };
+ 
+@@ -349,7 +349,7 @@
+ #define SDIO_ANY_ID (~0)
+ 
+ struct sdio_device_id {
+-	__u8	class;			/* Standard interface or SDIO_ANY_ID */
++	__u8	c_class;			/* Standard interface or SDIO_ANY_ID */
+ 	__u16	vendor;			/* Vendor or SDIO_ANY_ID */
+ 	__u16	device;			/* Device ID or SDIO_ANY_ID */
+ 	kernel_ulong_t driver_data;	/* Data private to the driver */
+@@ -375,7 +375,7 @@
+ 	__u16	manuf;
+ 	__u16	id;
+ 	__u8	rev;
+-	__u8	class;
++	__u8	c_class;
+ };
+ #define BCMA_CORE(_manuf, _id, _rev, _class)  \
+ 	{ .manuf = _manuf, .id = _id, .rev = _rev, .class = _class, }
