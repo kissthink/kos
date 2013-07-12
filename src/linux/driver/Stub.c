@@ -25,7 +25,7 @@ unsigned long phys_base;
 struct dma_map_ops;
 struct dma_map_ops *dma_ops = 0;
 struct in6_addr;
-typedef struct raw_spinlock raw_spinlock_t;
+//typedef struct raw_spinlock raw_spinlock_t;
 unsigned long kernel_stack;
 typedef unsigned short u16;
 typedef u16 word;
@@ -182,9 +182,9 @@ __sum16 csum_ipv6_magic(const struct in6_addr *saddr,
       __u32 len, unsigned short proto, __wsum sum) { return 0; }
 
 // kernel/spinlock.c
-unsigned long _raw_spin_lock_irqsave(raw_spinlock_t *lock) { return 0; }
-void _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags) {}
-void _raw_spin_lock(raw_spinlock_t *lock) {}
+//unsigned long _raw_spin_lock_irqsave(raw_spinlock_t *lock) { return 0; }
+//void _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, unsigned long flags) {}
+//void _raw_spin_lock(raw_spinlock_t *lock) {}
 
 // mm/vmalloc.c or mm/nommu.c
 void vfree(const void *addr) {}

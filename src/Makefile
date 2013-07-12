@@ -12,7 +12,7 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
-DRIVERDIRS=linux linux/lib linux/driver linux/driver/base linux/driver/pci
+DRIVERDIRS=linux linux/kernel linux/lib linux/driver linux/driver/base linux/driver/pci
 DRIVER_WRAPPER_SOURCES=$(wildcard $(addsuffix /*.c,$(DRIVERDIRS)))
 DRIVER_WRAPPER_BSOURCES=$(notdir $(DRIVER_WRAPPER_SOURCES))
 DRIVER_WRAPPER_OBJECTS=$(DRIVER_WRAPPER_BSOURCES:%.c=%.o)
