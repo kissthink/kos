@@ -1,18 +1,20 @@
---- ../src/extern/linux-3.9.4/include/linux/spinlock_types.h	2013-07-12 01:37:40.498873021 -0400
-+++ linux/spinlock_types.h	2013-07-12 01:38:10.982873074 -0400
-@@ -29,6 +29,7 @@
+--- ../src/extern/linux-3.9.4/include/linux/spinlock_types.h	2013-07-13 02:22:42.811027344 -0400
++++ linux/spinlock_types.h	2013-07-13 02:23:41.683027446 -0400
+@@ -29,6 +29,8 @@
  #ifdef CONFIG_DEBUG_LOCK_ALLOC
  	struct lockdep_map dep_map;
  #endif
 +  void *lockImpl;
++  int lockImplInit;
  } raw_spinlock_t;
  
  #define SPINLOCK_MAGIC		0xdead4ead
-@@ -53,6 +54,7 @@
+@@ -53,6 +55,8 @@
  #define __RAW_SPIN_LOCK_INITIALIZER(lockname)	\
  	{					\
  	.raw_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
 +	.lockImpl = 0, \
++	.lockImplInit = 0, \
  	SPIN_DEBUG_INIT(lockname)		\
  	SPIN_DEP_MAP_INIT(lockname) }
  
