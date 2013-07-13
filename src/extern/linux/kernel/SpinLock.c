@@ -2,6 +2,12 @@
 #include "linux/irqflags.h"
 #include "SpinLock.h"
 
+// Due to extensive use of macros in Linux's spinlock_init() and DEFINE_SPINLOCK
+// functions that are used to initialize spinlock_t dynamically/statically,
+// I could not find a better way than lazily create SpinLock class, which is
+// embedded in raw_spinlock_t struct. I used atomic CAS operation but not 100%
+// sure this is the right approach
+
 // spin_lock()
 void __raw_spin_lock(raw_spinlock_t *lock) {
   if (!__sync_val_compare_and_swap(&lock->lockImplInit, 0, 1))

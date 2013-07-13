@@ -5,9 +5,6 @@ void *SpinLockCreate() {
   return new SpinLock();
 }
 
-// Initialize SpinLock if lockImpl is invalid
-// Since initializing lockImpl from Linux's C functions
-// is complicated, I decided to take lazy approach
 void SpinLockAcquire(void *lockImpl) {
   KASSERT0(lockImpl != nullptr);
   ((SpinLock *)lockImpl)->acquire();
