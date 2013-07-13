@@ -28,8 +28,8 @@ instruction.
 gdb_asm_functions.S
 -------------------
 This file has interrupt handlers for the Gdb stub.
-Register save/restore routines are defined as GdbCpuState class' member methods.
-Registers are saved on a separate stack (int array) inside GdbCpuState.
+Register save/restore routines are defined.
+Registers are saved on a separate stack (int array) inside GdbCpu.
 For x86-64bit machine, the stack will look like following after interrupt is raised.
 
 ------
@@ -52,7 +52,7 @@ It is a singleton object that handles most of operations Gdb stub requires.
 void init(int numCpu, Processor* procTable) needs to be called after initAPCI();
 inside Machine.cc to initialize multicore Gdb stub.
 Call void startGdb(bool allstop) to start Gdb.
-Each GdbCpuState (register values) are saved on processor specific area via fs register.
+Each GdbCpu (register values) are saved on processor specific area via fs register.
 Each methods is protected by a SpinLock. Make sure to use ISR version of locking/unlocking
 as Gdb is assumed to be used inside interrupt handler where interrupts are disabled.
 
@@ -186,7 +186,7 @@ Start/Stop logic for Gdb stub
 -----------------------------
 Each CPU core will enter the installed interrupt handler, catchException3, when an interrupt 3 is raised from reaching a breakpoint.
 When a breakpoint is set, gdb will replace first byte of the current instruction to "int 3". When code returns from the interrupt handler,
-"int 3" is replaced back to original byte. GdbCpuState::saveRegisters() method saves register values to software stack in GdbCpuState object
+"int 3" is replaced back to original byte. saveRegisters() saves register values to software stack in GdbCpu object
 before entering handle_exception. First part of handle_exception is to check if a baton is free. A thread that picks up a baton freely enters
 a critical section, talking to gdb. A baton is held by a thread until vCont;c; packet is executed. When a thread executes 'c', a baton is passed
 on to a waiting thread or released if there is no waiting thread. waiting flag is used to let other threads know that a thread on a CPU core

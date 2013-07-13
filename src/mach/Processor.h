@@ -26,26 +26,26 @@
 
 class Thread;
 class FrameManager;
-class GdbCpuState;
+class GdbCpu;
 
 // would like to use 'offsetof', but asm does not work with 'offsetof'
 // use fs:0 as 'this', then access member: slower, but cleaner?
 // see http://stackoverflow.com/questions/3562697/whats-use-of-c-in-x86-64-inline-assembly
 class Processor {
-  mword             apicID;
-  mword             cpuID;
-  Thread*           currThread;
-  Thread*           idleThread;
-  FrameManager*     frameManager;
-  mword					    lockCount;
-  GdbCpuState* curCpuState;
+  mword         apicID;
+  mword         cpuID;
+  Thread*       currThread;
+  Thread*       idleThread;
+  FrameManager* frameManager;
+  mword         lockCount;
+  GdbCpu*       gdbCpu;
 
   friend class Machine;
   friend class Gdb;
 
   // lockCount must not reach 0 during bootstrap -> interrupts disabled
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
-    frameManager(nullptr), lockCount(mwordlimit / 2), curCpuState(0) {}
+    frameManager(nullptr), lockCount(mwordlimit / 2), gdbCpu(0) {}
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
@@ -56,7 +56,7 @@ class Processor {
   }
 
   void install() {
-   MSR::write(MSR::FS_BASE, mword(this));
+   MSR::write(MSR::GS_BASE, mword(this));
    //Prepare Syscall/Sysret Registers
    initSysCall();
   }
@@ -76,47 +76,49 @@ class Processor {
   static volatile LAPIC* lapic() {
    return (LAPIC*)lapicAddr;
   }
-  void initGdbCpuStates(GdbCpuState* state) {
-    curCpuState = state;
+  void setGdbCpu(GdbCpu* s) {
+    gdbCpu = s;
   }
 
 public:
   static mword getApicID() {
-//    mword x; asm volatile("mov %%fs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID))); return x;
-    mword x; asm volatile("mov %%fs:0, %0" : "=r"(x)); return x;
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID))); return x;
   }
   static mword getCpuID() {
-    mword x; asm volatile("mov %%fs:8, %0" : "=r"(x)); return x;
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, cpuID))); return x;
   }
   static Thread* getCurrThread() {
-    mword x; asm volatile("mov %%fs:16, %0" : "=r"(x)); return (Thread*)x;
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, currThread))); return (Thread*)x;
   }
   static void setCurrThread(Thread* x) {
-             asm volatile("mov %0, %%fs:16" :: "r"(x) : "memory");
+             asm volatile("mov %0, %%gs:%c1" :: "r"(x), "i"(offsetof(struct Processor, currThread)) : "memory");
   }
   static Thread* getIdleThread() {
-    mword x; asm volatile("mov %%fs:24, %0" : "=r"(x)); return (Thread*)x;
-  }
-  static void setFrameManager(FrameManager* x) {
-             asm volatile("mov %0, %%fs:32" :: "r"(x) : "memory");
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, idleThread))); return (Thread*)x;
   }
   static FrameManager* getFrameManager() {
-    mword x; asm volatile("mov %%fs:32, %0" : "=r"(x)); return (FrameManager*)x;
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, frameManager))); return (FrameManager*)x;
+  }
+  static void setFrameManager(FrameManager* x) {
+             asm volatile("mov %0, %%gs:%c1" :: "r"(x), "i"(offsetof(struct Processor, frameManager)) : "memory");
+  }
+  static GdbCpu* getGdbCpu() {
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, gdbCpu))); return (GdbCpu*)x;
   }
   static mword getLockCount() {
     KASSERT0(!interruptsEnabled());
-    mword x; asm volatile("mov %%fs:40, %0" : "=r"(x)); return x;
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount))); return x;
   }
   static mword incLockCount() {
     KASSERT0(!interruptsEnabled());
-    mword x; asm volatile("mov %%fs:40, %0" : "=r"(x) :: "memory");
-             asm volatile("mov %0, %%fs:40" :: "r"(x+1) : "memory");
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
+             asm volatile("mov %0, %%gs:%c1" :: "r"(x+1), "i"(offsetof(struct Processor, lockCount)) : "memory");
    return x+1;
   }
   static mword decLockCount() {
     KASSERT0(!interruptsEnabled());
-    mword x; asm volatile("mov %%fs:40, %0" : "=r"(x) :: "memory");
-             asm volatile("mov %0, %%fs:40" :: "r"(x-1) : "memory");
+    mword x; asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
+             asm volatile("mov %0, %%gs:%c1" :: "r"(x-1), "i"(offsetof(struct Processor, lockCount)) : "memory");
     return x-1;
   }
   void startInterrupts() {

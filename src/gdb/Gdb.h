@@ -23,7 +23,7 @@ public:
   void init(int numCPU, Processor* procTable) {
     KASSERT0(numCPU);
     numCpu = numCPU;
-    cpuStates = new GdbCpuState[numCpu];
+    cpuStates = new GdbCpu[numCpu];
     processorTable = procTable;
     DBG::outlnISR(DBG::GDBDebug, "Processor table ", FmtHex(processorTable));
     sem = new NonBlockSemaphore[numCpu];
@@ -35,12 +35,12 @@ public:
   }
 
   // returns CPU states (locked version)
-  GdbCpuState* getCurrentCpuState() const {
+  GdbCpu* getCurrentCpuState() const {
     ScopedLockISR<> so(mutex);
     return _getCurrentCpuState();
   }
   // returns CPU state for the current CPU
-  GdbCpuState* getCpuState(int cpuIdx) {
+  GdbCpu* getCpuState(int cpuIdx) {
     ScopedLockISR<> so(mutex);
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     return &cpuStates[cpuIdx];
@@ -50,7 +50,7 @@ public:
   void setupGdb(int cpuIdx) {
     ScopedLockISR<> so(mutex);
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    processorTable[cpuIdx].initGdbCpuStates(&cpuStates[cpuIdx]);
+    processorTable[cpuIdx].setGdbCpu(&cpuStates[cpuIdx]);
     DBG::outlnISR(DBG::GDBDebug, "setup cpu ", cpuIdx+1);
     numInitialized = cpuIdx+1;
     cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
@@ -61,7 +61,7 @@ public:
     ScopedLockISR<> so(mutex);
     enumIdx = 0;
   }
-  GdbCpuState* next() {
+  GdbCpu* next() {
     ScopedLockISR<> so(mutex);
     if (enumIdx < numCpu) return &cpuStates[enumIdx++];
     return nullptr;
@@ -71,13 +71,13 @@ public:
   // returns a buffer storing 64-bit registers
   char* getRegs64() const {
     ScopedLockISR<> so(mutex);
-    GdbCpuState* state = _getCurrentCpuState();
+    GdbCpu* state = _getCurrentCpuState();
     return reinterpret_cast<char *>(state->getRegs64());
   }
   // a buffer storing 32-bit registers
   char* getRegs32() const {
     ScopedLockISR<> so(mutex);
-    GdbCpuState* state = _getCurrentCpuState();
+    GdbCpu* state = _getCurrentCpuState();
     return reinterpret_cast<char *>(state->getRegs32());
   }
 
@@ -133,10 +133,8 @@ public:
 
 private:
   // returns CPU state (actual implementation, unlocked)
-  GdbCpuState* _getCurrentCpuState() const {
-    mword x;
-    asm volatile("mov %%fs:48, %0" : "=r"(x));
-    return reinterpret_cast<GdbCpuState *>(x);
+  GdbCpu* _getCurrentCpuState() const {
+    return Processor::getGdbCpu();
   }
 
   // sends an IPI to a specified CPU core
@@ -149,9 +147,9 @@ private:
     KASSERT1(!err, FmtHex(err));
   }
 
-  Gdb(): cpuStates(nullptr), processorTable(nullptr)
-  , numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
-  GdbCpuState* cpuStates;
+  Gdb(): cpuStates(nullptr), processorTable(nullptr),
+    numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
+  GdbCpu* cpuStates;
   Processor* processorTable;
   int numCpu;
   int numInitialized;

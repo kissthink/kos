@@ -1,5 +1,8 @@
-#ifndef Gdb_Asm_Functions_h_
-#define Gdb_Asm_Functions_h_ 1
+#ifndef gdb_asm_functions_h_
+#define gdb_asm_functions_h_ 1
+
+class GdbCpu;
+extern "C" void restoreRegisters(GdbCpu*);
 
 /**
  * I have not imported all of exception handlers
@@ -17,4 +20,4 @@ extern "C" void catchException7();
 extern "C" void catchException9();
 extern "C" void catchException16();
 
-#endif // Gdb_Asm_Functions_h_
+#endif // gdb_asm_functions_h_

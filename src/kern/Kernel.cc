@@ -104,7 +104,7 @@ void mainLoop(ptr_t) {
     asm volatile("movq %0, %%rsp"::"r"(uRSP) : "memory");
     //Set Start Address of user Program in RCX, so sysret loads RIP with RCX
     asm volatile("movq %0, %%rcx"::"r"(func_ptr) : "memory");
-    asm volatile("sysretq" ::: "memory");
+//    asm volatile("sysretq" ::: "memory");
 
     //Activate Kernel Space again
     kernelSpace.activate();
