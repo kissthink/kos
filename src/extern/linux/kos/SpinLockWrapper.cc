@@ -1,4 +1,4 @@
-#include "capi/SpinLock.h"
+#include "extern/linux/kos/SpinLock.h"
 #include "util/SpinLock.h"
 
 void *SpinLockCreate() {

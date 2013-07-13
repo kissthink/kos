@@ -1,4 +1,4 @@
-#include "capi/PCI.h"
+#include "extern/linux/kos/PCI.h"
 #include "mach/PCI.h"
 
 uint32_t PCIReadConfigWord(uint16_t bus, uint16_t dev, uint16_t func, uint16_t reg, uint32_t width) {

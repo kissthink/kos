@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "capi/Memory.h"
+#include "extern/linux/kos/Memory.h"
 #include "kern/KernelVM.h"
 
 extern KernelVM kernelVM;

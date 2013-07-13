@@ -1,0 +1,17 @@
+--- ../src/extern/linux-3.9.4/include/asm-generic/bitops/const_hweight.h	2013-07-12 22:40:33.143004257 -0400
++++ linux/const_hweight.h	2013-07-12 22:42:59.727004511 -0400
+@@ -21,10 +21,10 @@
+ /*
+  * Generic interface.
+  */
+-#define hweight8(w)  (__builtin_constant_p(w) ? __const_hweight8(w)  : __arch_hweight8(w))
+-#define hweight16(w) (__builtin_constant_p(w) ? __const_hweight16(w) : __arch_hweight16(w))
+-#define hweight32(w) (__builtin_constant_p(w) ? __const_hweight32(w) : __arch_hweight32(w))
+-#define hweight64(w) (__builtin_constant_p(w) ? __const_hweight64(w) : __arch_hweight64(w))
++#define hweight8(w)  (__builtin_constant_p(w) ? (unsigned int)  __const_hweight8(w)  : __arch_hweight8(w))
++#define hweight16(w) (__builtin_constant_p(w) ? (unsigned int)  __const_hweight16(w) : __arch_hweight16(w))
++#define hweight32(w) (__builtin_constant_p(w) ? (unsigned int)  __const_hweight32(w) : __arch_hweight32(w))
++#define hweight64(w) (__builtin_constant_p(w) ? (unsigned long) __const_hweight64(w) : __arch_hweight64(w))
+ 
+ /*
+  * Interface for known constant arguments
