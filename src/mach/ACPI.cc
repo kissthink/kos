@@ -27,6 +27,9 @@ extern "C" {
 
 #include <map>
 
+#undef __STRICT_ANSI__ // to get access to vsnprintf
+#include <cstdio>
+
 static vaddr rsdp = 0;
 
 static map<vaddr,mword,less<vaddr>,KernelAllocator<pair<vaddr,mword>>> allocations;
@@ -51,22 +54,32 @@ void Machine::initACPI(vaddr r) {
   ACPI_STATUS status = AcpiInitializeTables( NULL, 0, true );
   KASSERT1( status == AE_OK, status );
 
-  // FADT is need to check for PS/2 keyboard
+  // FADT is needed to check for PS/2 keyboard
   acpi_table_fadt* fadt;
-  char FADT[] = "FACP";
-  status = AcpiGetTable( FADT, 0, (ACPI_TABLE_HEADER**)&fadt );
+  status = AcpiGetTable( const_cast<char*>(ACPI_SIG_FADT), 0, (ACPI_TABLE_HEADER**)&fadt );
   KASSERT1( status == AE_OK, status );
   DBG::out(DBG::Acpi, "FADT: ", fadt->Header.Length, '/', FmtHex(fadt->BootFlags));
   if (fadt->BootFlags & ACPI_FADT_8042) {
     DBG::out(DBG::Acpi, " - 8042");
-    // PS/2 enable - FADT bit not set on bochs & qemu
+    // enable PS/2 driver, but: FADT bit not set on bochs & qemu
   }
   DBG::out(DBG::Acpi, kendl);
 
+  acpi_table_srat* srat;
+  status = AcpiGetTable( const_cast<char*>(ACPI_SIG_SRAT), 0, (ACPI_TABLE_HEADER**)&srat );
+  if (status == AE_OK) {
+    DBG::outln(DBG::Acpi, "SRAT: ", srat->Header.Length);
+  }
+
+  acpi_table_slit* slit;
+  status = AcpiGetTable( const_cast<char*>(ACPI_SIG_SLIT), 0, (ACPI_TABLE_HEADER**)&slit );
+  if (status == AE_OK) {
+    DBG::outln(DBG::Acpi, "SLIT: ", slit->Header.Length);
+  }
+
   // MADT is needed for APICs, I/O-APICS, etc.
   acpi_table_madt* madt;
-  char MADT[] = "APIC";
-  status = AcpiGetTable( MADT, 0, (ACPI_TABLE_HEADER**)&madt );
+  status = AcpiGetTable( const_cast<char*>(ACPI_SIG_MADT), 0, (ACPI_TABLE_HEADER**)&madt );
   KASSERT1( status == AE_OK, status );
   int madtLength = madt->Header.Length - sizeof(acpi_table_madt);
   vaddr apicPhysAddr = madt->Address;
@@ -197,12 +210,8 @@ static ACPI_STATUS display(ACPI_HANDLE handle, UINT32 level, void* ctx, void** r
   KASSERT1( status == AE_OK, status );
   status = AcpiGetObjectInfo(handle, &info);
   KASSERT1( status == AE_OK, status );
-#ifdef ACPICA_OUTPUT
-  char* name = (char*)&info->Name;
-  AcpiOsPrintf("%c%c%c%c HID: %s, ADR: %.8X, Status: %x\n",
-    name[0], name[1], name[2], name[3],
-    info->HardwareId.String, info->Address, info->CurrentStatus);
-#endif
+//  AcpiOsPrintf("%.4s HID: %s, ADR: %.8X, Status: %x\n", (char*)&info->Name,
+//    info->HardwareId.String, info->Address, info->CurrentStatus);
   return AE_OK;
 }
 
@@ -211,8 +220,10 @@ void Machine::parseACPI() {
 
   status = AcpiInitializeSubsystem();
   KASSERT1( status == AE_OK, status );
+
 //  status = AcpiReallocateRootTable();
 //  KASSERT1( status == AE_OK, status );  
+
   status = AcpiLoadTables();
   KASSERT1( status == AE_OK, status );
 
@@ -220,11 +231,12 @@ void Machine::parseACPI() {
 
   status = AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
   KASSERT1( status == AE_OK, status );
+
   status = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
   KASSERT1( status == AE_OK, status );
 
-  ACPI_HANDLE sysBusHandle = ACPI_ROOT_OBJECT;
-  AcpiWalkNamespace(ACPI_TYPE_DEVICE, sysBusHandle, -1, display, NULL, NULL, NULL);
+  status = AcpiWalkNamespace(ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX, display, NULL, NULL, NULL);
+  KASSERT1( status == AE_OK, status );
 
   // TODO: in principle, the ACPI subsystem keeps running...
   status = AcpiTerminate();
@@ -523,17 +535,23 @@ ACPI_STATUS AcpiOsSignal(UINT32 Function, void* Info) {
 }
 
 void ACPI_INTERNAL_VAR_XFACE AcpiOsPrintf(const char* Format, ...) {
-#ifdef ACPICA_OUTPUT
   va_list args;
   va_start(args, Format);
-  StdDbg.outln(Printf(Format, args));
-#endif
+  AcpiOsVprintf(Format, args);
+  va_end(args);
 }
 
 void AcpiOsVprintf(const char* Format, va_list Args) {
-#ifdef ACPICA_OUTPUT
-  StdDbg.outln(Printf(Format, args));
-#endif
+  va_list tmpargs;
+  va_copy(tmpargs, Args);
+  int size = vsnprintf(nullptr, 0, Format, tmpargs);
+  va_end(tmpargs);
+  if (size < 0) return;
+  size += 1;
+  char* buffer = new char[size];
+  vsnprintf(buffer, size, Format, Args);
+  DBG::out(DBG::Acpi, buffer);
+  globaldelete(buffer, size);
 }
 
 void AcpiOsRedirectOutput(void* Destination) { ABORT0(); }
