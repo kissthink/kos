@@ -29,6 +29,9 @@ class SpinLock {
   void releaseInternal() volatile {
     __atomic_clear(&locked, __ATOMIC_SEQ_CST);
   }
+  bool tryAcquireInternal() volatile {
+    return __atomic_test_and_set(&locked, __ATOMIC_SEQ_CST);
+  }
 public:
   SpinLock() : locked(false) {}
   ptr_t operator new(size_t) { return ::operator new(SpinLock::size()); }
@@ -51,6 +54,12 @@ public:
   void releaseISR() volatile {
     releaseInternal();
     Processor::decLockCount();
+  }
+  bool tryAcquire() volatile {
+    Processor::disableInterrupts();
+    bool success = tryAcquireInternal();
+    if (!success) Processor::enableInterrupts();
+    return success;
   }
 };
 
