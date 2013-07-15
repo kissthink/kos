@@ -66,3 +66,6 @@ $(DRIVER_OBJECTS): $(OBJECTS) $(KOS_OBJECTS)
 
 clean:
 	rm -f libdriver.a $(OBJECTS) $(KOS_OBJECTS) $(DRIVER_OBJECTS)
+#	$(MAKE) -C $(SRCDIR)/extern/linux-$(LINUXVER) $@
+#	$(MAKE) -C $(SRCDIR)/extern/linux-$(LINUXVER) mrproper
+#	$(MAKE) -C $(SRCDIR)/extern/linux-$(LINUXVER) distclean

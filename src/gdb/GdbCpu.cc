@@ -1,7 +1,10 @@
 #include "gdb/GdbCpu.h"
+#include "mach/Processor.h"
 
-// needed this implementation in .cc for gdb_asm_functions.S
-uint64_t* GdbCpuState::stackPtr() {
-  ScopedLockISR<> so(mutex);
-  return stack + bufferSize;
+GdbCpu* getCurrentGdbCpu() {
+  return Processor::getGdbCpu();
+}
+
+uint64_t* getCurrentGdbStack(GdbCpu* gs) {
+  return gs->stackPtr();
 }

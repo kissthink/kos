@@ -39,11 +39,11 @@ namespace cpuState {
                                        "Running" };
 }
 
-const int numRegs64 = 17;
-const int numRegs32 = 7;
-static const unsigned long bufferSize = 1000000;
+const int numRegs64  = 17;
+const int numRegs32  = 7;
+const int bufferSize = (1<<20);
 
-class GdbCpuState {
+class GdbCpu {
   // *do NOT change orders for these 4 variables*
   reg64 reg64Buffer[numRegs64];       // gdb_asm_functions.S requires this here
   reg32 reg32Buffer[numRegs32];
@@ -72,7 +72,7 @@ class GdbCpuState {
   }
 
 public:
-  GdbCpuState(): gdbErrorCode(0), state(cpuState::UNKNOWN), ripDecremented(false) {
+  GdbCpu(): gdbErrorCode(0), state(cpuState::UNKNOWN), ripDecremented(false) {
     memset(cpuId, 0, sizeof(char) * 20);
     memset(stack, 0, sizeof(uint64_t) * bufferSize); 
     memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
@@ -122,9 +122,10 @@ public:
     return cpuInfo;
   }
 
-  uint64_t* stackPtr();           // starting address of stack setup by GDB stub
-  void saveRegisters();           // save registers and go to exception handler
-  void restoreRegisters();        // restore registers and return to KOS
+  uint64_t* stackPtr() {           // starting address of stack setup by GDB stub
+    ScopedLockISR<> so(mutex);
+    return stack + bufferSize;
+  }
 
   // access registers stored on reg64/32 buffers
   reg64* getRegs64() {
@@ -174,5 +175,9 @@ public:
   }
 
 } __attribute__((aligned(4096)));   // required to compile
+
+
+extern "C" GdbCpu* getCurrentGdbCpu();
+extern "C" uint64_t* getCurrentGdbStack(GdbCpu*);
 
 #endif // GdbCpu_h_

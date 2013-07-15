@@ -25,7 +25,7 @@ class IndexMap {
   struct Chunk;
   static_assert( sizeof(Type*) == sizeof(Chunk*), "sizeof(Type*) != sizeof(Chunk*)" );
   static const size_t ptrCnt = BlockSize / sizeof(Chunk*);
-  static const size_t ptrCntLog = floorlog2_c(ptrCnt);
+  static const size_t ptrCntLog = floorlog2(ptrCnt);
   static_assert( ptrCnt = pow2(ptrCntLog), "ptrCnt not a power of 2");
   struct Chunk {
     Chunk* ptr[ptrCnt];

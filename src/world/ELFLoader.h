@@ -17,20 +17,26 @@ private:
 	bool initialized;
 
 public:
-	ELFLoader () : initialized(false) {}
+	ELFLoader() :
+			initialized(false) {
+	}
 
-	bool loadAndMapELF( File* elfFile, AddressSpace* addSpace ) {
-		if (!elfReader.load(elfFile->startptr(), elfFile->size())) return false;
+	bool loadAndMapELF(File* elfFile, AddressSpace* addSpace) {
+		if (!elfReader.load(elfFile->startptr(), elfFile->size()))
+			return false;
 		initialized = true;
 		KASSERT1(elfReader.get_class() == ELFCLASS64, elfReader.get_class());
 
 		for (int i = 0; i < elfReader.segments.size(); ++i) { // iterate segments
 			const ELFIO::segment* pseg = elfReader.segments[i];
 
-			if (pseg->get_type() != PT_LOAD) continue;      // not a loadable segment
-			if (pseg->get_file_size() == 0)  continue;      // empty segment
+			if (pseg->get_type() != PT_LOAD)
+				continue;      // not a loadable segment
+			if (pseg->get_file_size() == 0)
+				continue;      // empty segment
 
-			KASSERTN(pseg->get_file_size() <= pseg->get_memory_size(), pseg->get_file_size(), ' ', pseg->get_memory_size());
+			KASSERTN(pseg->get_file_size() <= pseg->get_memory_size(),
+					pseg->get_file_size(), ' ', pseg->get_memory_size());
 
 			vaddr offset = vaddr(elfFile->startptr()) + pseg->get_data_offset(); // get segment offset in file
 			offset = align_down(offset, pagesize<1>());     // align it
@@ -47,24 +53,28 @@ public:
 			 * segment and small enough to be in the same page, then .rodata ends
 			 * up executable.  */
 			AddressSpace::PageType permType = AddressSpace::RoData; // most restrictive
-			if (!(pseg->get_flags() & PF_W))	permType = AddressSpace::Data;
-			if (pseg->get_flags() & PF_X) permType = AddressSpace::Code;
+			if (!(pseg->get_flags() & PF_W))
+				permType = AddressSpace::Data;
+			if (pseg->get_flags() & PF_X)
+				permType = AddressSpace::Code;
 			addSpace->mapPages<1>(seg_la, seg_va, size, permType);
 
-			if (pseg->get_memory_size() > pseg->get_file_size()) {//zero out BSS
+			if (pseg->get_memory_size() > pseg->get_file_size()) { //zero out BSS
 				vaddr bssStart = seg_va + pseg->get_file_size() + 1;
-				memset( (void*)bssStart, 0, pseg->get_memory_size() - pseg->get_file_size() );
+				memset((void*) bssStart, 0,
+						pseg->get_memory_size() - pseg->get_file_size());
 			}
 		}
 		return true;
 	}
 
 	vaddr findMainAddress() {
-		if (!initialized) return topaddr;
+		if (!initialized)
+			return topaddr;
 		ELFIO::Elf_Half sec_num = elfReader.sections.size();
 		for (int i = 0; i < sec_num; ++i) {
 			ELFIO::section* psec = elfReader.sections[i];
-			if (psec->get_type() == SHT_SYMTAB) {// Check section type
+			if (psec->get_type() == SHT_SYMTAB) { // Check section type
 				const ELFIO::symbol_section_accessor symbols(elfReader, psec);
 				for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
 					kstring name;
@@ -87,8 +97,10 @@ public:
 	}
 
 	vaddr findEntryAddress() {
-		if (!initialized) return topaddr;
-		else return elfReader.get_entry();
+		if (!initialized)
+			return topaddr;
+		else
+			return elfReader.get_entry();
 	}
 };
 

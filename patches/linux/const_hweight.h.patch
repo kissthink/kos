@@ -12,6 +12,6 @@
 +#define hweight16(w) (__builtin_constant_p(w) ? (unsigned int)  __const_hweight16(w) : __arch_hweight16(w))
 +#define hweight32(w) (__builtin_constant_p(w) ? (unsigned int)  __const_hweight32(w) : __arch_hweight32(w))
 +#define hweight64(w) (__builtin_constant_p(w) ? (unsigned long) __const_hweight64(w) : __arch_hweight64(w))
- 
+
  /*
   * Interface for known constant arguments

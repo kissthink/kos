@@ -23,10 +23,13 @@
 #include "world/File.h"
 #include "world/ELFLoader.h"
 
+#include "mach/Machine.h"
+#include "mach/asm_functions.h"
+
 AddressSpace kernelSpace(AddressSpace::Kernel);
-KernelVM kernelVM;
+KernelHeap kernelHeap;
 Scheduler kernelScheduler;
-map<kstring,File*,less<kstring>,KernelAllocator<kstring>> kernelFS;
+map<kstring, File*, less<kstring>, KernelAllocator<kstring>> kernelFS;
 
 static void mainLoop(ptr_t); // forward declaration
 static void task(ptr_t);     // forward declaration
@@ -52,41 +55,60 @@ extern "C" void kmain(mword magic, mword addr) {
     // start up BSP: low-level machine-dependent initialization
     Machine::initBSP(magic, addr, bspIdleLoop);
   }
-};
+}
 
 void mainLoop(ptr_t) {
   File* f1 = kernelFS.find("motd")->second;
   for (;;) {
     char c;
-    if (f1->read( &c, 1 ) == 0) break;
+    if (f1->read(&c, 1) == 0) break;
     StdOut.out(c);
     StdDbg.out(c);
   }
 
-	File* f = kernelFS.find("testprogram2")->second;
+  File* f = kernelFS.find("testprogram2")->second;
 
-	//User Address Space
-	AddressSpace userAS(AddressSpace::User);
-	vaddr startAS = pagesize<2>();
-	vaddr lengthAS = topuser - startAS;
-	userAS.setMemoryRange(startAS,lengthAS);
+  //User Address Space
+  AddressSpace userAS(AddressSpace::User);
+  vaddr startAS = pagesize<2>();
+  vaddr lengthAS = topuser - startAS;
+  userAS.setMemoryRange(startAS, lengthAS);
 
-	//ELF Loader
-	ELFLoader elfLoader;
-	if (elfLoader.loadAndMapELF(f,&userAS)) {
-		//Clone and Activate Address Space
-		userAS.clonePagetable(kernelSpace);
-		userAS.activate();
+  //ELF Loader
+  ELFLoader elfLoader;
+  if (elfLoader.loadAndMapELF(f, &userAS)) {
+    //Clone and Activate Address Space
+    userAS.clonePagetable(kernelSpace);
+    userAS.activate();
 
-		//Execute Program
-		int (*func_ptr)(void);
-		func_ptr = (int (*)(void))elfLoader.findMainAddress();
-		KASSERT0(vaddr(func_ptr) != topaddr);
-		StdOut.outln("return value: ", func_ptr());
+    //Allocate stack
+    vaddr kStack = userAS.allocPages<1>(2 * pagesize<1>(), AddressSpace::Data);
+    KASSERT0(vaddr(kStack) != topaddr);
+    vaddr uStack = userAS.allocPages<1>(2 * pagesize<1>(), AddressSpace::Data);
+    KASSERT0(vaddr(uStack) != topaddr);
+    //User Program Address
+    int (*func_ptr)(void);
+    func_ptr = (int (*)(void))elfLoader.findMainAddress();
+    KASSERT0(vaddr(func_ptr) != topaddr);
+    /**
+     * Go to the userspace with a fake sysret!
+     * We should always take care of RCX!!
+     * Remember we always (whether in user or kernel space) a valid and allocated RSP!
+     **/
+    //Set Ring 0 RSP(Though this is not necessary!)
+    mword kRSP = 0;
+    asm ("movq %%rsp, %0":"=r"(kRSP):: "memory");
+    Machine::loadTSSRSP(0, kStack + 2 * pagesize<1>());
+    //Set User RSP(This is necessary!)
+    mword uRSP = uStack + 2 * pagesize<1>();
+    asm volatile("movq %0, %%rsp"::"r"(uRSP) : "memory");
+    //Set Start Address of user Program in RCX, so sysret loads RIP with RCX
+    asm volatile("movq %0, %%rcx"::"r"(func_ptr) : "memory");
+//    asm volatile("sysretq" ::: "memory");
 
-		//Activate Kernel Space again
-		kernelSpace.activate();
-	}
+    //Activate Kernel Space again
+    kernelSpace.activate();
+  }
   Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");

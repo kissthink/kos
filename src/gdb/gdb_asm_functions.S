@@ -1,14 +1,4 @@
 .text
-.align  8
-
-# GdbCpuState::saveRegisters()
-.globl _ZN11GdbCpuState13saveRegistersEv
-# GdbCpuState::stackPtr()
-.globl _ZN11GdbCpuState8stackPtrEv
-# GdbCpuState::restoreRegisters()
-.globl _ZN11GdbCpuState16restoreRegistersEv
-
-.globl handle_exception
 
 # Restore the program's registers (including stack pointer, which
 # means we get the right stack and don't have to worry about popping our
@@ -16,8 +6,9 @@
 # cs, rip, ss, rsp, eflags are restored by iretq
 # fs, gs are not modified by GDB and must be set by wrmsr instruction
 
-# requires reg64Buffer to be first member variable (access via $rdi)
-_ZN11GdbCpuState13saveRegistersEv:
+# requires reg64Buffer to be at %rdi
+.align  8
+saveRegisters:
     mov %rax,    (%rdi)
     mov %rbx,   8(%rdi)
     mov %rcx,  16(%rdi)
@@ -25,13 +16,10 @@ _ZN11GdbCpuState13saveRegistersEv:
     pop %rax    # return address ?? (ignore)
     pop %rax    # rsi
     mov %rax,  32(%rdi)
-#    mov %rsi,  32(%rdi)
-    pop %rax
+    pop %rax    # rdi
     mov %rax,  40(%rdi)
-#    mov %rdi,  40(%rdi)
     mov %rbp,  48(%rdi)
-# save stack ptr at saveRegisters2
-#   mov %rsp,  56(%rdi)
+#   mov %rsp,  56(%rdi)    save rsp later
     mov %r8,   64(%rdi)
     mov %r9,   72(%rdi)
     mov %r10,  80(%rdi)
@@ -44,11 +32,9 @@ _ZN11GdbCpuState13saveRegistersEv:
     mov %es,  152(%rdi)
     mov %fs,  156(%rdi)
     mov %gs,  160(%rdi)
-# saveRegisters2
 #    pop %rbx    # return address for catchException <- want this?
     pop %rbx    # return address to breakpoint()    <- want this
     mov %rbx,  128(%rdi)     # rip
-
     pop %rbx
     movl %ebx, 140(%rdi)     # cs
     pop %rbx
@@ -60,12 +46,16 @@ _ZN11GdbCpuState13saveRegistersEv:
     mov %rsi, %rbx           # exception number
 
 # _remcomHandler
-    call _ZN11GdbCpuState8stackPtrEv
+    call getCurrentGdbStack
     mov %rax, %rsp
     mov %rbx, %rdi
     call handle_exception
 
-_ZN11GdbCpuState16restoreRegistersEv:
+# requires reg64Buffer to be at %rdi
+.globl restoreRegisters
+.align  8
+restoreRegisters:
+#    mov  0(%rdi), %rax    restore rax later
     mov   8(%rdi), %rbx
     mov  16(%rdi), %rcx
     mov  24(%rdi), %rdx
@@ -97,8 +87,8 @@ _ZN11GdbCpuState16restoreRegistersEv:
     xor %rax, %rax
     mov 128(%rdi), %rax     # rip
     push %rax
-    mov    (%rdi), %rax
 
+    mov    (%rdi), %rax     # restore rax here
     mov  40(%rdi), %rdi     # restore rdi here
 # iretq requires
 # ss
@@ -109,20 +99,18 @@ _ZN11GdbCpuState16restoreRegistersEv:
     iretq
 
 # catchException
-.macro CatchEx_TOP ex_num
+.macro CatchEx ex_num
 .globl catchException\ex_num
 .align  8
 catchException\ex_num:
-.endm
-
-.macro CatchEx ex_num
-CatchEx_TOP \ex_num
     push %rdi           # save rdi, rsi
     push %rsi
-#    mov currentCpu, %rdi
-    mov %fs:48, %rdi
+		push %rax
+		call getCurrentGdbCpu
+		mov %rax, %rdi
+		pop %rax
     mov $\ex_num, %rsi
-    call _ZN11GdbCpuState13saveRegistersEv
+    call saveRegisters
 .endm
 
 CatchEx 0

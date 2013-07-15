@@ -3,6 +3,7 @@ CROSSDIR=/usr/local/cross
 TOOLSDIR=/usr/local
 TARGET=x86_64-pc-elf
 GCCVER=4.7.2
+LINUXVER=3.9.4
 
 LINUXVER=3.9.4
 

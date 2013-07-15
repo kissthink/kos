@@ -59,13 +59,13 @@ SECTIONS
 	__ctors_end     = ADDR(.ctors) + SIZEOF(.ctors);
 	__KernelCode    = ADDR(.text);
 	__KernelCodeEnd = ADDR(.text) + SIZEOF(.text);
-	__KernelRO	  	= ADDR(.rodata);
+	__KernelRO	= ADDR(.rodata);
 	__KernelRO_End  = ADDR(.rodata) + SIZEOF(.rodata);
-	__KernelData		= ADDR(.data);
+	__KernelData	= ADDR(.data);
 	__KernelDataEnd = ADDR(.data) + SIZEOF(.data);
-	__KernelBss			= ADDR(.bss);
+	__KernelBss	= ADDR(.bss);
 	__KernelBssEnd  = ADDR(.bss) + SIZEOF(.bss);
-	__BootHeap		  = ADDR(.boot.heap);
+	__BootHeap	= ADDR(.boot.heap);
 	__BootHeapEnd   = ADDR(.boot.heap) + SIZEOF(.boot.heap);
 }
 

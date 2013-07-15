@@ -14,8 +14,8 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#ifndef _KernelVM_h_
-#define _KernelVM_h_ 1
+#ifndef _KernelHeap_h_
+#define _KernelHeap_h_ 1
 
 #include "extern/stl/mod_set"
 #include "util/BuddyMap.h"
@@ -24,13 +24,11 @@
 
 #include <memory>
 
-template<typename T> class KernelAllocator;
-
-class KernelVM {
-  friend ostream& operator<<(ostream&, const KernelVM&);
+class KernelHeap {
+  friend ostream& operator<<(ostream&, const KernelHeap&);
 
   static const mword min = pagesizebits<1>();
-  static const mword max = ceilinglog2_c(kernelRange);
+  static const mword max = ceilinglog2(kernelRange);
   static const mword dpl = 2;
   using BuddySet = InPlaceSet<vaddr,min>;
   BuddyMap<min,max,BuddySet> availableMemory;
@@ -40,14 +38,14 @@ class KernelVM {
   vaddr allocInternal(size_t size);
   void releaseInternal(vaddr p, size_t size);
 
-  KernelVM(const KernelVM&) = delete;                  // no copy
-  const KernelVM& operator=(const KernelVM&) = delete; // no assignment
+  KernelHeap(const KernelHeap&) = delete;                  // no copy
+  const KernelHeap& operator=(const KernelHeap&) = delete; // no assignment
 
   inline void expand(size_t size);
   inline void checkExpand(size_t size);
 
 public:
-  KernelVM() {} // don't do anything, since constructor is called *after* init
+  KernelHeap() {} // don't do anything, since constructor is called *after* init
   void init(vaddr start, vaddr end);
   void addMemory(vaddr start, vaddr end);
   template<bool aligned=true>
@@ -72,7 +70,7 @@ public:
   void free(ptr_t p);
 };
 
-extern KernelVM kernelVM;
+extern KernelHeap kernelHeap;
 
 template<typename T> class KernelAllocator : public allocator<T> {
 public:
@@ -82,11 +80,11 @@ public:
   template<typename U> KernelAllocator (const KernelAllocator<U>& x) : allocator<T>(x) {}
   ~KernelAllocator() = default;
   T* allocate(size_t n, const void* = 0) {
-    return (T*)(kernelVM.alloc(n * sizeof(T)));
+    return (T*)(kernelHeap.alloc(n * sizeof(T)));
   }
   void deallocate(T* p, size_t s) {
-    kernelVM.release((vaddr)p, s * sizeof(T));
+    kernelHeap.release((vaddr)p, s * sizeof(T));
   }
 };
 
-#endif /* _KernelVM_h_ */
+#endif /* _KernelHeap_h_ */

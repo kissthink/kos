@@ -43,7 +43,7 @@ const BitSeg<uint32_t,21,1> CPUID::X2APIC;
 const BitSeg<uint32_t,24,1> CPUID::TSC_Deadline;
 const BitSeg<uint32_t,24,8> CPUID::LAPIC_ID;
 
-const BitSeg<mword, 7,1> MSR::SYSCALL;
+const BitSeg<mword, 0,1> MSR::SYSCALL;
 const BitSeg<mword, 8,1> MSR::BSP;
 const BitSeg<mword,11,1> MSR::AE;
 const BitSeg<mword,11,1> MSR::NX;

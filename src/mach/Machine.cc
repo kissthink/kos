@@ -104,12 +104,27 @@ static void keybThread(ptr_t) {
   }
 }
 
+void Machine::loadTSSRSP(uint8_t privilegeLevel,vaddr RSP)
+{
+	if(privilegeLevel > 2)
+	{
+		StdErr.outln("Invalid Privilege Level!");
+		return;
+	}
+
+	tss.rsp[privilegeLevel] = RSP;
+}
+
+extern "C" void handleSysCall(){
+	StdErr.outln("YEAAHHHHH it's workinggggggg");
+  }
+
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
   // setup IDT, GDT, address space
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-//  loadTR(tssSelector * sizeof(SegmentDescriptor)); // TODO: separate cache-aligned TSS per core?
+
   clearLDT();
   PageManager::configure();
   kernelSpace.activate();
@@ -165,11 +180,11 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   Processor dummyProcessor;
   dummyProcessor.install();
 
-  // detemine end addresses of kernel overall (except modules)
+  // determine end addresses of kernel overall (except modules)
   vaddr kernelEnd = align_up(mbiEnd, pagesize<2>());
 
   // give kernel heap pre-allocated memory -> limited dynamic memory available
-  kernelVM.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
+  kernelHeap.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
 
   // call global constructors: %rbx is callee-saved, thus safe to use
   // ostream output cannot be used before this point (i.e. not DBG::out)
@@ -254,8 +269,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "FM/bootstrap: ", frameManager);
 
   // release all mapped memory (excl. multiboot) to heap
-  kernelVM.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
-  DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelVM);
+  kernelHeap.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
+  DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelHeap);
 
   // init AddressSpace
   kernelSpace.setPagetable(pml4addr);
@@ -277,8 +292,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "AS/modules: ", kernelSpace);
 
   // release multiboot memory to heap
-  kernelVM.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
-  DBG::outln(DBG::Basic, "VM/mbi: ", kernelVM);
+  kernelHeap.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
+  DBG::outln(DBG::Basic, "VM/mbi: ", kernelHeap);
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);
@@ -309,7 +324,7 @@ void Machine::initBSP2() {
 //  kernelSpace.unmapPages<1>(lapicAddr, pagesize<1>()); // debugging only
   DBG::outln(DBG::Basic, "FM/acpi: ", frameManager);
   DBG::outln(DBG::Basic, "AS/acpi: ", kernelSpace);
-  DBG::outln(DBG::Basic, "VM/acpi: ", kernelVM);
+  DBG::outln(DBG::Basic, "VM/acpi: ", kernelHeap);
 
   // find PCI devices
   PCI::probeAll();
@@ -361,14 +376,14 @@ void Machine::initBSP2() {
   KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(vaddr(&__KernelCode) - vaddr(&__Boot)) );
 //  DBG::outln(DBG::Basic, "FM/free: ", frameManager);
 //  DBG::outln(DBG::Basic, "AS/free: ", kernelSpace);
-//  DBG::outln(DBG::Basic, "VM/free: ", kernelVM);
+//  DBG::outln(DBG::Basic, "VM/free: ", kernelHeap);
 
   // free AP boot code
   check = frameManager.release(BOOT16, pagesize<1>());
   KASSERTN( check, FmtHex(BOOT16), '-', FmtHex(pagesize<1>()) );
   DBG::outln(DBG::Basic, "FM/free16: ", frameManager);
   DBG::outln(DBG::Basic, "AS/free16: ", kernelSpace);
-  DBG::outln(DBG::Basic, "VM/free16: ", kernelVM);
+  DBG::outln(DBG::Basic, "VM/free16: ", kernelHeap);
 
   // wake up APs
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
@@ -501,7 +516,7 @@ void Machine::setupTSS(unsigned int number, laddr address) {
   SystemDescriptor* tssDesc = (SystemDescriptor*)&gdt[number];
   tssDesc->Base00 = (address & 0x000000000000FFFF);
   tssDesc->Base16 = (address & 0x0000000000FF0000) >> 16;
-  tssDesc->Type = 0x9;
+  tssDesc->Type = 0x9;//Available 64-bit TSS
   tssDesc->DPL = 3;
   tssDesc->P = 1;
   tssDesc->Base24 = (address & 0x00000000FF000000) >> 24;

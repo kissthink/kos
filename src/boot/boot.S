@@ -34,19 +34,18 @@ mbTagInfo:        # Request information from boot loader - all possible tags
 #    .long 16      # network - not currently supported by grub2
 mbTagInfoEnd:
 
-# not handled by grub2 - not currently needed anyway
-#    .short 2, 0      # sections override
+#    .short 2, 0      # sections override, not handled/needed with grub2
 #    .long 24
 #    .long mbHdr
 #    .long _loadStart
 #    .long _loadEnd
 #    .long _bssEnd
 
-#    .short 3, 0      # entry point override
+#    .short 3, 0      # entry point override, not handled/needed with grub2
 #    .long 12
 #    .long entryPoint
 
-		.short 6, 0		# alignment (2^21) of modules
+		.short 6, 0	    # alignment (2^21) of modules
 		.long 21
 
     .long 0, 0      # end Of Tags

@@ -15,4 +15,3 @@ extern "C" {
 #endif
 
 #endif /* C_Memory_h_ */
-

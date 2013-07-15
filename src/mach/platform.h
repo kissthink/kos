@@ -94,45 +94,45 @@ static inline void MemoryBarrier() {
 
 #if defined(__clang__)
 
-static inline constexpr mword msb_r( mword x ) {
-  return x == 1 ? 0 : 1 + msb_r(x >> 1);
+static inline constexpr mword msb_recursive( mword x ) {
+  return x == 1 ? 0 : 1 + msb_recursive(x >> 1);
 }
 
-static inline constexpr mword lsb_r( mword x ) {
-  return x & 1 ? 0 : 1 + lsb_r(x >> 1);
+static inline constexpr mword lsb_recursive( mword x ) {
+  return x & 1 ? 0 : 1 + lsb_recursive(x >> 1);
 }
 
-static inline constexpr mword floorlog2_c( mword x ) {
-  return x == 0 ? mwordbits : msb_r(x);
+static inline constexpr mword floorlog2( mword x ) {
+  return x == 0 ? mwordbits : msb_recursive(x);
 }
 
-static inline constexpr mword ceilinglog2_c( mword x ) {
-  return x == 1 ? 0 : msb_r(x - 1) + 1;
+static inline constexpr mword ceilinglog2( mword x ) {
+  return x == 1 ? 0 : msb_recursive(x - 1) + 1;
 }
 
-static inline constexpr mword bitalignment_c( mword x ) {
-  return x == 0 ? mwordbits : lsb_r(x);
+static inline constexpr mword bitalignment( mword x ) {
+  return x == 0 ? mwordbits : lsb_recursive(x);
 }
 
 static inline constexpr mword lsbcond(mword x, mword alt = mwordbits) {
-  return x == 0 ? alt : lsb_r(x);
+  return x == 0 ? alt : lsb_recursive(x);
 }
 
 static inline constexpr mword msbcond(mword x, mword alt = mwordbits) {
-  return x == 0 ? alt : msb_r(x);
+  return x == 0 ? alt : msb_recursive(x);
 }
 
 #else /* assume gcc */
 
-static inline constexpr mword floorlog2_c( mword x ) {
+static inline constexpr mword floorlog2( mword x ) {
   return x == 0 ? mwordbits : (mwordbits - __builtin_clzll(x)) - 1;
 }
 
-static inline constexpr mword ceilinglog2_c( mword x ) {
+static inline constexpr mword ceilinglog2( mword x ) {
   return x == 1 ? 0 : (mwordbits - __builtin_clzll(x - 1));
 }
 
-static inline constexpr mword bitalignment_c( mword x ) {
+static inline constexpr mword bitalignment( mword x ) {
   return x == 0 ? mwordbits : __builtin_ctzll(x);
 }
 
@@ -162,21 +162,21 @@ static inline mword msbcond(mword x, mword alt = mwordbits) {
 
 #endif
 
-static inline mword floorlog2( mword x ) {
+static inline mword floorlog2_alt( mword x ) {
   return msbcond(x, mwordbits);
 }
 
-static inline mword ceilinglog2( mword x ) {
+static inline mword ceilinglog2_alt( mword x ) {
   return msbcond(x - 1, -1) + 1; // x = 1 -> msb = -1 (alt) -> result is 0
 }
 
-static inline mword bitalignment( mword x ) {
+static inline mword bitalignment_alt( mword x ) {
   return lsbcond(x, mwordbits);
 }
 
 template<size_t N, bool free = false>
 static inline mword multiscan(mword* data) { // assume loop unroll; no branch
-  static_assert( N < mwordbits / ceilinglog2_c(mwordbits), "template parameter N too large" );
+  static_assert( N < mwordbits / ceilinglog2(mwordbits), "template parameter N too large" );
   mword result = 0;
   mword mask = ~0;
   for (size_t i = 0; i < N; i++) {

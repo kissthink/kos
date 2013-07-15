@@ -33,12 +33,12 @@ extern "C" void __assert_func( const char* const file, const char* const line,
 #if 0
 extern "C" void free(void* p) {
   DBG::outln(DBG::Libc, "LIBC/free: ", FmtHex(p));
-  kernelVM.free(p);
+  kernelHeap.free(p);
 }
 
 extern "C" void* malloc(size_t s) {
   DBG::out(DBG::Libc, "LIBC/malloc: ", FmtHex(s));
-  void* p = kernelVM.malloc(s);
+  void* p = kernelHeap.malloc(s);
   DBG::outln(DBG::Libc, " -> ", p);
   return p;
 }

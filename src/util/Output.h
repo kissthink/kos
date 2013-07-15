@@ -5,14 +5,8 @@
 #include "mach/platform.h"
 
 #include <ostream>
+#include <iomanip>
 #include <cstdarg>
-
-struct Printf {
-  const char *format;
-  va_list& args;
-  Printf(const char *f, va_list& a) : format(f), args(a) {}
-};
-extern ostream& operator<<(ostream &os, const Printf& pf);
 
 struct FmtHex {
   ptr_t ptr;
@@ -21,7 +15,11 @@ struct FmtHex {
   FmtHex(ptr_t p,       int d = 0) : ptr((ptr_t)p), digits(d) {}
   FmtHex(const char* p, int d = 0) : ptr((ptr_t)p), digits(d) {}
 };
-extern ostream& operator<<(ostream &os, const FmtHex& hex);
+
+inline ostream& operator<<(ostream &os, const FmtHex& hex) {
+  os << setw(hex.digits) << hex.ptr;
+  return os;
+}
 
 static const char kendl = '\n';
 

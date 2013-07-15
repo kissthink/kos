@@ -12,8 +12,7 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
-DRIVERLIB=extern/linux/libdriver.a
-LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o #$(DRIVERLIB)
+LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o #extern/linux/libdriver.a
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
@@ -159,9 +158,6 @@ clean:
 	$(MAKE) -C extern/dlmalloc $@
 	$(MAKE) -C extern/acpica $@
 	$(MAKE) -C extern/linux $@
-	$(MAKE) -C extern/linux-$(LINUXVER) $@
-	$(MAKE) -C extern/linux-$(LINUXVER) mrproper
-	$(MAKE) -C extern/linux-$(LINUXVER) distclean
 	$(MAKE) -C user $@
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\

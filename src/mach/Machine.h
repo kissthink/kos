@@ -72,6 +72,9 @@ public:
   static void initBSP2();                              // not in .boot.text!
   static void staticEnableIRQ(mword irq, mword idtnum) __section(".boot.text");
 
+  static void loadTSSRSP(uint8_t privilegeLevel,vaddr RSP);
+
+
   static inline void timerInterrupt(mword);
 
   friend void exceptionHandler(int, void (*)());
