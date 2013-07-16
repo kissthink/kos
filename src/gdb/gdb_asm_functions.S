@@ -113,13 +113,46 @@ catchException\ex_num:
     call saveRegisters
 .endm
 
-CatchEx 0
-CatchEx 1
-CatchEx 2
-CatchEx 3
-CatchEx 4
-CatchEx 5
-CatchEx 6
-CatchEx 7
-CatchEx 9
-CatchEx 16
+.align 8
+mem_fault:
+    pop %rax
+#    mov %rax, gdb_errorcode
+    pop %rax                # rip (but we jump to mem_fault_routine)
+    pop %rax                # cs
+    pop %rbx                # eflags
+    pop %rcx                # rsp
+    pop %rdx                # ss
+    leave
+    push %rdx               # ss
+    push %rcx               # rsp
+    push %rbx               # eflags
+    push %rax               # cs
+    mov mem_fault_routine, %rax
+    push %rax               # rip
+    mov $0, %rax
+    mov %rax, mem_fault_routine
+    iretq
+
+# catchExceptionFault
+.macro CatchExFault ex_num
+.globl catchExceptionFault\ex_num
+.align 8
+catchExceptionFault\ex_num:
+    cmp $0, mem_fault_routine
+    jne mem_fault
+    jmp isr_wrapper_\ex_num
+.endm
+
+CatchEx 0x00
+CatchEx 0x01
+CatchEx 0x02
+CatchEx 0x03
+CatchEx 0x04
+CatchEx 0x05
+CatchEx 0x06
+CatchEx 0x07
+CatchEx 0x09
+CatchExFault 0x0c
+CatchExFault 0x0d
+CatchExFault 0x0e
+CatchEx 0x10

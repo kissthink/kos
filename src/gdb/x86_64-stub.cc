@@ -708,6 +708,8 @@ handle_exception (int64_t exceptionVector) {
     memset(outputBuffer, 0, BUFMAX);
     ptr = getpacket ();         // get request from gdb
 
+    DBG::outlnISR(DBG::Basic, ptr);
+
     switch (*ptr++) {
       case 'q':   // qOffsets, qSupported, qSymbol::
       {
@@ -896,14 +898,17 @@ handle_exception (int64_t exceptionVector) {
 
 // this function is used to set up exception handlers for tracing and breakpoints
 void set_debug_traps(bool as) {
-  exceptionHandler (0, catchException0);
-  exceptionHandler (1, catchException1);
-  exceptionHandler (3, catchException3);
-  exceptionHandler (4, catchException4);
-  exceptionHandler (5, catchException5);
-  exceptionHandler (6, catchException6);
-  exceptionHandler (7, catchException7);
-  exceptionHandler (16, catchException16);
+  exceptionHandler (0x00, catchException0x00);
+  exceptionHandler (0x01, catchException0x01);
+  exceptionHandler (0x03, catchException0x03);
+  exceptionHandler (0x04, catchException0x04);
+  exceptionHandler (0x05, catchException0x05);
+  exceptionHandler (0x06, catchException0x06);
+  exceptionHandler (0x07, catchException0x07);
+  exceptionHandler (0x0c, catchExceptionFault0x0c);
+  exceptionHandler (0x0d, catchExceptionFault0x0d);
+  exceptionHandler (0x0e, catchExceptionFault0x0e);
+  exceptionHandler (0x10, catchException0x10);
 
   waiting = new bool[Gdb::getInstance().getNumCpus()];
   shouldReturnFromException = new bool[Gdb::getInstance().getNumCpus()];

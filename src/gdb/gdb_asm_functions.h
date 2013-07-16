@@ -9,15 +9,18 @@ extern "C" void restoreRegisters(GdbCpu*);
  * from the sample gdbstub here, as the code
  * seemed to use only interrupt 1 & 3.
  */
-extern "C" void catchException0();
-extern "C" void catchException1();
-extern "C" void catchException2();
-extern "C" void catchException3();
-extern "C" void catchException4();
-extern "C" void catchException5();
-extern "C" void catchException6();
-extern "C" void catchException7();
-extern "C" void catchException9();
-extern "C" void catchException16();
+extern "C" void catchException0x00();
+extern "C" void catchException0x01();
+extern "C" void catchException0x02();
+extern "C" void catchException0x03();
+extern "C" void catchException0x04();
+extern "C" void catchException0x05();
+extern "C" void catchException0x06();
+extern "C" void catchException0x07();
+extern "C" void catchException0x09();
+extern "C" void catchExceptionFault0x0c();
+extern "C" void catchExceptionFault0x0d();
+extern "C" void catchExceptionFault0x0e();
+extern "C" void catchException0x10();
 
 #endif // gdb_asm_functions_h_
