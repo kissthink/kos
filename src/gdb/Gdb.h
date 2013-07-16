@@ -29,29 +29,27 @@ public:
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) {
       cpuStates[i].setCpuId(i);
+      processorTable[i].setGdbCpu(&cpuStates[i]);
     }
     setupGdb(0);
     DBG::outlnISR(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
   }
 
   // returns CPU states (locked version)
-  GdbCpu* getCurrentCpuState() const {
-    ScopedLockISR<> so(mutex);
-    return _getCurrentCpuState();
+  inline GdbCpu* getCurrentCpuState() const {
+    return Processor::getGdbCpu();
   }
   // returns CPU state for the current CPU
-  GdbCpu* getCpuState(int cpuIdx) {
-    ScopedLockISR<> so(mutex);
+  inline GdbCpu* getCpuState(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     return &cpuStates[cpuIdx];
   }
 
   // gdb breakpoints can be set after calling this method.
   void setupGdb(int cpuIdx) {
-    ScopedLockISR<> so(mutex);
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    processorTable[cpuIdx].setGdbCpu(&cpuStates[cpuIdx]);
-    DBG::outlnISR(DBG::GDBDebug, "setup cpu ", cpuIdx+1);
+//    processorTable[cpuIdx].setGdbCpu(&cpuStates[cpuIdx]);
+//    DBG::outlnISR(DBG::GDBDebug, "setup cpu ", cpuIdx+1);
     numInitialized = cpuIdx+1;
     cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
   }
@@ -69,32 +67,25 @@ public:
 
   // access registers
   // returns a buffer storing 64-bit registers
-  char* getRegs64() const {
-    ScopedLockISR<> so(mutex);
-    GdbCpu* state = _getCurrentCpuState();
-    return reinterpret_cast<char *>(state->getRegs64());
+  inline char* getRegs64() const {
+    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs64());
   }
   // a buffer storing 32-bit registers
-  char* getRegs32() const {
-    ScopedLockISR<> so(mutex);
-    GdbCpu* state = _getCurrentCpuState();
-    return reinterpret_cast<char *>(state->getRegs32());
+  inline char* getRegs32() const {
+    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs32());
   }
 
   // returns CPU name used by Gdb
-  const char* getCpuId(int cpuIdx) {
-    ScopedLockISR<> so(mutex);
+  inline const char* getCpuId(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     return cpuStates[cpuIdx].getId();
   }
   // total # of CPUs in the system
-  int getNumCpus() const {
-    ScopedLockISR<> so(mutex);
+  __finline inline int getNumCpus() const {
     return numCpu;
   }
   // total # of CPUs initialized for gdb use
-  int getNumCpusInitialized() const {
-    ScopedLockISR<> so(mutex);
+  __finline inline int getNumCpusInitialized() const {
     return numInitialized;
   }
 
@@ -132,11 +123,6 @@ public:
 
 
 private:
-  // returns CPU state (actual implementation, unlocked)
-  GdbCpu* _getCurrentCpuState() const {
-    return Processor::getGdbCpu();
-  }
-
   // sends an IPI to a specified CPU core
   void sendIPI(int cpuIdx, int ipiNum) const {
     LAPIC* lapic = (LAPIC *) lapicAddr;
