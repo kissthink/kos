@@ -71,6 +71,22 @@ public:
   inline char* getRegs32() {
     return reinterpret_cast<char *>(getCurrentCpuState()->getRegs32());
   }
+  inline reg64 getReg64(int regno) {
+    return getCurrentCpuState()->getRegs64()[regno];
+  }
+  inline reg32 getReg32(int regno) {
+    return getCurrentCpuState()->getRegs32()[regno];
+  }
+  inline void setReg64(int regno, reg64 val) {
+    getCurrentCpuState()->setReg64(regno, val);
+  }
+  inline void setReg32(int regno, reg32 val) {
+    getCurrentCpuState()->setReg32(regno, val);
+  }
+
+  inline void incrementRip() {
+    getCurrentCpuState()->incrementRip();
+  }
 
   // returns CPU name used by Gdb
   inline const char* getCpuName(int cpuIdx) const {
@@ -116,6 +132,14 @@ public:
     DBG::outlnISR(DBG::GDBDebug, "V(", cpuIdx+1, ')');
   }
 
+  void disableLocalInterrupts() const {
+    LAPIC* lapic = (LAPIC *) lapicAddr;
+    lapic->maskInterrupts();
+  }
+  void enableLocalInterrupts() const {
+    LAPIC* lapic = (LAPIC *) lapicAddr;
+    lapic->unMaskInterrupts();
+  }
 
 private:
   // sends an IPI to a specified CPU core

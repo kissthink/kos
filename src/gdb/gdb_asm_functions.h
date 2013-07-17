@@ -23,4 +23,7 @@ extern "C" void catchExceptionFault0x0d();
 extern "C" void catchExceptionFault0x0e();
 extern "C" void catchException0x10();
 
+extern "C" int get_char(char* addr);
+extern "C" void set_char(char* addr, int val);
+
 #endif // gdb_asm_functions_h_

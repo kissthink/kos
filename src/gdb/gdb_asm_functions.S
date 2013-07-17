@@ -131,6 +131,59 @@ mem_fault:
     push %rax               # rip
     iretq
 
+# get_char/set_char can cause faults due to invalid request from
+# gdb users. Therefore, it is essential to provide fault handlers
+# to prevent kernel from dying.
+# Since, faults re-run faulty instruction, we need to change return
+# address from fault handler to point to next instruction (like traps)
+# By writing in assembly code, I can easily manipulate return address
+# to point to next valid instruction.
+# Furthermore, I always use frame pointer to make the code work consistently
+# regardless of -fno-omit-frame-pointer flag set during compilation.
+.globl get_char
+.align 8
+# int get_char(char* addr)
+get_char:
+    push %rbp
+    mov %rsp, %rbp
+    mov %rdi, -0x8(%rbp)      # char* addr
+    mov %rbx, -0x10(%rbp)
+    lea mem_fault_return1, %rbx
+    mov %rbx, mem_fault_return_addr
+    mov -0x8(%rbp), %rax
+    movzbl (%rax), %eax
+mem_fault_return1:
+    mov -0x10(%rbp), %rbx
+    mov -0x8(%rbp), %rdi
+    pop %rbp
+    retq
+
+.globl set_char
+.align 8
+# void set_char(char* addr, int val)
+set_char:
+    push %rbp
+    mov %rsp, %rbp
+    mov %rdi, -0x8(%rbp)      # char* addr
+    mov %rsi, -0x10(%rbp)     # int val
+    mov %rbx, -0x18(%rbp)
+    mov %rdx, -0x20(%rbp)
+    mov %rax, -0x28(%rbp)
+    lea mem_fault_return2, %rbx
+    mov %rbx, mem_fault_return_addr
+    mov -0x10(%rbp), %rax
+    mov %rax,%rdx
+    mov -0x8(%rbp), %rax
+    mov %dl, (%rax)
+mem_fault_return2:
+    mov -0x28(%rbp), %rax
+    mov -0x20(%rbp), %rdx
+    mov -0x18(%rbp), %rbx
+    mov -0x10(%rbp), %rsi
+    mov -0x8(%rbp), %rdi
+    pop %rbp
+    retq
+
 # catchExceptionFault
 .macro CatchExFault ex_num
 .globl catchExceptionFault\ex_num
