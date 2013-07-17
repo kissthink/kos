@@ -129,8 +129,6 @@ mem_fault:
     mov %rax, mem_err
     mov mem_fault_return_addr, %rax
     push %rax               # rip
-    mov $0, %rax
-    mov %rax, mem_fault_routine
     iretq
 
 # catchExceptionFault
@@ -138,7 +136,7 @@ mem_fault:
 .globl catchExceptionFault\ex_num
 .align 8
 catchExceptionFault\ex_num:
-    cmp $0, mem_fault_routine
+    cmp $0, gdbFaultHandlerSet
     jne mem_fault
     jmp isr_wrapper_\ex_num
 .endm

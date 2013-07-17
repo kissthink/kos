@@ -13,89 +13,84 @@
 extern void set_debug_traps(bool);
 extern void breakpoint();
 
+#define GdbInstance Gdb::getInstance()
+
 class Gdb {
 public:
   static Gdb& getInstance() {
     static Gdb gdb;
     return gdb;
   }
-  // initialize internal data structures & variables
-  void init(int numCPU, Processor* procTable) {
-    KASSERT0(numCPU);
+  void init(int numCPU, Processor* processorTable) {
+    KASSERT1(numCPU > 0, numCPU);
     numCpu = numCPU;
     cpuStates = new GdbCpu[numCpu];
-    processorTable = procTable;
-    DBG::outlnISR(DBG::GDBDebug, "Processor table ", FmtHex(processorTable));
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) {
       cpuStates[i].setCpuId(i);
       processorTable[i].setGdbCpu(&cpuStates[i]);
     }
-    setupGdb(0);
+    markGdbReady(0);
     DBG::outlnISR(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
   }
 
-  // returns CPU states (locked version)
-  inline GdbCpu* getCurrentCpuState() const {
+  // gives pointer to asked GdbCpu object
+  inline GdbCpu* getCurrentCpuState() {
     return Processor::getGdbCpu();
   }
-  // returns CPU state for the current CPU
   inline GdbCpu* getCpuState(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     return &cpuStates[cpuIdx];
   }
+  inline void setCpuState(cpuState::cpuStateEnum state) {
+    Processor::getGdbCpu()->setCpuState(state);
+  }
 
-  // gdb breakpoints can be set after calling this method.
-  void setupGdb(int cpuIdx) {
+  // mark current CPU gdb debugging ready
+  inline void markGdbReady(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-//    processorTable[cpuIdx].setGdbCpu(&cpuStates[cpuIdx]);
-//    DBG::outlnISR(DBG::GDBDebug, "setup cpu ", cpuIdx+1);
     numInitialized = cpuIdx+1;
     cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
   }
 
   // enumerate CPUs
-  void startEnumerate() {
+  inline void startEnumerate() {
     ScopedLockISR<> so(mutex);
     enumIdx = 0;
   }
-  GdbCpu* next() {
+  inline GdbCpu* next() {
     ScopedLockISR<> so(mutex);
     if (enumIdx < numCpu) return &cpuStates[enumIdx++];
     return nullptr;
   }
 
-  // access registers
-  // returns a buffer storing 64-bit registers
-  inline char* getRegs64() const {
+  // returns buffer storing gdb manipulated registers for current CPU
+  inline char* getRegs64() {
     return reinterpret_cast<char *>(getCurrentCpuState()->getRegs64());
   }
-  // a buffer storing 32-bit registers
-  inline char* getRegs32() const {
+  inline char* getRegs32() {
     return reinterpret_cast<char *>(getCurrentCpuState()->getRegs32());
   }
 
   // returns CPU name used by Gdb
-  inline const char* getCpuId(int cpuIdx) {
+  inline const char* getCpuName(int cpuIdx) const {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    return cpuStates[cpuIdx].getId();
+    return cpuStates[cpuIdx].getName();
   }
   // total # of CPUs in the system
-  __finline inline int getNumCpus() const {
+  inline int getNumCpus() const {
     return numCpu;
   }
   // total # of CPUs initialized for gdb use
-  __finline inline int getNumCpusInitialized() const {
+  inline int getNumCpusInitialized() const {
     return numInitialized;
   }
 
-  // starts initial breakpoint
   void startGdb(bool allstop) {
-    KASSERT0(numCpu);
+    KASSERT1(numCpu > 0, numCpu);
     set_debug_traps(allstop);
     StdOut.outlnISR("Waiting for Gdb connection");
-    cpuStates[0].setCpuState(cpuState::RUNNING);
-    breakpoint();
+    breakpoint();   // initiate connection to gdb
   }
 
   // sends IPI to other available cores
@@ -133,10 +128,9 @@ private:
     KASSERT1(!err, FmtHex(err));
   }
 
-  Gdb(): cpuStates(nullptr), processorTable(nullptr),
-    numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
+  Gdb(): cpuStates(nullptr),numCpu(0),
+    numInitialized(0), enumIdx(0), sem(nullptr) {}
   GdbCpu* cpuStates;
-  Processor* processorTable;
   int numCpu;
   int numInitialized;
   int enumIdx;

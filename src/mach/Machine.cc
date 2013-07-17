@@ -135,7 +135,7 @@ void Machine::initAP(funcvoid_t func) {
   processorTable[apIndex].initThread(*apIdleThread);
 
   // enable GDB on this core
-  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().setupGdb(apIndex);
+  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().markGdbReady(apIndex);
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
