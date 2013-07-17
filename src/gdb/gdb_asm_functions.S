@@ -115,19 +115,19 @@ catchException\ex_num:
 
 .align 8
 mem_fault:
-    pop %rax
-#    mov %rax, gdb_errorcode
+    pop %rax                # error code
     pop %rax                # rip (but we jump to mem_fault_routine)
     pop %rax                # cs
     pop %rbx                # eflags
     pop %rcx                # rsp
     pop %rdx                # ss
-    leave
     push %rdx               # ss
     push %rcx               # rsp
     push %rbx               # eflags
     push %rax               # cs
-    mov mem_fault_routine, %rax
+    mov $1, %rax
+    mov %rax, mem_err
+    mov mem_fault_return_addr, %rax
     push %rax               # rip
     mov $0, %rax
     mov %rax, mem_fault_routine

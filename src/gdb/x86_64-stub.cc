@@ -55,6 +55,7 @@ static Thread* gdbThread = nullptr;        // thread talking to gdb (remember be
 static VContAction* prevAction = nullptr;  // previous vContAction
 
 static bool allstop = false;
+void *mem_fault_return_addr = nullptr;
 
 /**
  * cCpu, gCPu related functions
@@ -244,10 +245,10 @@ void debug_error (const char *format, ...) {
 }
 
 // Address of a routine to RTE to if we get a memory fault.
-void (*volatile mem_fault_routine) () = NULL;
+void (*volatile mem_fault_routine) () = nullptr;
 
 // Indicate to caller of mem2hex or hex2mem that there has been an error
-static volatile int mem_err = 0;
+volatile int mem_err = 0;
 
 void set_mem_err () {
   mem_err = 1;
@@ -258,7 +259,12 @@ void set_mem_err () {
 // to mem_fault, they won't get restored, so there better not be any
 // saved)
 int get_char (char *addr) {
-  return *addr;
+  int val = 0;
+  mem_fault_return_addr = &&mem_fault_return;
+  asm volatile("":::"memory");
+  val = *addr;
+mem_fault_return:
+  return val;     // return to here from interrupt handler
 }
 
 void set_char (char *addr, int val) {
@@ -288,7 +294,7 @@ char* mem2hex (char *mem, char *buf, int count, int may_fault) {
     *buf++ = hexchars[ch % 16];
   }
   *buf = 0;
-  if (may_fault) mem_fault_routine = NULL;
+  if (may_fault) mem_fault_routine = nullptr;
 
   return buf;
 }
@@ -303,7 +309,7 @@ char* hex2mem (char *buf, char *mem, int count, int may_fault) {
     set_char (mem++, ch);
     if (may_fault && mem_err) return mem;
   }
-  if (may_fault) mem_fault_routine = NULL;
+  if (may_fault) mem_fault_routine = nullptr;
   return mem;
 }
 
@@ -849,7 +855,7 @@ handle_exception (int64_t exceptionVector) {
               mem2hex ((char *) addr, outputBuffer, length, 1);
               if (mem_err) {
                 strcpy (outputBuffer, "E03");
-                debug_error ("memory fault");
+//                debug_error ("memory fault");
               }
             }
           }
@@ -872,7 +878,7 @@ handle_exception (int64_t exceptionVector) {
                 hex2mem (ptr, (char *) addr, length, 1);
                 if (mem_err) {
                   strcpy (outputBuffer, "E03");
-                  debug_error ("memory fault");
+//                  debug_error ("memory fault");
                 } else {
                   strcpy (outputBuffer, "OK");
                 }
