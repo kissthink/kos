@@ -261,7 +261,6 @@ void set_mem_err () {
 int get_char (char *addr) {
   int val = 0;
   mem_fault_return_addr = &&mem_fault_return;
-  asm volatile("":::"memory");
   val = *addr;
 mem_fault_return:
   return val;     // return to here from interrupt handler
@@ -713,8 +712,6 @@ handle_exception (int64_t exceptionVector) {
     outputBuffer[0] = 0;        // reset out buffer to 0
     memset(outputBuffer, 0, BUFMAX);
     ptr = getpacket ();         // get request from gdb
-
-    DBG::outlnISR(DBG::Basic, ptr);
 
     switch (*ptr++) {
       case 'q':   // qOffsets, qSupported, qSymbol::
