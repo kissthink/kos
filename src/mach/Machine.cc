@@ -83,6 +83,7 @@ volatile static PIT pit;
 volatile static RTC rtc;
 
 // check various assumptions about data type sizes
+static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
 static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
 static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
 static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
@@ -121,6 +122,7 @@ extern "C" void handleSysCall(){
 
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
+
   // setup IDT, GDT, address space
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
@@ -129,13 +131,13 @@ void Machine::initAP(funcvoid_t func) {
   PageManager::configure();
   kernelSpace.activate();
 
-  // configure local processor with idle thread -> enable interrupts
-  processorTable[apIndex].install();
+  // configure local processor
+  Processor::checkCapabilities(false);
+  processorTable[apIndex].install(frameManager);
   Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
-  processorTable[apIndex].initThread(*apIdleThread);
+  processorTable[apIndex].init2(*apIdleThread, Gdb::getInstance().setupGdb(apIndex));
 
   // enable GDB on this core
-  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().setupGdb(apIndex);
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
@@ -153,7 +155,6 @@ void Machine::initAP2() {
   Processor::enableInterrupts();
   DBG::out(DBG::Basic, 'H');
   apIndex = bspIndex;
-//  StoreBarrier();
   Halt();
 }
 
@@ -162,28 +163,22 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // initialize bss
   memset((char*)&__KernelBss, 0, &__KernelBssEnd - &__KernelBss);
 
-  // initialize basic video output: no screen output before this point
-  Screen::init();
-  // update screen's virtual address, because identity mapping disappears later
-  Screen::setAddress(Screen::getAddress() + kernelBase);
+  // initialize basic devices
+  Screen::init(kernelBase); // kernelBase, b/c no identity mapping later
+  SerialDevice0::init(DBG::test(DBG::GDBEnable)); // no interrupts
+  DebugDevice::init();      // qemu debug device
 
   // initialize MBI & debugging: no debug output before this point!
   vaddr mbiEnd = multiboot.init(magic, mbiAddr + kernelBase);
-  multiboot.initDebug(false);
-
-  // initialize basic (no interrupts) serial device and qemu debug device
-  SerialDevice0::init(DBG::test(DBG::GDBEnable));
-  DebugDevice::init();
-
-  // dummy processor to manage interrupts: no locking before this point!
-  Processor dummyProcessor;
-  dummyProcessor.install();
-
   // determine end addresses of kernel overall (except modules)
   vaddr kernelEnd = align_up(mbiEnd, pagesize<2>());
 
   // give kernel heap pre-allocated memory -> limited dynamic memory available
   kernelHeap.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
+
+  // need dummy processor for lock counter: no locking before this point!
+  Processor dummyProcessor;
+  dummyProcessor.install(frameManager);
 
   // call global constructors: %rbx is callee-saved, thus safe to use
   // ostream output cannot be used before this point (i.e. not DBG::out)
@@ -193,12 +188,11 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // re-initialize debugging, but this time with messages
   DBG::outln(DBG::Basic, "********** BOOT **********");
-  multiboot.initDebug(true);
+  multiboot.initDebug();
 
   // check CPU capabilities
-  DBG::out(DBG::Basic, "checking capabilities:");
-  KASSERT0(__atomic_always_lock_free(sizeof(mword),0));
-  Processor::checkCapabilities();
+  DBG::out(DBG::Basic, "checking BSP capabilities:");
+  Processor::checkCapabilities(true);
 
   // print boot memory information
   DBG::outln(DBG::Basic, "Boot16:    ", FmtHex(&boot16Begin),  " - ", FmtHex(&boot16End));
@@ -252,9 +246,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // activate new page tables -> proper dynamic memory, but no identity mapping
   kernelSpace.activate();
 
-  // make frameManager globally accessible
-  dummyProcessor.setFrameManager(&frameManager);
-
   // initialize kernel FS with boot modules
   modStart = align_down(modStart, pagesize<2>());
   modEnd = align_up(modEnd, pagesize<2>());
@@ -273,6 +264,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);
 
+  // install IDT entries
+  setupAllIDTs();
+  loadIDT(idt, sizeof(idt));
+
   // install GDT (replacing boot loader's GDT), TSS, TR, LDT
   memset(gdt, 0, sizeof(gdt));
   setupGDT(kernCodeSelector, 0, 0, true);
@@ -286,14 +281,15 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   clearLDT();
 
   // initialize gdb object
-  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().init(cpuCount, processorTable);
+  Gdb::getInstance().init(cpuCount);
 
-  // configure BSP processor with main thread 
-  processorTable[bspIndex].install();
+  // configure BSP processor
+  processorTable[bspIndex].install(frameManager);
   Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
-  processorTable[bspIndex].initThread(*bspIdleThread);
+  processorTable[bspIndex].init2(*bspIdleThread, Gdb::getInstance().setupGdb(bspIndex));
 
-  if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().startGdb(DBG::test(DBG::GDBAllStop));
+  // start gdb
+  Gdb::getInstance().start();
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
@@ -315,10 +311,6 @@ void Machine::initBSP2() {
 
   // find PCI devices
   PCI::probeAll();
-
-  // install IDT entries
-  setupAllIDTs();
-  loadIDT(idt, sizeof(idt));
 
   // enable interrupts; needed for rtc.wait below
   Processor::enableInterrupts();
@@ -346,7 +338,6 @@ void Machine::initBSP2() {
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
     if ( i != bspIndex ) {
       apIndex = i;                          // prepare sync variable
-//      StoreBarrier();	                      // sync memory before starting AP
       processorTable[i].sendInitIPI();
       rtc.wait(5);                          // wait for HW init
       processorTable[i].sendStartupIPI(BOOT16 / 0x1000);
@@ -356,12 +347,12 @@ void Machine::initBSP2() {
   DBG::out(DBG::Basic, kendl);
 
   // update screen's virtual address, before boot memory disappears
-  PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data);
+  PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data, frameManager);
   Screen::setAddress(videoAddr);
 
   // free kernel boot memory
   for ( vaddr x = kernelBase; x < vaddr(&__KernelCode); x += pagesize<2>() ) {
-    PageManager::unmap<2>(x);
+    PageManager::unmap<2>(x, frameManager);
   }
   bool check = frameManager.release(vaddr(&__Boot) - kernelBase, vaddr(&__KernelCode) - vaddr(&__Boot));
   KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(vaddr(&__KernelCode) - vaddr(&__Boot)) );

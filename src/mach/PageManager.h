@@ -176,27 +176,27 @@ protected:
 
   // specialization for <pagelevels> below (must be outside of class scope)
   template <unsigned int N>
-  static inline void maprecursive( mword vma, Owner owner ) {
+  static inline void maprecursive( mword vma, Owner owner, FrameManager& fm ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
-    maprecursive<N+1>(vma,owner);
+    maprecursive<N+1>(vma,owner,fm);
     PageEntry* pe = getEntry<N+1>(vma);
     KASSERT1(N+1 == pagelevels || !pe->PS, FmtHex(vma));
     DBG::out(DBG::Paging, ' ', pe);
     if unlikely(!pe->P) {
       DBG::out(DBG::Paging, 'A');
-      laddr lma = Processor::getFrameManager()->alloc(pagetablesize());
+      laddr lma = fm.alloc(pagetablesize());
       pe->c = owner | PageTable | lma;
       memset( getTable<N>(vma), 0, pagetablesize() );	// TODO: use alloczero later
     }
   }
 
   template <unsigned int N>
-  static inline void map( mword vma, mword lma, Owner owner, PageType type ) {
+  static inline void map( mword vma, mword lma, Owner owner, PageType type, FrameManager& fm ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     KASSERT1( aligned(vma, pagesize<N>()), FmtHex(vma) );
     KASSERT1( (lma & ~ADDR()) == 0, FmtHex(lma) );
     DBG::outln(DBG::Paging, "mapping: ", FmtHex(vma), '/', FmtHex(pagesize<N>()), " -> ", FmtHex(lma));
-    maprecursive<N>(vma,owner);
+    maprecursive<N>(vma, owner, fm);
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, ' ', pe);
     KASSERT1( !pe->P, FmtHex(vma) );
@@ -207,21 +207,21 @@ protected:
 
   // specialization for <pagelevels-1> below (must be outside of class scope)
   template <unsigned int N>
-  static inline void unmaprecursive( mword vma, size_t levels ) {
+  static inline void unmaprecursive( mword vma, FrameManager& fm, size_t levels ) {
     static_assert( N >= 1 && N < pagelevels-1, "page level template violation" );
-    laddr lma = unmap<N+1>(vma, levels);
-    Processor::getFrameManager()->release(lma, pagetablesize());
+    laddr lma = unmap<N+1>(vma, fm, levels);
+    fm.release(lma, pagetablesize());
   }
 
   template <unsigned int N>
-  static inline mword unmap( mword vma, size_t levels = 0 ) {
+  static inline mword unmap( mword vma, FrameManager& fm, size_t levels = 0 ) {
     static_assert( N >= 1 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, "unmapping ", FmtHex(vma), '/', FmtHex(pagesize<N>()), ": ", pe);
     KASSERT1( pe->P, FmtHex(vma) );
     pe->P = 0;
     mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before recursion
-    if (levels > 0) unmaprecursive<N>(vma, levels - 1);
+    if (levels > 0) unmaprecursive<N>(vma, fm, levels - 1);
     else CPU::invTLB(vma);
     return ret;
   }
@@ -241,9 +241,9 @@ template<> inline mword PageManager::ptp<1>() {
   return VAddr(pml4entry << pagesizebits<pagelevels>());
 }
 
-template<> inline void PageManager::maprecursive<pagelevels>( mword, PageManager::Owner ) {}
+template<> inline void PageManager::maprecursive<pagelevels>( mword, PageManager::Owner, FrameManager& ) {}
 
-template<> inline void PageManager::unmaprecursive<pagelevels-1>( mword, size_t ) {}
+template<> inline void PageManager::unmaprecursive<pagelevels-1>( mword, FrameManager& , size_t ) {}
 
 template<> inline void PageManager::relabel<pagelevels+1>( vaddr, PageManager::Owner, PageManager::PageType ) {}
 

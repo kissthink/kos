@@ -158,7 +158,7 @@ void Machine::initACPI(vaddr r) {
   KASSERT0(apicMap.size());
 
   // map APIC page and enable local APIC
-  PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data);
+  PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data, *Processor::getFrameManager());
   Processor::enableAPIC(0xf8);              // confirm spurious vector at 0xf8
 
   // determine bspApicID, cpuCount, bspIndex, and create processorTable
@@ -167,7 +167,7 @@ void Machine::initACPI(vaddr r) {
   processorTable = new Processor[cpuCount];
   int idx = 0;
   for (const pair<uint32_t,uint32_t>& ap : apicMap) {
-    processorTable[idx].init(ap.second, ap.first, *Processor::getFrameManager());
+    processorTable[idx].init(ap.second, ap.first);
     if (ap.second == bspApicID) bspIndex = idx;
     idx += 1;
   }

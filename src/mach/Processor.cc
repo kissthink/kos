@@ -17,14 +17,14 @@
 #include "mach/Processor.h"
 #include "kern/Debug.h"
 
-void Processor::checkCapabilities() {
-  KASSERT0(RFlags::hasCPUID()); DBG::out(DBG::Basic, " CPUID");
-  KASSERT0(CPUID::hasAPIC());   DBG::out(DBG::Basic, " APIC");
-  KASSERT0(CPUID::hasMSR());    DBG::out(DBG::Basic, " MSR");
-  KASSERT0(CPUID::hasNX());     DBG::out(DBG::Basic, " NX");
-  if (CPUID::hasMWAIT())        DBG::out(DBG::Basic, " MWAIT");
-  if (CPUID::hasARAT())         DBG::out(DBG::Basic, " ARAT");
-  if (CPUID::hasTSC_Deadline()) DBG::out(DBG::Basic, " TSC");
-  if (CPUID::hasX2APIC())       DBG::out(DBG::Basic, " X2A");
-  DBG::out(DBG::Basic, kendl);
+void Processor::checkCapabilities(bool print) {
+  KASSERT0(RFlags::hasCPUID()); if (print) DBG::out(DBG::Basic, " CPUID");
+  KASSERT0(CPUID::hasAPIC());   if (print) DBG::out(DBG::Basic, " APIC");
+  KASSERT0(CPUID::hasMSR());    if (print) DBG::out(DBG::Basic, " MSR");
+  KASSERT0(CPUID::hasNX());     if (print) DBG::out(DBG::Basic, " NX");
+  if (CPUID::hasMWAIT())        if (print) DBG::out(DBG::Basic, " MWAIT");
+  if (CPUID::hasARAT())         if (print) DBG::out(DBG::Basic, " ARAT");
+  if (CPUID::hasTSC_Deadline()) if (print) DBG::out(DBG::Basic, " TSC");
+  if (CPUID::hasX2APIC())       if (print) DBG::out(DBG::Basic, " X2A");
+  if (print) DBG::out(DBG::Basic, kendl);
 }

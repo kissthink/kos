@@ -31,6 +31,7 @@ vaddr Multiboot::init( mword magic, vaddr mbi ) {
   // mbiEnd = mbi + ((multiboot_header_tag*)mbi)->size;
   mbiStart = mbi + sizeof(multiboot_header_tag);
   mbiEnd = mbi + *(uint32_t*)mbi;
+  initDebug(false);
   return mbiEnd;
 }
 

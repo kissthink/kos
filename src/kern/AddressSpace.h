@@ -20,7 +20,6 @@
 #include "util/BuddyMap.h"
 #include "mach/Memory.h"
 #include "mach/PageManager.h"
-#include "mach/Processor.h"
 #include "kern/FrameManager.h"
 #include "ipc/SpinLock.h"
 
@@ -38,7 +37,7 @@ private:
   friend ostream& operator<<(ostream&, const AddressSpace&);
 
   SpinLock lock;
-  laddr pagetable;  // page table address (physical)
+  laddr pagetable;  // page table address (physical address)
   Owner owner;
 
   using BuddySet = set<vaddr,less<vaddr>,KernelAllocator<vaddr>>;
@@ -64,7 +63,7 @@ private:
     for (; size > 0; size -= pagesize<N>()) {
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
       KASSERT1(lma != topaddr, size);
-      PageManager::map<N>(vma, lma, owner, t);
+      PageManager::map<N>(vma, lma, owner, t, *Processor::getFrameManager());
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();
     }
@@ -80,7 +79,7 @@ private:
     for (; size > 0; size -= pagesize<N>()) {
       size_t idx = availableMemory.insert2(vma, pagesizebits<N>());
       KASSERTN((idx >= pagesizebits<N>() && idx < pagebits), FmtHex(vma), '/', idx)
-      laddr lma = PageManager::unmap<N>(vma, (idx - pagesizebits<N>()) / pagetablebits);
+      laddr lma = PageManager::unmap<N>(vma, *Processor::getFrameManager(), (idx - pagesizebits<N>()) / pagetablebits);
       if (alloc) Processor::getFrameManager()->release(lma, pagesize<N>());
       vma += pagesize<N>();
     }

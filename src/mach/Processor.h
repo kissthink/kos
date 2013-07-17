@@ -41,27 +41,25 @@ class Processor {
   static constexpr volatile LAPIC* apic() { return (LAPIC*)lapicAddr; }
 
   friend class Machine;
-  friend class Gdb;
 
   // start with interrupts disable -> lockCount = 1
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
-    frameManager(nullptr), doNotPreempt(0), lockCount(0), gdbCpu(0) {}
+    frameManager(nullptr), doNotPreempt(0), lockCount(0), gdbCpu(nullptr) {}
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
-  void init(mword apic, mword cpu, FrameManager& fm) {
+  void init(mword apic, mword cpu) {
     apicID = apic;
     cpuID = cpu;
+  }
+
+  void install(FrameManager& fm) {
     frameManager = &fm;
-  }
 
-  void install() {
-   MSR::write(MSR::GS_BASE, mword(this));
-   //Prepare Syscall/Sysret Registers
-   initSysCall();
-  }
+    // write GS
+    MSR::write(MSR::GS_BASE, mword(this));
 
-	void initSysCall() {
+    // prepare syscall/sysret registers
 		MSR::enableSYSCALL();
 		MSR::write(MSR::SYSCALL_CSTAR, 0x0);
 		MSR::write(MSR::SYSCALL_SFMASK, 0x0);
@@ -70,10 +68,8 @@ class Processor {
 		MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
 	}
 
-  void initThread(Thread& t) {
-   currThread = idleThread = &t;
-  }
-  void setGdbCpu(GdbCpu* s) {
+  void init2(Thread& t, GdbCpu* s) {
+    currThread = idleThread = &t;
     gdbCpu = s;
   }
 
@@ -105,9 +101,6 @@ public:
     FrameManager* x;
     asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, frameManager)));
     return x;
-  }
-  static void setFrameManager(FrameManager* x) {
-    asm volatile("mov %0, %%gs:%c1" :: "r"(x), "i"(offsetof(struct Processor, frameManager)) : "memory");
   }
   static GdbCpu* getGdbCpu() {
     GdbCpu* x;
@@ -177,7 +170,7 @@ public:
     KASSERT1(err == 0, FmtHex(err));
   }
 
-  static void checkCapabilities()                      __section(".boot.text");
+  static void checkCapabilities(bool print)            __section(".boot.text");
 } __packed;
 
 #endif /* Processor_h_ */

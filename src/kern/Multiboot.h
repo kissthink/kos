@@ -26,7 +26,7 @@ class Multiboot {
   vaddr mbiEnd;
 public:
   vaddr init(mword magic, vaddr mbi)               __section(".boot.text");
-  void initDebug(bool msg)                         __section(".boot.text");
+  void initDebug(bool msg = true)                  __section(".boot.text");
   void parseAll(laddr& modStart, laddr& modEnd)    __section(".boot.text");
   vaddr getRSDP()                                  __section(".boot.text");
   void getMemory(FrameManager& fm)                 __section(".boot.text");

@@ -20,17 +20,15 @@ public:
     return gdb;
   }
   // initialize internal data structures & variables
-  void init(int numCPU, Processor* procTable) {
+  void init(int numCPU) {
+    if (!DBG::test(DBG::GDBEnable)) return;
     KASSERT0(numCPU);
     numCpu = numCPU;
     cpuStates = new GdbCpu[numCpu];
-    processorTable = procTable;
-    DBG::outln(DBG::GDBDebug, "Processor table ", FmtHex(processorTable));
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) {
       cpuStates[i].setCpuId(i);
     }
-    setupGdb(0);
     DBG::outln(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
   }
 
@@ -47,13 +45,14 @@ public:
   }
 
   // gdb breakpoints can be set after calling this method.
-  void setupGdb(int cpuIdx) {
+  GdbCpu* setupGdb(int cpuIdx) {
+    if (!DBG::test(DBG::GDBEnable)) return nullptr;
     ScopedLock<> so(mutex);
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    processorTable[cpuIdx].setGdbCpu(&cpuStates[cpuIdx]);
     DBG::outln(DBG::GDBDebug, "setup cpu ", cpuIdx+1);
     numInitialized = cpuIdx+1;
     cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
+    return &cpuStates[cpuIdx];
   }
 
   // enumerate CPUs
@@ -99,9 +98,9 @@ public:
   }
 
   // starts initial breakpoint
-  void startGdb(bool allstop) {
-    KASSERT0(numCpu);
-    set_debug_traps(allstop);
+  void start() {
+    if (!DBG::test(DBG::GDBEnable)) return;
+    set_debug_traps(DBG::test(DBG::GDBAllStop));
     StdOut.outln("Waiting for Gdb connection");
     cpuStates[0].setCpuState(cpuState::RUNNING);
     breakpoint();
@@ -147,10 +146,8 @@ private:
     KASSERT1(!err, FmtHex(err));
   }
 
-  Gdb(): cpuStates(nullptr), processorTable(nullptr),
-    numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
+  Gdb(): cpuStates(nullptr), numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
   GdbCpu* cpuStates;
-  Processor* processorTable;
   int numCpu;
   int numInitialized;
   int enumIdx;

@@ -30,10 +30,10 @@ private:
 	static char  buffer[xmax * ymax] __aligned(0x1000);
 	static char* video;
 
-	static void init() {
+	static void init(mword displacement) {
 		// monochrome screen would be at 0xb0000, increment by 1 byte
 		if (((*(uint16_t*)0x410) & 0x30) == 0x30) Reboot();
-		video = (char*)0xb8000;
+		video = (char*)(displacement + 0xb8000);
 		memcpy(buffer, video, ymax * xmax);
 	}
 
