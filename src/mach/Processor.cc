@@ -1,5 +1,5 @@
 /******************************************************************************
-    Copyright 2013 Behrooz Shafiee, Martin Karsten
+    Copyright 2012-2013 Martin Karsten
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,27 +14,17 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#ifndef _PIT_h_
-#define _PIT_h_ 1
+#include "mach/Processor.h"
+#include "kern/Debug.h"
 
-#include "mach/platform.h"
-
-class PIT {
-  static const int frequency = 1000;
-  volatile mword currentTick;
-public:
-  PIT() : currentTick(0) {}
-  void init() volatile                                 __section(".boot.text");
-  void staticInterruptHandler() volatile {
-    currentTick += 1;
-  }
-  void wait(mword miliseconds) volatile {
-    mword start = currentTick;
-    while (currentTick < start + miliseconds) Pause();
-  }
-  mword tick() volatile {
-    return currentTick;
-  }
-};
-
-#endif /* _PIT_h_ */
+void Processor::checkCapabilities() {
+  KASSERT0(RFlags::hasCPUID()); DBG::out(DBG::Basic, " CPUID");
+  KASSERT0(CPUID::hasAPIC());   DBG::out(DBG::Basic, " APIC");
+  KASSERT0(CPUID::hasMSR());    DBG::out(DBG::Basic, " MSR");
+  KASSERT0(CPUID::hasNX());     DBG::out(DBG::Basic, " NX");
+  if (CPUID::hasMWAIT())        DBG::out(DBG::Basic, " MWAIT");
+  if (CPUID::hasARAT())         DBG::out(DBG::Basic, " ARAT");
+  if (CPUID::hasTSC_Deadline()) DBG::out(DBG::Basic, " TSC");
+  if (CPUID::hasX2APIC())       DBG::out(DBG::Basic, " X2A");
+  DBG::out(DBG::Basic, kendl);
+}

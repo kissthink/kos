@@ -18,7 +18,7 @@
 #define _BuddyMap_h_ 1
 
 #include "util/Bitmask.h"
-#include "util/Debug.h"
+#include "kern/Debug.h"
 
 #include <map>
 

@@ -16,8 +16,8 @@
 ******************************************************************************/
 #include "extern/dlmalloc/malloc_glue.h"
 #include "extern/dlmalloc/malloc.h"
-#include "util/Debug.h"
 #include "kern/AddressSpace.h"
+#include "kern/Debug.h"
 #include "kern/Kernel.h"
 #include "kern/KernelHeap.h"
 

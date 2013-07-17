@@ -18,7 +18,7 @@
 #define _FrameManager_h_ 1
 
 #include "util/BuddyMap.h"
-#include "util/Debug.h"
+#include "kern/Debug.h"
 #include "kern/KernelHeap.h"
 
 #include <set>

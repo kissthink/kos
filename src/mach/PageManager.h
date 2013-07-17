@@ -17,10 +17,10 @@
 #ifndef _PageManager_h_
 #define _PageManager_h_ 1
 
-#include "util/Debug.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
 #include "mach/Processor.h"
+#include "kern/Debug.h"
 #include "kern/FrameManager.h"
 
 #include <cstring>
@@ -82,7 +82,7 @@ private:
   }
 
   // extract significant bits for level N from virtual address
-  template <unsigned int N> static constexpr mword addrprefix(mword vma) {
+  template <unsigned int N> static constexpr mword addrprefix( mword vma ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
     return (vma & maskbits(pagesizebits<N>(),pagebits)) >> pagesizebits<N>();
   }

@@ -14,9 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/OutputSafe.h"
 #include "dev/Screen.h"
 #include "dev/Serial.h"
+#include "kern/OutputSafe.h"
 
 class ScreenBuffer : public OutputDevice {
   ScreenSegment segment;

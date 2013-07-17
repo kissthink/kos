@@ -14,9 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/OutputSafe.h"
 #include "mach/platform.h"
 #include "mach/asm_functions.h"
+#include "kern/OutputSafe.h"
 
 extern void Breakpoint2(vaddr ia) {
   asm volatile( "nop" ::: "memory" );

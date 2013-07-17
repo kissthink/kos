@@ -1,7 +1,7 @@
 #ifndef NonBlockSemaphore_h_
 #define NonBlockSemaphore_h_ 1
 
-#include "util/SpinLock.h"
+#include "ipc/SpinLock.h"
 #include <atomic>
 
 /**
@@ -20,7 +20,7 @@ public:
   void P() volatile {
     for(;;) {
       Pause();
-      ScopedLockISR<> so(lk);
+      ScopedLock<> so(lk);
       if (counter <= 0) {
         continue;
       } else {
@@ -31,12 +31,12 @@ public:
   }
 
   void V() volatile {
-    ScopedLockISR<> so(lk);
+    ScopedLock<> so(lk);
     counter += 1;
   }
 
   void resetCounter(int newCounter) {
-    ScopedLockISR<> so(lk);
+    ScopedLock<> so(lk);
     counter = newCounter;
   }
 };

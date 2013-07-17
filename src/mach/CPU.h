@@ -21,6 +21,8 @@
 #include "mach/platform.h"
 
 class RFlags {
+  friend class Processor;
+
   static const BitSeg<mword, 0,1> CF;
   static const BitSeg<mword, 2,1> PF;
   static const BitSeg<mword, 4,1> AF;
@@ -47,10 +49,10 @@ class RFlags {
     asm volatile("push %0\n\tpopf" :: "r"(x) : "memory");
   }
 
-public:
-  RFlags() = delete;                         // no creation
-  RFlags(const RFlags&) = delete;            // no copy
-  RFlags& operator=(const RFlags&) = delete; // no assignment
+  static bool interruptsEnabled() {
+    mword rf = read();
+    return rf & IF();
+  }
 
   static bool hasCPUID() {
     mword rf = read();
@@ -59,10 +61,12 @@ public:
     mword rf2 = read();
     return ((rf ^ rf2) & ID()) == 0;
   }
-  static bool interruptsEnabled() {
-    mword rf = read();
-    return rf & IF();
-  }
+
+public:
+  RFlags() = delete;                         // no creation
+  RFlags(const RFlags&) = delete;            // no copy
+  RFlags& operator=(const RFlags&) = delete; // no assignment
+
 };
 
 namespace CPU {
@@ -145,7 +149,7 @@ namespace CPU {
     asm volatile( "cli" ::: "memory" );
   }
   static inline void invTLB(mword val) {
-    // Somehow the extra move into register seems to be necessary to
+    // Somehow the extra move into a register seems to be necessary to
     // to make invlpg work reliably (e.g. bochs, but also observed on HW),
     // instead of just: asm volatile( "invlpg %0" :: "m"(val) : "memory" );
     asm volatile( "invlpg (%0)" :: "r"(val) : "memory" );
@@ -219,6 +223,8 @@ struct MSR {
 
 // TODO: handle unsupported CPUID requests...
 class CPUID {
+  friend class Processor;
+
   static const BitSeg<uint32_t, 2,1> ARAT;  // Always Running APIC timer (i.e. constant rate during deep sleep modes)
   static const BitSeg<uint32_t, 3,1> MWAIT;
   static const BitSeg<uint32_t, 5,1> MSR;
@@ -235,11 +241,6 @@ class CPUID {
   static inline void cpuid( uint32_t ia, uint32_t ic, uint32_t& a, uint32_t& b, uint32_t& c, uint32_t& d ) {
     asm volatile("cpuid" : "=a"(a),"=b"(b),"=c"(c),"=d"(d) : "a"(ia),"c"(ic) : "memory");
   }
-
-public:
-  CPUID() = delete;                         // no creation
-  CPUID(const CPUID&) = delete;             // no copy
-  CPUID& operator=(const CPUID&) = delete;  // no assignment
 
   static inline bool hasAPIC() {
     uint32_t a,b,c,d;
@@ -293,6 +294,11 @@ public:
   }
 
   void getCacheInfo()                                 __section(".boot.text");
+
+public:
+  CPUID() = delete;                         // no creation
+  CPUID(const CPUID&) = delete;             // no copy
+  CPUID& operator=(const CPUID&) = delete;  // no assignment
 };
 
 #endif /* _CPU_h_ */

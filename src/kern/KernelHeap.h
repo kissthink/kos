@@ -19,8 +19,8 @@
 
 #include "extern/stl/mod_set"
 #include "util/BuddyMap.h"
-#include "util/SpinLock.h"
 #include "mach/Memory.h"
+#include "ipc/SpinLock.h"
 
 #include <memory>
 

@@ -18,7 +18,7 @@
 #define _Scheduler_h_ 1
 
 #include "util/EmbeddedQueue.h"
-#include "util/SpinLock.h"
+#include "ipc/SpinLock.h"
 
 class Thread;
 
@@ -46,10 +46,6 @@ public:
   }
   void yield() {
     ScopedLock<> lo(lk);
-    yieldInternal();
-  }
-  void preempt() {
-    ScopedLockISR<> lo(lk);
     yieldInternal();
   }
 };

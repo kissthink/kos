@@ -34,31 +34,23 @@ class SpinLock {
   }
 public:
   SpinLock() : locked(false) {}
-  ptr_t operator new(size_t) { return ::operator new(SpinLock::size()); }
-  void operator delete(ptr_t ptr) { globaldelete(ptr, SpinLock::size()); }
+  ptr_t operator new(size_t) { return ::operator new(size()); }
+  void operator delete(ptr_t ptr) { globaldelete(ptr, size()); }
   static constexpr size_t size() {
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(SpinLock);
   }
   void acquire() volatile {
-    Processor::disableInterrupts();
+    Processor::incLockCount();
     acquireInternal();
   }
   void release() volatile {
     releaseInternal();
-    Processor::enableInterrupts();
-  }
-  void acquireISR() volatile {
-    Processor::incLockCount();
-    acquireInternal();
-  }
-  void releaseISR() volatile {
-    releaseInternal();
     Processor::decLockCount();
   }
   bool tryAcquire() volatile {
-    Processor::disableInterrupts();
+    Processor::incLockCount();
     bool success = tryAcquireInternal();
-    if (!success) Processor::enableInterrupts();
+    if (!success) Processor::decLockCount();
     return success;
   }
 };
@@ -67,8 +59,7 @@ class NoLock {
 public:
   void acquire() volatile {}
   void release() volatile {}
-  void acquireISR() volatile {}
-  void releaseISR() volatile {}
+  bool tryAcquire() volatile { return true; }
 };
 
 template <typename Lock = SpinLock>
@@ -77,14 +68,6 @@ class ScopedLock {
 public:
   ScopedLock(volatile Lock& lk) : lk(lk) { lk.acquire(); }
   ~ScopedLock() { lk.release(); }
-};
-
-template <typename Lock = SpinLock>
-class ScopedLockISR {
-  volatile Lock& lk;
-public:
-  ScopedLockISR(volatile Lock& lk) : lk(lk) { lk.acquireISR(); }
-  ~ScopedLockISR() { lk.releaseISR(); }
 };
 
 #endif /* _SpinLock_h_ */

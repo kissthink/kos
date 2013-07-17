@@ -22,8 +22,8 @@ extern "C" {
 #include "mach/Processor.h"
 #include "mach/PCI.h"
 #include "kern/AddressSpace.h"
-#include "kern/BlockingSync.h"
 #include "kern/Kernel.h"
+#include "ipc/BlockingSync.h"
 
 #include <map>
 
@@ -158,12 +158,11 @@ void Machine::initACPI(vaddr r) {
   KASSERT0(apicMap.size());
 
   // map APIC page and enable local APIC
-  MSR::enableAPIC();                // should be enabled by default
   PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data);
-  Processor::lapic()->enable(0xf8);               // confirm spurious vector at 0xf8
+  Processor::enableAPIC(0xf8);              // confirm spurious vector at 0xf8
 
   // determine bspApicID, cpuCount, bspIndex, and create processorTable
-  bspApicID = Processor::lapic()->getLAPIC_ID();
+  bspApicID = Processor::apic()->getLAPIC_ID();
   cpuCount = apicMap.size();
   processorTable = new Processor[cpuCount];
   int idx = 0;
@@ -427,10 +426,8 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
   DBG::outln(DBG::Acpi, "ACPI install intr handler: ", InterruptNumber);
   if (InterruptNumber != 9 || !ServiceRoutine) return AE_BAD_PARAMETER;
   if (sciHandler) return AE_ALREADY_EXISTS;
-  Processor::disableInterrupts();
-  sciHandler = ServiceRoutine;
   sciContext = Context;
-  Processor::enableInterrupts();
+  sciHandler = ServiceRoutine;
   return AE_OK;
 }
 
@@ -442,10 +439,8 @@ ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber,
   if (InterruptNumber != 9 || !ServiceRoutine || ServiceRoutine != sciHandler) {
     return AE_BAD_PARAMETER;
   }
-  Processor::disableInterrupts();
   sciHandler = nullptr;
   sciContext = nullptr;
-  Processor::enableInterrupts();
   return AE_OK;
 }
 

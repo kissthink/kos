@@ -79,8 +79,8 @@ Machine::IrqOverrideInfo* Machine::irqOverrideTable = nullptr;
 
 // static keyboard and RTC object
 static Keyboard keyboard;
-static PIT pit;
-static RTC rtc;
+volatile static PIT pit;
+volatile static RTC rtc;
 
 // check various assumptions about data type sizes
 static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
@@ -147,11 +147,10 @@ void Machine::initAP(funcvoid_t func) {
 // 2nd init routine for APs - on new stack, processor object initialized
 void Machine::initAP2() {
   // enable APIC
-  MSR::enableAPIC();                // should be enabled by default
-  Processor::enableAPIC(0xf8);      // confirm spurious vector at 0xf8
+  Processor::enableAPIC(0xf8);             // confirm spurious vector at 0xf8
 
   // enable interrupts, sync with BSP, then halt
-  processorTable[apIndex].startInterrupts();
+  Processor::enableInterrupts();
   DBG::out(DBG::Basic, 'H');
   apIndex = bspIndex;
 //  StoreBarrier();
@@ -199,15 +198,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // check CPU capabilities
   DBG::out(DBG::Basic, "checking capabilities:");
   KASSERT0(__atomic_always_lock_free(sizeof(mword),0));
-  KASSERT0(RFlags::hasCPUID()); DBG::out(DBG::Basic, " CPUID");
-  KASSERT0(CPUID::hasAPIC());   DBG::out(DBG::Basic, " APIC");
-  KASSERT0(CPUID::hasMSR());    DBG::out(DBG::Basic, " MSR");
-  KASSERT0(CPUID::hasNX());     DBG::out(DBG::Basic, " NX");
-  if (CPUID::hasMWAIT())        DBG::out(DBG::Basic, " MWAIT");
-  if (CPUID::hasARAT())         DBG::out(DBG::Basic, " ARAT");
-  if (CPUID::hasTSC_Deadline()) DBG::out(DBG::Basic, " TSC");
-  if (CPUID::hasX2APIC())       DBG::out(DBG::Basic, " X2A");
-  DBG::out(DBG::Basic, kendl);
+  Processor::checkCapabilities();
 
   // print boot memory information
   DBG::outln(DBG::Basic, "Boot16:    ", FmtHex(&boot16Begin),  " - ", FmtHex(&boot16End));
@@ -221,25 +212,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "Heap Seg:  ", FmtHex(&__BootHeap),   " - ", FmtHex(&__BootHeapEnd));
   DBG::outln(DBG::Basic, "Multiboot: ", FmtHex((mbiAddr + kernelBase)), " - ", FmtHex(mbiEnd));
   DBG::outln(DBG::Basic, "Vid/APIC:  ", FmtHex(videoAddr), " / ", FmtHex(lapicAddr));
-
-  // make frameManager globally accessible
-  dummyProcessor.setFrameManager(&frameManager);
-
-  // install all IDT entries
-  setupAllIDTs();
-  loadIDT(idt, sizeof(idt));
-
-  // install GDT (replacing boot loader's GDT), TSS, TR, LDT
-  memset(gdt, 0, sizeof(gdt));
-  setupGDT(kernCodeSelector, 0, 0, true);
-  setupGDT(kernDataSelector, 0, 0, false);
-  setupGDT(userCodeSelector, 3, 0, true);
-  setupGDT(userDataSelector, 3, 0, false);
-  memset(&tss, 0, sizeof(TaskStateSegment));
-  setupTSS(tssSelector, (vaddr)&tss);
-  loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-  loadTR(tssSelector * sizeof(SegmentDescriptor));
-  clearLDT();
 
   // get memory information from multiboot -> store in frameManager
   laddr modStart, modEnd;
@@ -280,6 +252,9 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // activate new page tables -> proper dynamic memory, but no identity mapping
   kernelSpace.activate();
 
+  // make frameManager globally accessible
+  dummyProcessor.setFrameManager(&frameManager);
+
   // initialize kernel FS with boot modules
   modStart = align_down(modStart, pagesize<2>());
   modEnd = align_up(modEnd, pagesize<2>());
@@ -297,6 +272,18 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   initACPI(rsdp);
+
+  // install GDT (replacing boot loader's GDT), TSS, TR, LDT
+  memset(gdt, 0, sizeof(gdt));
+  setupGDT(kernCodeSelector, 0, 0, true);
+  setupGDT(kernDataSelector, 0, 0, false);
+  setupGDT(userCodeSelector, 3, 0, true);
+  setupGDT(userDataSelector, 3, 0, false);
+  memset(&tss, 0, sizeof(TaskStateSegment));
+  setupTSS(tssSelector, (vaddr)&tss);
+  loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
+  loadTR(tssSelector * sizeof(SegmentDescriptor));
+  clearLDT();
 
   // initialize gdb object
   if (DBG::test(DBG::GDBEnable)) Gdb::getInstance().init(cpuCount, processorTable);
@@ -329,8 +316,12 @@ void Machine::initBSP2() {
   // find PCI devices
   PCI::probeAll();
 
+  // install IDT entries
+  setupAllIDTs();
+  loadIDT(idt, sizeof(idt));
+
   // enable interrupts; needed for rtc.wait below
-  processorTable[bspIndex].startInterrupts();
+  Processor::enableInterrupts();
 
 #if 0
   DBG::out(DBG::Basic, "PIT test, 5 secs...");
@@ -405,8 +396,11 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
 }
 
 inline void Machine::timerInterrupt(mword counter) {
-  if (counter % cpuCount == bspIndex) kernelScheduler.preempt();
-  else processorTable[counter % cpuCount].sendWakeUpIPI();
+  if (counter % cpuCount == bspIndex) {
+    if (Processor::preempt()) kernelScheduler.yield();
+  } else {
+    processorTable[counter % cpuCount].sendWakeUpIPI();
+  }
 }
 
 extern "C" void isr_handler_0x08() { // double fault
@@ -457,11 +451,11 @@ extern "C" void isr_handler_0x2c() { // mouse interrupt
 
 extern "C" void isr_handler_0x40() {
   Processor::sendEOI();              // EOI *before* switching stacks
-  kernelScheduler.preempt();
+  if (Processor::preempt()) kernelScheduler.yield();
 }
 
 extern "C" void isr_handler_0x41() {
-  StdErr.out(" TIPI", (RFlags::interruptsEnabled() ? 'e' : 'd'));
+  StdErr.out(" TIPI", (Processor::interruptsEnabled() ? 'e' : 'd'));
   tipiReceived = true;
   Processor::sendEOI();
 }
@@ -524,7 +518,7 @@ void Machine::setupTSS(unsigned int number, laddr address) {
 }
 
 void Machine::setupAllIDTs() {
-  KASSERT0(!RFlags::interruptsEnabled());
+  KASSERT0(!Processor::interruptsEnabled());
   memset(idt, 0, sizeof(idt));
   setupIDT(0x00, (vaddr)&isr_wrapper_0x00);
   setupIDT(0x01, (vaddr)&isr_wrapper_0x01);

@@ -567,7 +567,7 @@ void Keyboard::staticInterruptHandler() {
 		KeyCode key = keyTable[code];       // get key code from XT set
 
 #if KEYBOARD_RAW
-		kbq.appendFromISR(key);
+		kbq.tryAppend(key);
 		continue;
 #endif
 
@@ -612,7 +612,7 @@ void Keyboard::staticInterruptHandler() {
 						case KEY_PLUS:         key = KEY_EQUAL; break;
 						case KEY_BACKSLASH:    key = KEY_BAR; break;
 					} else if (ctrl && alt && extended && key == KEY_KP_DECIMAL) Reboot();
-					kbq.appendFromISR(key); // add key to key buffer!
+					kbq.tryAppend(key); // add key to key buffer!
 					break;
 			}
 		}

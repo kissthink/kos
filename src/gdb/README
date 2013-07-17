@@ -53,8 +53,7 @@ void init(int numCpu, Processor* procTable) needs to be called after initAPCI();
 inside Machine.cc to initialize multicore Gdb stub.
 Call void startGdb(bool allstop) to start Gdb.
 Each GdbCpu (register values) are saved on processor specific area via fs register.
-Each methods is protected by a SpinLock. Make sure to use ISR version of locking/unlocking
-as Gdb is assumed to be used inside interrupt handler where interrupts are disabled.
+Each methods is protected by a SpinLock. Gdb is assumed to be used inside interrupt handler where interrupts are disabled.
 
 GdbCpu
 ------
@@ -64,8 +63,7 @@ setupGdb is called, because Gdb stub is not initialized for use on that CPU yet.
 GdbCpu object has 2 buffers for storing register values for the CPU core it represents.
 Also, it has an int array to use as a stack inside interrupt handler.
 It keeps track of CpuStates, register values, stacks, CpuNames, and CpuIds.
-Each method is protected by a SpinLock. Make sure to use ISR version of locking/unlocking
-as Gdb is assumed to be used iniside interrupt handler where interrupts are disabled.
+Each method is protected by a SpinLock. Gdb is assumed to be used iniside interrupt handler where interrupts are disabled.
 
 NonBlockSemaphore
 -----------------

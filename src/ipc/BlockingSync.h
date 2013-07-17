@@ -18,11 +18,11 @@
 #define _BlockingSync_h_ 1
 
 #include "util/EmbeddedQueue.h"
-#include "util/SpinLock.h"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
+#include "ipc/SpinLock.h"
 
 class BlockingSync {
   EmbeddedQueue<Thread> threadQueue;

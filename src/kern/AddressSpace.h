@@ -18,11 +18,11 @@
 #define _AddressSpace_h_ 1
 
 #include "util/BuddyMap.h"
-#include "util/SpinLock.h"
 #include "mach/Memory.h"
 #include "mach/PageManager.h"
 #include "mach/Processor.h"
 #include "kern/FrameManager.h"
+#include "ipc/SpinLock.h"
 
 #include <set>
 

@@ -18,7 +18,7 @@
 #include "mach/Machine.h"
 #include "dev/RTC.h"
 
-void RTC::init() { // see http://wiki.osdev.org/RTC
+void RTC::init() volatile { // see http://wiki.osdev.org/RTC
   Machine::staticEnableIRQ( PIC::RTC, 0x28 );
   out8(0x70, 0x0b);
   uint8_t prev = in8(0x71);

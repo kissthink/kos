@@ -17,8 +17,8 @@
 #ifndef _PCI_h_
 #define _PCI_h_ 1
 
-#include "util/Debug.h"
 #include "mach/platform.h"
+#include "kern/Debug.h"
 
 class PCI {
   static const uint16_t AddressPort = 0xCF8;

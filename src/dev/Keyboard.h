@@ -23,7 +23,7 @@
 #define _Keyboard_h_ 1
 
 #include "kern/KernelQueues.h"
-#include "kern/SyncQueues.h"
+#include "ipc/SyncQueues.h"
 
 //#define KEYBOARD_RAW 1
 

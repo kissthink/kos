@@ -18,7 +18,7 @@
 #define _Output_h_ 1
 
 #include "util/Output.h"
-#include "util/SpinLock.h"
+#include "ipc/SpinLock.h"
 #include "extern/stl/outputbuf.h"
 
 #include <ostream>
@@ -56,14 +56,6 @@ public:
     print(a...);
     print(kendl);
     lk.release();
-  }
-
-  template<typename... Args>
-  void outlnISR( const Args&... a ) {
-    lk.acquireISR();
-    print(a...);
-    print(kendl);
-    lk.releaseISR();
   }
 };
 

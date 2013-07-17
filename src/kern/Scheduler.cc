@@ -14,9 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/Debug.h"
 #include "mach/Processor.h"
 #include "mach/stack.h"
+#include "kern/Debug.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 

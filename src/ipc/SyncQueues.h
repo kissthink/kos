@@ -18,10 +18,10 @@
 #define _SyncQueues_h_ 1
 
 #include "util/Output.h"
-#include "util/SpinLock.h"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
+#include "ipc/SpinLock.h"
 
 template<typename Buffer>
 class ProdConsQueue {
@@ -56,8 +56,8 @@ public:
     elementQueue.push(elem);
   }
 
-  bool appendFromISR(const Element& elem) {          // non-blocking append
-    ScopedLockISR<> lo(lk);
+  bool tryAppend(const Element& elem) {              // non-blocking append
+    ScopedLock<> lo(lk);
     if likely(unclaimedElements == elementQueue.max_size()) return false;
     else if unlikely(!resume()) unclaimedElements += 1;
     else KASSERT1(elementQueue.empty(), elementQueue.size());

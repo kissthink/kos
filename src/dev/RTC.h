@@ -20,20 +20,20 @@
 #include "mach/platform.h"
 
 class RTC {
-  mword currentTick;
+  volatile mword currentTick;
 public:
   RTC() : currentTick(0) {}
-  void init();
-  void staticInterruptHandler() {
+  void init() volatile                                 __section(".boot.text");
+  void staticInterruptHandler() volatile {
     out8(0x70,0x0C);
     in8(0x71);
     currentTick += 1;
   }
-  void wait(mword ticks) {
+  void wait(mword ticks) volatile {
     mword start = currentTick;
     while (currentTick < start + ticks) Pause();
   }
-  mword tick() {
+  mword tick() volatile {
     return currentTick;
   }
 };

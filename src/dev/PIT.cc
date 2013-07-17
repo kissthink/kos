@@ -18,7 +18,7 @@
 #include "mach/Machine.h"
 #include "dev/PIT.h"
 
-void PIT::init() { // http://www.jamesmolloy.co.uk/tutorial_html/5.-IRQs%20and%20the%20PIT.html
+void PIT::init() volatile { // http://www.jamesmolloy.co.uk/tutorial_html/5.-IRQs%20and%20the%20PIT.html
 	// Firstly, register our timer callback.
 	Machine::staticEnableIRQ(PIC::PIT, 0x20);
 

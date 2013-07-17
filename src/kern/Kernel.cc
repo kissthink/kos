@@ -14,16 +14,15 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#include "util/OutputSafe.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
 #include "kern/AddressSpace.h"
+#include "kern/OutputSafe.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 #include "world/File.h"
 #include "world/ELFLoader.h"
 
-#include "mach/Machine.h"
 #include "mach/asm_functions.h"
 
 AddressSpace kernelSpace(AddressSpace::Kernel);
@@ -109,7 +108,8 @@ void mainLoop(ptr_t) {
     //Activate Kernel Space again
     kernelSpace.activate();
   }
-  Breakpoint();
+
+//  Breakpoint();
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");
   Thread::create(task, nullptr, kernelSpace, "B");
@@ -138,15 +138,10 @@ void mainLoop(ptr_t) {
   task(nullptr);
 }
 
-static SpinLock lk;
-
 void task(ptr_t) {
   mword id = Processor::getApicID();
   for (;;) {
-    lk.acquire();
     StdOut.out(Processor::getCurrThread()->getName(), id, ' ');
-//    StdDbg.out(Processor::getCurrThread()->getName(), id, ' ');
-    lk.release();
     mword newid;
     do {
       Pause();

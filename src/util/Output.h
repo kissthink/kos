@@ -23,7 +23,7 @@ inline ostream& operator<<(ostream &os, const FmtHex& hex) {
 
 static const char kendl = '\n';
 
-// defined in Output.cc
+// defined in OutputSafe.cc
 extern void kassertprint(const char* const loc, int line, const char* const func);
 extern void kassertprint1(const char* const msg);
 extern void kassertprint1(const unsigned long long num);

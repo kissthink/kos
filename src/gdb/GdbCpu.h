@@ -1,8 +1,8 @@
 #ifndef GdbCpu_h_
 #define GdbCpu_h_ 1
 
-#include "util/Debug.h"
-#include "util/SpinLock.h"
+#include "kern/Debug.h"
+#include "ipc/SpinLock.h"
 
 #include <cstring>
 #include <string>
@@ -62,7 +62,7 @@ class GdbCpu {
 
   // CPU string used by 'info thread'
   void setCpuIdStr() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     _setCpuIdStr();
   }
   // unlocked internal implementation
@@ -81,7 +81,7 @@ public:
 
   // sets string m1, m2, ... (used for info thread)
   void setCpuId(int cpuIndex) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     this->cpuIndex = cpuIndex;
     _setCpuIdStr();
     char buf2[10];
@@ -91,26 +91,26 @@ public:
 
   // sets cpu state enum and string
   void setCpuState(cpuState::cpuStateEnum newState) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     state = newState;
     _setCpuIdStr();
   }
 
   // returns cpu state enum
   cpuState::cpuStateEnum getCpuState() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return state;
   }
 
   // returns cpu name
   inline const char* getId() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return cpuId;
   }
 
   // returns cpu index (starts from 0)
   int getCpuIndex() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return cpuIndex;
   }
   /**
@@ -118,59 +118,59 @@ public:
    * (e.g. m1,m2,m3,m4)
    */
   inline string getCpuInfo() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return cpuInfo;
   }
 
   uint64_t* stackPtr() {           // starting address of stack setup by GDB stub
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return stack + bufferSize;
   }
 
   // access registers stored on reg64/32 buffers
   reg64* getRegs64() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return reg64Buffer;
   }
   reg32* getRegs32() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return reg32Buffer;
   }
   reg64* getReg64(int regno) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return &reg64Buffer[regno];
   }
   reg32* getReg32(int regno) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     return &reg32Buffer[regno];
   }
   void setReg64(int regno, reg64 val) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     reg64Buffer[regno] = val;
   }
   void setReg32(int regno, reg32 val) {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     reg32Buffer[regno] = val;
   }
 
   // rip manipulation
   void decrementRip() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     if (!ripDecremented) {
       reg64Buffer[registers::RIP] -= 1;
       ripDecremented = true;
     }
   }
   void incrementRip() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     if (ripDecremented) {
       reg64Buffer[registers::RIP] += 1;
       ripDecremented = false;
-      DBG::outlnISR(DBG::GDBDebug, "rip incremented");
+      DBG::outln(DBG::GDBDebug, "rip incremented");
     }
   }
   void resetRip() {
-    ScopedLockISR<> so(mutex);
+    ScopedLock<> so(mutex);
     ripDecremented = false;
   }
 

@@ -18,7 +18,7 @@
 #define _Debug_h_ 1
 
 #include "util/Bitmask.h"
-#include "util/OutputSafe.h"
+#include "kern/OutputSafe.h"
 
 class DBG {
 public:
@@ -61,14 +61,6 @@ public:
     if (levels.test(c)) {
       StdDbg.outln(a...);
       StdOut.outln(a...);
-    }
-  }
-
-  template<typename... Args>
-  static void outlnISR( Level c, const Args&... a ) {
-    if (levels.test(c)) {
-      StdDbg.outlnISR(a...);
-      StdOut.outlnISR(a...);
     }
   }
 

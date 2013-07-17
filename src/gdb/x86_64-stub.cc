@@ -11,7 +11,7 @@
 #include "kern/Thread.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
-#include "util/Debug.h"
+#include "kern/Debug.h"
 #include "util/EmbeddedQueue.h"
 
 #undef __STRICT_ANSI__
@@ -113,7 +113,7 @@ void _returnFromException(int cpuState = 0) {
       }
     }
   }
-//  entry_q.releaseISR();
+//  entry_q.release();
   restoreRegisters(state);
 }
 
@@ -363,7 +363,7 @@ bool checkIfHalt(reg64 rip) {
   hlt[0] = hexchars[(str[0] >> 4) & 0xf];
   hlt[1] = hexchars[(str[0] % 16) & 0xf];
   if (hlt[0] == 'f' && hlt[1] == '4') {
-    DBG::outlnISR(DBG::GDBDebug, "halt at thread ", Processor::getApicID() + 1);
+    DBG::outln(DBG::GDBDebug, "halt at thread ", Processor::getApicID() + 1);
     return true;
   }
   return false;
@@ -383,7 +383,7 @@ bool checkIfPause(reg64 rip) {
   pause[3] = hexchars[(str[1] % 16) & 0xf];
   if (pause[0] == 'f' && pause[1] == '3' &&
     pause[2] == '9' && pause[3] == '0') {
-    DBG::outlnISR(DBG::GDBDebug, "pause at thread ", Processor::getApicID() + 1);
+    DBG::outln(DBG::GDBDebug, "pause at thread ", Processor::getApicID() + 1);
     return true;
   }
   return false;
@@ -400,7 +400,7 @@ void clearTFBit() {
   val &= 0xfffffeff;
   state->setReg32(registers::EFLAGS, val);
 
-  DBG::outlnISR(DBG::GDBDebug, "Cleared TF bit for thread ",
+  DBG::outln(DBG::GDBDebug, "Cleared TF bit for thread ",
     Processor::getApicID() + 1, " eflags: ", FmtHex(val));
 }
 
@@ -416,7 +416,7 @@ void setTFBit() {
   val |= 0x100;
   state->setReg32(registers::EFLAGS, val);
 
-  DBG::outlnISR(DBG::GDBDebug, "Set TF bit for thread ",
+  DBG::outln(DBG::GDBDebug, "Set TF bit for thread ",
     Processor::getApicID() + 1, " eflags: ", FmtHex(val));
 }
 
@@ -440,7 +440,7 @@ void sendStopReply(char* outputBuffer, int sigval) {
   outputBuffer[12] = ';';
   outputBuffer[13] = 0;
 
-  DBG::outlnISR(DBG::GDBDebug, "Sending stop reply: ", outputBuffer,
+  DBG::outln(DBG::GDBDebug, "Sending stop reply: ", outputBuffer,
     " from thread ", Processor::getApicID() + 1);
   putpacket(outputBuffer);
 }
@@ -477,7 +477,7 @@ VContAction* parse_vcont(char* ptr)
       res = action;
       res_signal = signal;
       res_thread = threadId;
-      DBG::outlnISR(DBG::GDBDebug, "action: ", (char)res, " signal: ", res_signal,
+      DBG::outln(DBG::GDBDebug, "action: ", (char)res, " signal: ", res_signal,
         " thread: ", res_thread);
     }
   }
@@ -498,7 +498,7 @@ VContAction* parse_vcont(char* ptr)
     vContActionQueue.push(vContAction);
 
     result = vContAction;
-    DBG::outlnISR(DBG::GDBDebug, "Parsed vContAction - ", *vContAction);
+    DBG::outln(DBG::GDBDebug, "Parsed vContAction - ", *vContAction);
   }
 
   return result;
@@ -512,7 +512,7 @@ VContAction* parse_vcont(char* ptr)
 void consumeVContAction()
 {
   VContAction* action = vContActionQueue.front();
-  DBG::outlnISR(DBG::GDBDebug, *action, " from thread: ", Processor::getApicID() + 1);
+  DBG::outln(DBG::GDBDebug, *action, " from thread: ", Processor::getApicID() + 1);
 
   KASSERT0(action);
   KASSERT1(!action->executed, action->action);
@@ -528,7 +528,7 @@ void consumeVContAction()
   }
 
   reg32 eflags = *Gdb::getInstance().getCurrentCpuState()->getReg32(registers::EFLAGS);
-  DBG::outlnISR(DBG::GDBDebug, "Consuming vContAction - ", *action,
+  DBG::outln(DBG::GDBDebug, "Consuming vContAction - ", *action,
        " from thread: ", Processor::getApicID() + 1,
        " eflags: ", FmtHex(eflags));
 
@@ -553,7 +553,7 @@ void consumeVContAction()
         isFree = false;
         waiting[i] = false;
         Gdb::getInstance().V(i);
-        DBG::outlnISR(DBG::GDBDebug, "Passed baton from thread: ",
+        DBG::outln(DBG::GDBDebug, "Passed baton from thread: ",
           Processor::getApicID() + 1, " to thread: ", i + 1);
         action->executed = true;
         _returnFromException();
@@ -595,14 +595,14 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
           if (waiting[action->threadId-1]) {
             // pass baton to the waiting thread.
             Gdb::getInstance().V(action->threadId-1);
-            DBG::outlnISR(DBG::GDBDebug, "Passed baton from thread: ",
+            DBG::outln(DBG::GDBDebug, "Passed baton from thread: ",
               Processor::getApicID() + 1, " to thread: ", action->threadId);
             handle_exception(exceptionVector);  // this thread will wait.
           }
 
           // Assumes the thread needs to be in
           // interrupt handler before Gdb asks 'c', or 's'
-          DBG::outlnISR(DBG::GDBDebug, "current thread: ", Processor::getApicID() + 1);
+          DBG::outln(DBG::GDBDebug, "current thread: ", Processor::getApicID() + 1);
           ABORT1(action->threadId);
         } else {
           // action on current thread.
@@ -628,7 +628,7 @@ handle_exception (int64_t exceptionVector) {
 
   Thread* currThread = Processor::getCurrThread();
 
-  DBG::outlnISR(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
+  DBG::outln(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
             ", eflags=", FmtHex(*Gdb::getInstance().getCurrentCpuState()->getReg32(registers::EFLAGS)),
             ", pc=", FmtHex(*Gdb::getInstance().getCurrentCpuState()->getReg64(registers::RIP)),
             ", thread=", FmtHex(currThread));
@@ -638,10 +638,10 @@ handle_exception (int64_t exceptionVector) {
   Gdb::getInstance().getCurrentCpuState()->resetRip();
   if (exceptionVector == 3) {
     reg32 eflags = *Gdb::getInstance().getCurrentCpuState()->getReg32(registers::EFLAGS);
-    DBG::outlnISR(DBG::GDBDebug, "eflags & 0x100 = ", (eflags & 0x100));
+    DBG::outln(DBG::GDBDebug, "eflags & 0x100 = ", (eflags & 0x100));
     if ((eflags & 0x100) == 0) {   // if TF is set, treat the rip valid
       Gdb::getInstance().getCurrentCpuState()->decrementRip();
-      DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " decrement rip to ",
+      DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " decrement rip to ",
         FmtHex(*Gdb::getInstance().getCurrentCpuState()->getReg64(registers::RIP)));
     }
   }
@@ -653,17 +653,17 @@ handle_exception (int64_t exceptionVector) {
    * If a baton is held by another thread and the lockholder is not you,
    * you have to wait until someone passes a baton.
    */
-  DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " trying to enter");
+  DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " trying to enter");
   entry_q.P();
 
   if (gdbThread != nullptr && gdbThread != currThread && !isFree && (lockHolder == -1 || lockHolder != threadId)) {
     waiting[threadId] = true;
-    DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " is waiting for real lock holder: ", lockHolder+1);
+    DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " is waiting for real lock holder: ", lockHolder+1);
     entry_q.V();
     Gdb::getInstance().P(threadId);
-    DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " woke up");
+    DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " woke up");
     if (shouldReturnFromException[threadId]) {
-      DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " returning from exception");
+      DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " returning from exception");
       shouldReturnFromException[threadId] = false;
       GdbCpu* state = Gdb::getInstance().getCurrentCpuState();
       state->setCpuState(cpuState::RUNNING);
@@ -676,21 +676,21 @@ handle_exception (int64_t exceptionVector) {
   waiting[threadId] = false;
   lockHolder = threadId;
   gdbThread = currThread;
-  DBG::outlnISR(DBG::GDBDebug, "thread ", threadId+1, " got in");
+  DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " got in");
 
   memset(outputBuffer, 0, BUFMAX);      // reset output buffer
 
   if (!vContActionQueue.empty()) {
-    DBG::outlnISR(DBG::GDBDebug, "there is a pending operation.");
+    DBG::outln(DBG::GDBDebug, "there is a pending operation.");
     VContAction* action = vContActionQueue.front();
     if (action->executed) {
-      DBG::outlnISR(DBG::GDBDebug, "pending operation done - ", *action);
+      DBG::outln(DBG::GDBDebug, "pending operation done - ", *action);
       prevAction = action;              // remember previous action (if 'c' don't increment rip)
       vContActionQueue.pop();
       KASSERT0(vContActionQueue.empty());
       sendStopReply(outputBuffer, sigval);
     } else {
-      DBG::outlnISR(DBG::GDBDebug, "entering consumeVContAction: ", *action);
+      DBG::outln(DBG::GDBDebug, "entering consumeVContAction: ", *action);
       consumeVContAction();
     }
   }
