@@ -171,14 +171,6 @@ public:
   void maskTimer() volatile {
     LVT_Timer |= MaskTimer();
   }
-  void maskInterrupts() volatile {
-    LVT_LINT0 |= MaskTimer();
-    LVT_LINT1 |= MaskTimer();
-  }
-  void unMaskInterrupts() volatile {
-    LVT_LINT0 &= ~MaskTimer();
-    LVT_LINT1 &= ~MaskTimer();
-  }
   uint8_t getLAPIC_ID() volatile {
     return LAPIC_ID.get(ID);
   }
