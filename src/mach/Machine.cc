@@ -132,7 +132,7 @@ void Machine::initAP(funcvoid_t func) {
   processorTable[apIndex].install(frameManager);
   kernelSpace.activate();
   Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
-  processorTable[apIndex].init2(*apIdleThread, Gdb::getInstance().setupGdb(apIndex));
+  processorTable[apIndex].init2(*apIdleThread, Gdb::setupGdb(apIndex));
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
@@ -286,15 +286,15 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   clearLDT();
 
   // initialize gdb object -> move up, but need to coordinate with IDT setup
-  GdbInstance.init(cpuCount);
+  Gdb::init(cpuCount);
 
   // configure BSP processor
   processorTable[bspIndex].install(frameManager);
   Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
-  processorTable[bspIndex].init2(*bspIdleThread, Gdb::getInstance().setupGdb(bspIndex));
+  processorTable[bspIndex].init2(*bspIdleThread, Gdb::setupGdb(bspIndex));
 
   // start gdb
-  GdbInstance.start();
+  Gdb::start();
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
