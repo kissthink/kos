@@ -32,8 +32,10 @@ struct VContAction : public EmbeddedElement<VContAction> {
       && empty == other.empty
       && threadAssigned == other.threadAssigned
       && executed == other.executed) return true;
-
     return false;
+  }
+  bool isForCurrentThread() const {
+    return (threadId == -1 || threadId == (int)Processor::getApicID()+1);
   }
 
   friend ostream& operator<<(ostream &, const VContAction &);

@@ -42,135 +42,106 @@ namespace cpuState {
 const int numRegs64  = 17;
 const int numRegs32  = 7;
 const int bufferSize = (1<<20);
+const int cpuNameLen = 20;
+const int cpuIndexLen = 10;
 
 class GdbCpu {
   // *do NOT change orders for these 4 variables*
-  reg64 reg64Buffer[numRegs64];       // gdb_asm_functions.S requires this here
+  reg64 reg64Buffer[numRegs64];             // gdb_asm_functions.S requires this here
   reg32 reg32Buffer[numRegs32];
   uint64_t stack[bufferSize];
-  int64_t gdbErrorCode;
-
-  char cpuId[20];                     // in format (Core %d) [State]
-  string cpuInfo;                // used by GDB RSP (remote serial protocol)
+  uint64_t* stackEnd = stack + bufferSize;
+  char cpuName[cpuNameLen];                 // in format (Core %d) [State]
+  char cpuIdxStr[cpuIndexLen];              // used by GDB RSP (remote serial protocol)
   int cpuIndex;
-
-  cpuState::cpuStateEnum state;
-  SpinLock mutex;
-
-  bool ripDecremented;                // rip is decremented for int 3 with 's'
+  cpuState::cpuStateEnum state;             // current state
+  bool ripDecremented;                      // rip is decremented for int 3 with 's'
 
 
-  // CPU string used by 'info thread'
-  void setCpuIdStr() {
-    ScopedLock<> so(mutex);
-    _setCpuIdStr();
+  // initialize CPU info for human and gdb
+  inline void setCpuName() {
+    setString(cpuName, cpuNameLen, "CPU %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
   }
-  // unlocked internal implementation
-  void _setCpuIdStr() {
-    memset(cpuId, 0, sizeof(char) * 20);
-    snprintf(cpuId, 20, "CPU %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
+  inline void setCpuIdxStr() {
+    setString(cpuIdxStr, cpuIndexLen, "m%d", cpuIndex+1);
+    setCpuName();
+  }
+  void setString(char* buf, size_t len, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buf, len, format, args);
+    va_end(args);
   }
 
 public:
-  GdbCpu(): gdbErrorCode(0), state(cpuState::UNKNOWN), ripDecremented(false) {
-    memset(cpuId, 0, sizeof(char) * 20);
+  GdbCpu(): state(cpuState::UNKNOWN), ripDecremented(false) {
+    memset(cpuName, 0, sizeof(char) * cpuNameLen);
+    memset(cpuIdxStr, 0, sizeof(char) * cpuIndexLen);
     memset(stack, 0, sizeof(uint64_t) * bufferSize); 
     memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
     memset(reg32Buffer, 0, numRegs32 * sizeof(reg32));
   }
 
-  // sets string m1, m2, ... (used for info thread)
-  void setCpuId(int cpuIndex) {
-    ScopedLock<> so(mutex);
-    this->cpuIndex = cpuIndex;
-    _setCpuIdStr();
-    char buf2[10];
-    snprintf(buf2, 10, "m%d", cpuIndex+1);
-    cpuInfo = buf2;
+  // name/idx manipulation
+  inline void setCpuId(int cpuIdx) {
+    cpuIndex = cpuIdx;
+    setCpuIdxStr();
   }
-
-  // sets cpu state enum and string
-  void setCpuState(cpuState::cpuStateEnum newState) {
-    ScopedLock<> so(mutex);
+  inline void setCpuState(cpuState::cpuStateEnum newState) {
     state = newState;
-    _setCpuIdStr();
+    setCpuName();
   }
-
-  // returns cpu state enum
-  cpuState::cpuStateEnum getCpuState() {
-    ScopedLock<> so(mutex);
+  inline cpuState::cpuStateEnum getCpuState() const {
     return state;
   }
-
-  // returns cpu name
-  inline const char* getId() {
-    ScopedLock<> so(mutex);
-    return cpuId;
+  inline const char* getName() const {
+    return cpuName;
+  }
+  inline const char* getCpuIdxStr() const {
+    return cpuIdxStr;
   }
 
-  // returns cpu index (starts from 0)
-  int getCpuIndex() {
-    ScopedLock<> so(mutex);
-    return cpuIndex;
-  }
-  /**
-   * Returns CPU's info, used by GDB.
-   * (e.g. m1,m2,m3,m4)
-   */
-  inline string getCpuInfo() {
-    ScopedLock<> so(mutex);
-    return cpuInfo;
+  inline uint64_t* stackPtr() const {   // per-CPU stack area reserved for gdb
+    return stackEnd;
   }
 
-  uint64_t* stackPtr() {           // starting address of stack setup by GDB stub
-    ScopedLock<> so(mutex);
-    return stack + bufferSize;
-  }
-
-  // access registers stored on reg64/32 buffers
-  reg64* getRegs64() {
-    ScopedLock<> so(mutex);
+  // manipulate stored registers
+  // thread-safe as only called by its own CPU
+  inline reg64* getRegs64() {
     return reg64Buffer;
   }
-  reg32* getRegs32() {
-    ScopedLock<> so(mutex);
+  inline reg32* getRegs32() {
     return reg32Buffer;
   }
-  reg64* getReg64(int regno) {
-    ScopedLock<> so(mutex);
+  inline reg64* getReg64(int regno) {
     return &reg64Buffer[regno];
   }
-  reg32* getReg32(int regno) {
-    ScopedLock<> so(mutex);
+  inline reg32* getReg32(int regno) {
     return &reg32Buffer[regno];
   }
-  void setReg64(int regno, reg64 val) {
-    ScopedLock<> so(mutex);
+  inline void setReg64(int regno, reg64 val) {
     reg64Buffer[regno] = val;
   }
-  void setReg32(int regno, reg32 val) {
-    ScopedLock<> so(mutex);
+  inline void setReg32(int regno, reg32 val) {
     reg32Buffer[regno] = val;
   }
 
-  // rip manipulation
-  void decrementRip() {
-    ScopedLock<> so(mutex);
+  // manipulate stored registers
+  // thread-safe as only called by its own CPU
+  inline void decrementRip() {
     if (!ripDecremented) {
       reg64Buffer[registers::RIP] -= 1;
       ripDecremented = true;
     }
   }
-  void incrementRip() {
-    ScopedLock<> so(mutex);
+  inline void incrementRip() {
     if (ripDecremented) {
       reg64Buffer[registers::RIP] += 1;
       ripDecremented = false;
       DBG::outln(DBG::GDBDebug, "rip incremented");
     }
   }
-  void resetRip() {
-    ScopedLock<> so(mutex);
+  inline void resetRip() {
     ripDecremented = false;
   }
 

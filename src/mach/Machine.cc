@@ -160,13 +160,15 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // initialize basic devices
   Screen::init(kernelBase); // kernelBase, b/c no identity mapping later
-  SerialDevice0::init(DBG::test(DBG::GDBEnable)); // no interrupts
+  SerialDevice0::init();    // no interrupts
   DebugDevice::init();      // qemu debug device
 
   // initialize MBI & debugging: no debug output before this point!
   vaddr mbiEnd = multiboot.init(magic, mbiAddr + kernelBase);
   // determine end addresses of kernel overall (except modules)
   vaddr kernelEnd = align_up(mbiEnd, pagesize<2>());
+
+  SerialDevice0::setGdb(DBG::test(DBG::GDBEnable));   // DBG::test works here
 
   // give kernel heap pre-allocated memory -> limited dynamic memory available
   kernelHeap.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
@@ -284,7 +286,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   clearLDT();
 
   // initialize gdb object -> move up, but need to coordinate with IDT setup
-  Gdb::getInstance().init(cpuCount);
+  GdbInstance.init(cpuCount);
 
   // configure BSP processor
   processorTable[bspIndex].install(frameManager);
@@ -292,7 +294,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   processorTable[bspIndex].init2(*bspIdleThread, Gdb::getInstance().setupGdb(bspIndex));
 
   // start gdb
-  Gdb::getInstance().start();
+  GdbInstance.start();
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
