@@ -62,6 +62,13 @@ static GdbCpu* getGCpu() {
   return gCpu[cpuIdx];
 }
 
+// Processor::doNotPreempt is set to --lockCount in decLockCount()
+// Therefore, it seems like we do not need to call decLockCount
+// separately to balance doNotPreempt flag (because of entry_q lock?)
+static void disablePreemption() {
+  Processor::incLockCount();
+}
+
 void __returnFromException() {
   Gdb::setCpuState(cpuState::RUNNING);
   if (allstop) {    // wake other threads if in all-stop mode
@@ -370,6 +377,7 @@ void consumeVContAction() {
     if (prevAction && prevAction->action[0] == 's') {   // do not switch thread for 'next'
       isFree = false;                     // hold on to the baton
       action->executed = true;            // generate stop reply packet after 'next'
+      disablePreemption();                // set preemption to off so that thread won't move to another CPU
       _returnFromExceptionLocked();       // do 'next'
     }
     isFree = true;                        // free baton
