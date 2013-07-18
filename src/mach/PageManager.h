@@ -99,11 +99,6 @@ private:
     return (PageEntry*)align_down(mword(getEntry<N>(vma)),pagetablesize());
   }
 
-  static void configure() {
-    MSR::enableNX();                            // enable NX paging bit
-    CPU::writeCR4(CPU::readCR4() | CPU::PGE()); // enable  G paging bit
-  }
-
   static laddr bootstrap( FrameManager&fm, mword kernelBase, mword kernelBoot,
     mword kernelCode, mword kernelData, mword kernelEnd, mword pageSize ) {
 

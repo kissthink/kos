@@ -46,7 +46,7 @@ extern "C" void isr_handler_0x29() { // SCI interrupt
   Processor::sendEOI();
 }
 
-void Machine::initACPI(vaddr r) {
+laddr Machine::initACPI(vaddr r) {
   // set up information for acpica callback
   rsdp = r;
 
@@ -82,7 +82,7 @@ void Machine::initACPI(vaddr r) {
   status = AcpiGetTable( const_cast<char*>(ACPI_SIG_MADT), 0, (ACPI_TABLE_HEADER**)&madt );
   KASSERT1( status == AE_OK, status );
   int madtLength = madt->Header.Length - sizeof(acpi_table_madt);
-  vaddr apicPhysAddr = madt->Address;
+  laddr apicPhysAddr = madt->Address;
   DBG::out(DBG::Acpi, "MADT: ", madtLength, '/', FmtHex(apicPhysAddr));
 
   // disable 8259 PIC, if present
@@ -155,46 +155,34 @@ void Machine::initACPI(vaddr r) {
   }
   DBG::out(DBG::Acpi, kendl);
 
-  KASSERT0(apicMap.size());
-
-  // map APIC page and enable local APIC
-  PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data, *Processor::getFrameManager());
-  Processor::enableAPIC(0xf8);              // confirm spurious vector at 0xf8
-
-  // determine bspApicID, cpuCount, bspIndex, and create processorTable
-  bspApicID = Processor::apic()->getLAPIC_ID();
+  // determine cpuCount and create processorTable
   cpuCount = apicMap.size();
+  KASSERT0(cpuCount);
   processorTable = new Processor[cpuCount];
   int idx = 0;
   for (const pair<uint32_t,uint32_t>& ap : apicMap) {
     processorTable[idx].init(ap.second, ap.first);
-    if (ap.second == bspApicID) bspIndex = idx;
     idx += 1;
   }
-  DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
-  // IOAPIC irq range should at leave cover standard PIC irqs
-  KASSERT1(irqCount >= PIC::Max, irqCount );
-
-  // fill irqTable
+  // fill irqTable & irqOverrideTable
+  KASSERT1(irqCount >= PIC::Max, irqCount );         // have at least PIC irqs
   irqTable = new IrqInfo[irqCount];
+  irqOverrideTable = new IrqOverrideInfo[irqCount];
   for (uint32_t i = 0; i < irqCount; i += 1) {
     irqTable[i] = { 0, 0 };
+    irqOverrideTable[i] = { i, 0 };
   }
   for (const pair<uint32_t,IrqInfo>& i : irqMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount );
     irqTable[i.first] = i.second;
   }
-
-  // fill irqOverrideTable
-  irqOverrideTable = new IrqOverrideInfo[irqCount];
-  for (uint32_t i = 0; i < irqCount; i += 1) {
-    irqOverrideTable[i] = { i, 0 };
-  }
   for (const pair<uint32_t,IrqOverrideInfo>& i : irqOverrideMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount )
     irqOverrideTable[i.first] = i.second;
   }
+
+  return apicPhysAddr;
 }
 
 static ACPI_STATUS display(ACPI_HANDLE handle, UINT32 level, void* ctx, void** retval) {

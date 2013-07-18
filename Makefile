@@ -9,7 +9,7 @@ help:
 	@echo "$(MAKE) qpxe     build, run (qemu) via simulated PXE"
 	@echo "$(MAKE) bochs    build and run/debug (bochs)"
 	@echo "$(MAKE) dep      build dependencies"
-	@echo "$(MAKE) drivers	build linux drivers"
+	@echo "$(MAKE) drivers  build linux drivers (experimental!)"
 
 
 all libs clean dep depend vclean distclean run debug rgdb rgdba rgdbdebug rgdbadebug bochs pxe lpxe rpxe qpxe usb usbtest tests defines echo drivers:

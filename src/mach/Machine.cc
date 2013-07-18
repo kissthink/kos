@@ -122,22 +122,17 @@ extern "C" void handleSysCall(){
 
 // main init routine for APs, identity paging set up by bootstrap code
 void Machine::initAP(funcvoid_t func) {
-
-  // setup IDT, GDT, address space
+  // setup IDT, GDT
   loadIDT(idt, sizeof(idt));
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-
   clearLDT();
-  PageManager::configure();
-  kernelSpace.activate();
 
-  // configure local processor
+  // configure local processor, address space
   Processor::checkCapabilities(false);
   processorTable[apIndex].install(frameManager);
+  kernelSpace.activate();
   Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
   processorTable[apIndex].init2(*apIdleThread, Gdb::getInstance().setupGdb(apIndex));
-
-  // enable GDB on this core
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
@@ -228,7 +223,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "FM/boot16: ", frameManager);
 
   // bootstrap PageManager: permissive for boot segment (data, eg. rsp in boot)
-  PageManager::configure();
   laddr pml4addr = PageManager::bootstrap( frameManager, kernelBase,
     vaddr(&__Boot), vaddr(&__KernelCode), vaddr(&__KernelData), kernelEnd,
     pagesize<2>() );
@@ -262,7 +256,16 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "VM/mbi: ", kernelHeap);
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
-  initACPI(rsdp);
+  laddr apicPhysAddr = initACPI(rsdp);
+
+  // map APIC page and enable local APIC
+  PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data, frameManager);
+  Processor::enableAPIC(0xf8);              // confirm spurious vector at 0xf8
+  bspApicID = Processor::getLAPIC_ID();
+  for (size_t i = 0; i < cpuCount; i += 1) {
+    if (processorTable[i].rApicID() == bspApicID) bspIndex = i;
+  }
+  DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
   // install IDT entries
   setupAllIDTs();
@@ -280,7 +283,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   loadTR(tssSelector * sizeof(SegmentDescriptor));
   clearLDT();
 
-  // initialize gdb object
+  // initialize gdb object -> move up, but need to coordinate with IDT setup
   Gdb::getInstance().init(cpuCount);
 
   // configure BSP processor

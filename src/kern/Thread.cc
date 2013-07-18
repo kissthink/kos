@@ -24,5 +24,5 @@ void Thread::invoke(function_t func, ptr_t data) {
   CPU::enableInterrupts();
   func(data);
   /* sync/lock with join */
-  kernelScheduler.yield();
+  kernelScheduler.suspend();
 }

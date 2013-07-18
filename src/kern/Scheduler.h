@@ -44,6 +44,10 @@ public:
     rl.release();
     schedule();
   }
+  void suspend() {
+    ScopedLock<> lo(lk);
+    schedule();
+  }
   void yield() {
     ScopedLock<> lo(lk);
     yieldInternal();

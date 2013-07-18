@@ -3,7 +3,6 @@
 
 #include "gdb/GdbCpu.h"
 #include "gdb/NonBlockSemaphore.h"
-#include "mach/APIC.h"
 #include "mach/CPU.h"
 #include "mach/Memory.h"
 #include "mach/Processor.h"
@@ -138,11 +137,9 @@ private:
 
   // sends an IPI to a specified CPU core
   void sendIPI(int cpuIdx, int ipiNum) const {
-    LAPIC* lapic = (LAPIC *) lapicAddr;
     DBG::outln(DBG::GDBDebug, "sending IPI ", FmtHex(ipiNum),
-        " from ", Processor::getApicID()+1, " to core: ", cpuIdx+1);
-    KASSERT0(lapic);
-    mword err = lapic->sendIPI(cpuIdx, ipiNum);
+        " from ", Processor::getApicID() + 1, " to core: ", cpuIdx+1);
+    mword err = Processor::sendIPI(cpuIdx, ipiNum);
     KASSERT1(!err, FmtHex(err));
   }
 

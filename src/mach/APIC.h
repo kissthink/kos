@@ -38,6 +38,8 @@ struct PIC {
 
 // Note that APIC registers have to be written as a complete 32-bit word
 class LAPIC { // see Intel Vol 3, Section 10.4 "Local APIC"
+  friend class Processor;
+
   __aligned(0x10) uint32_t Reserved0x000;         // 0x000
   __aligned(0x10) uint32_t Reserved0x010;
   __aligned(0x10) uint32_t ID;
@@ -154,11 +156,6 @@ class LAPIC { // see Intel Vol 3, Section 10.4 "Local APIC"
     Deadline = 0b10
   };
 
-public:
-  LAPIC() = delete;                              // no creation
-  LAPIC(const LAPIC&) = delete;                  // no copy
-  const LAPIC& operator=(const LAPIC&) = delete; // no assignment
-
   void enable(uint8_t sv) volatile {
     SpuriosInterruptVector |= SpuriousVector(sv) | SoftwareEnable();
   }
@@ -195,6 +192,12 @@ public:
 //    while (ICR_LOW & DeliveryPending());
     return ErrorStatus;
   }
+
+public:
+  LAPIC() = delete;                              // no creation
+  LAPIC(const LAPIC&) = delete;                  // no copy
+  const LAPIC& operator=(const LAPIC&) = delete; // no assignment
+
 } __packed;
 
 class IOAPIC { // Intel 82093AA IOAPIC, Section 3.1 "Memory Mapped Registers..."

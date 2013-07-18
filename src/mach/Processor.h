@@ -55,6 +55,8 @@ class Processor {
 
   void install(FrameManager& fm) {
     frameManager = &fm;
+    MSR::enableNX();                               // enable NX paging bit
+    CPU::writeCR4(CPU::readCR4() | CPU::PGE());    // enable  G paging bit
 
     // write GS
     MSR::write(MSR::GS_BASE, mword(this));
@@ -74,6 +76,9 @@ class Processor {
   }
 
 public:
+  mword rApicID() {
+    return apicID;
+  }
   static mword getApicID() {
     mword x;
     asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID)));
@@ -146,6 +151,10 @@ public:
     apic()->enable(sv);
   }
 
+  static uint8_t getLAPIC_ID() {
+    return apic()->getLAPIC_ID();
+  }
+
   static void sendEOI() {
     apic()->sendEOI();
   }
@@ -168,6 +177,10 @@ public:
   void sendTestIPI() {
     mword err = apic()->sendIPI(apicID, 0x41 );
     KASSERT1(err == 0, FmtHex(err));
+  }
+
+  static uint32_t sendIPI( uint8_t dest, uint8_t vec ) {
+    return apic()->sendIPI(dest, vec);
   }
 
   static void checkCapabilities(bool print)            __section(".boot.text");

@@ -53,7 +53,7 @@ class Machine {
   static IrqOverrideInfo* irqOverrideTable;
 
   // code in mach/ACPI,.cc
-  static void initACPI( vaddr rsdp )                   __section(".boot.text");
+  static laddr initACPI( vaddr rsdp )                  __section(".boot.text");
   static void parseACPI()                              __section(".boot.text");
 
   static void setupIDT( uint32_t n, laddr addr )       __section(".boot.text");
