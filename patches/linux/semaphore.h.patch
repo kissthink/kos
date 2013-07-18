@@ -1,0 +1,20 @@
+--- ../src/extern/linux-3.9.4/include/linux/semaphore.h	2013-05-24 14:45:59.000000000 -0400
++++ linux/semaphore.h	2013-07-13 12:12:53.611088675 -0400
+@@ -17,6 +17,8 @@
+ 	raw_spinlock_t		lock;
+ 	unsigned int		count;
+ 	struct list_head	wait_list;
++  void *semImpl;
++  int semImplInit;
+ };
+ 
+ #define __SEMAPHORE_INITIALIZER(name, n)				\
+@@ -24,6 +26,8 @@
+ 	.lock		= __RAW_SPIN_LOCK_UNLOCKED((name).lock),	\
+ 	.count		= n,						\
+ 	.wait_list	= LIST_HEAD_INIT((name).wait_list),		\
++	.semImpl = 0, \
++	.semImplInit = 0, \
+ }
+ 
+ #define DEFINE_SEMAPHORE(name)	\

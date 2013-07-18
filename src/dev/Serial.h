@@ -26,7 +26,7 @@ class SerialDevice0 { // see http://wiki.osdev.org/Serial_Ports
   static const uint16_t SerialPort0 = 0x3F8;
   static bool gdb;
 
-  static void init(bool g = false) {
+  static void init(bool g = true) {
     gdb = g;
     out8(SerialPort0 + 1, 0x00);    // Disable all interrupts
     out8(SerialPort0 + 3, 0x80);    // Enable DLAB (set baud rate divisor)
@@ -35,6 +35,9 @@ class SerialDevice0 { // see http://wiki.osdev.org/Serial_Ports
     out8(SerialPort0 + 3, 0x03);    // 8 bits, no parity, one stop bit
     out8(SerialPort0 + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
 //    out8(SerialPort0 + 4, 0x0B);    // IRQs enabled, RTS/DSR set
+  }
+  static void setGdb(bool g) {      // DBG::test(DBG::GDBEnable) not usable until multiboot::init
+    gdb = g;
   }
 public:
   static void write(char c) {
