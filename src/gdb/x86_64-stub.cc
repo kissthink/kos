@@ -54,7 +54,7 @@ void *mem_fault_return_addr = nullptr;
 // GCpu is used for querying specific CPU by gdb
 static void setGCpu(int cpuIdx) {
   int currCpuIdx = Processor::getApicID();
-  gCpu[currCpuIdx] = GdbInstance.getCpuState(cpuIdx);
+  gCpu[currCpuIdx] = GdbInstance.getCpu(cpuIdx);
 }
 static GdbCpu* getGCpu() {
   int cpuIdx = Processor::getApicID();
@@ -81,14 +81,14 @@ void __returnFromException() {
 void _returnFromException() {
   __returnFromException();
 //  entry_q.releaseISR();
-  restoreRegisters(GdbInstance.getCurrentCpuState());
+  restoreRegisters(GdbInstance.getCurrentCpu());
 }
 
 // use if entry_q is not locked
 void _returnFromExceptionLocked() {
   __returnFromException();
   entry_q.V();
-  restoreRegisters(GdbInstance.getCurrentCpuState());
+  restoreRegisters(GdbInstance.getCurrentCpu());
 }
 
 int hex(char ch) {
@@ -268,15 +268,15 @@ void setTFBit() {
     Processor::getApicID() + 1, " eflags: ", FmtHex(eflags));
 }
 void clearTFBit(int cpuId) {
-  reg32 eflags = *(GdbInstance.getCpuState(cpuId)->getReg32(registers::EFLAGS));
+  reg32 eflags = GdbInstance.getReg32(registers::EFLAGS, cpuId);
   eflags &= 0xfffffeff;
-  GdbInstance.getCpuState(cpuId)->setReg32(registers::EFLAGS, eflags);
+  GdbInstance.setReg32(registers::EFLAGS, eflags, cpuId);
 }
 void setTFBit(int cpuId) {
-  reg32 eflags = *(GdbInstance.getCpuState(cpuId)->getReg32(registers::EFLAGS));
+  reg32 eflags = GdbInstance.getReg32(registers::EFLAGS, cpuId);
   eflags &= 0xfffffeff;
   eflags |= 0x100;
-  GdbInstance.getCpuState(cpuId)->setReg32(registers::EFLAGS, eflags);
+  GdbInstance.setReg32(registers::EFLAGS, eflags, cpuId);
 }
 
 // stop reply for vCont packets
@@ -438,25 +438,25 @@ handle_exception (int64_t exceptionVector) {
   KASSERT0(!Processor::interruptsEnabled());
 
   int threadId = Processor::getApicID();
-  GdbInstance.getCurrentCpuState()->setCpuState(cpuState::BREAKPOINT);
+  GdbInstance.setCpuState(cpuState::BREAKPOINT);
 
   Thread* currThread = Processor::getCurrThread();
 
   DBG::outln(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
-            ", eflags=", FmtHex(*GdbInstance.getCurrentCpuState()->getReg32(registers::EFLAGS)),
-            ", pc=", FmtHex(*GdbInstance.getCurrentCpuState()->getReg64(registers::RIP)),
+            ", eflags=", FmtHex(GdbInstance.getReg32(registers::EFLAGS)),
+            ", pc=", FmtHex(GdbInstance.getReg64(registers::RIP)),
             ", thread=", FmtHex(currThread));
 
   // for int 3, rip pushed by interrupt handling mechanism may not be a correct value
   // decrement rip value back to an instruction causing breakpoint and let it try again with a valid address
-  GdbInstance.getCurrentCpuState()->resetRip();
+  GdbInstance.resetRip();
   if (exceptionVector == 3) {
-    reg32 eflags = *GdbInstance.getCurrentCpuState()->getReg32(registers::EFLAGS);
+    reg32 eflags = GdbInstance.getReg32(registers::EFLAGS);
     DBG::outln(DBG::GDBDebug, "eflags & 0x100 = ", (eflags & 0x100));
     if ((eflags & 0x100) == 0) {   // if TF is set, treat the rip valid
-      GdbInstance.getCurrentCpuState()->decrementRip();
+      GdbInstance.decrementRip();
       DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " decrement rip to ",
-        FmtHex(*GdbInstance.getCurrentCpuState()->getReg64(registers::RIP)));
+        FmtHex(GdbInstance.getReg64(registers::RIP)));
     }
   }
 
@@ -479,7 +479,7 @@ handle_exception (int64_t exceptionVector) {
     if (shouldReturnFromException[threadId]) {
       DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " returning from exception");
       shouldReturnFromException[threadId] = false;
-      GdbCpu* state = GdbInstance.getCurrentCpuState();
+      GdbCpu* state = GdbInstance.getCurrentCpu();
       state->setCpuState(cpuState::RUNNING);
       restoreRegisters(state);
     }

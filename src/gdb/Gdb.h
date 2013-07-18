@@ -31,10 +31,10 @@ public:
   }
 
   // gives pointer to asked GdbCpu object
-  inline GdbCpu* getCurrentCpuState() {
+  inline GdbCpu* getCurrentCpu() {
     return Processor::getGdbCpu();
   }
-  inline GdbCpu* getCpuState(int cpuIdx) {
+  inline GdbCpu* getCpu(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     return &cpuStates[cpuIdx];
   }
@@ -64,26 +64,50 @@ public:
 
   // returns buffer storing gdb manipulated registers for current CPU
   inline char* getRegs64() {
-    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs64());
+    return reinterpret_cast<char *>(getCurrentCpu()->getRegs64());
   }
   inline char* getRegs32() {
-    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs32());
+    return reinterpret_cast<char *>(getCurrentCpu()->getRegs32());
+  }
+  inline char* getRegs64(int cpuIdx) {
+    return reinterpret_cast<char *>(getCpu(cpuIdx)->getRegs64());
+  }
+  inline char* getRegs32(int cpuIdx) {
+    return reinterpret_cast<char *>(getCpu(cpuIdx)->getRegs32());
   }
   inline reg64 getReg64(int regno) {
-    return getCurrentCpuState()->getRegs64()[regno];
+    return getCurrentCpu()->getRegs64()[regno];
   }
   inline reg32 getReg32(int regno) {
-    return getCurrentCpuState()->getRegs32()[regno];
+    return getCurrentCpu()->getRegs32()[regno];
+  }
+  inline reg64 getReg64(int regno, int cpuIdx) {
+    return getCpu(cpuIdx)->getRegs64()[regno];
+  }
+  inline reg32 getReg32(int regno, int cpuIdx) {
+    return getCpu(cpuIdx)->getRegs32()[regno];
   }
   inline void setReg64(int regno, reg64 val) {
-    getCurrentCpuState()->setReg64(regno, val);
+    getCurrentCpu()->setReg64(regno, val);
   }
   inline void setReg32(int regno, reg32 val) {
-    getCurrentCpuState()->setReg32(regno, val);
+    getCurrentCpu()->setReg32(regno, val);
+  }
+  inline void setReg64(int regno, reg64 val, int cpuIdx) {
+    getCpu(cpuIdx)->setReg64(regno, val);
+  }
+  inline void setReg32(int regno, reg32 val, int cpuIdx) {
+    getCpu(cpuIdx)->setReg32(regno, val);
   }
 
   inline void incrementRip() {
-    getCurrentCpuState()->incrementRip();
+    getCurrentCpu()->incrementRip();
+  }
+  inline void decrementRip() {
+    getCurrentCpu()->decrementRip();
+  }
+  inline void resetRip() {
+    getCurrentCpu()->resetRip();
   }
 
   // returns CPU name used by Gdb
