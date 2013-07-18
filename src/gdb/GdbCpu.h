@@ -14,9 +14,9 @@ typedef uint32_t reg32;
 
 namespace registers {
   enum reg_enum {
-    RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP,
-    R8, R9, R10, R11, R12, R13, R14, R15, RIP,
-    EFLAGS = 0, CS, SS, DS, ES, FS, GS
+    RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP,     // registers are in order gdb front-end expects!
+    R8, R9, R10, R11, R12, R13, R14, R15, RIP,  // it is preferred to not reorder
+    EFLAGS = 0, CS, SS, DS, ES, FS, GS          // 32-bit registers
   };
 }
 
@@ -48,7 +48,9 @@ const int cpuIndexLen = 10;
 class GdbCpu {
   // *do NOT change orders for these 4 variables*
   reg64 reg64Buffer[numRegs64];             // gdb_asm_functions.S requires this here
-  reg32 reg32Buffer[numRegs32];
+  reg32 reg32Buffer[numRegs32];             // registers are divided into 64/32-bits and stored in separate buffers and ordered as above
+                                            // reg_enum enum because gdb front-end differentiates register sizes and expects above order.
+                                            // separate buffers for 64/32-bit registers allow send/receive registers easily
   uint64_t stack[bufferSize];
   uint64_t* stackEnd = stack + bufferSize;
   char cpuName[cpuNameLen];                 // in format (Core %d) [State]
