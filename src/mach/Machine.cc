@@ -132,7 +132,7 @@ void Machine::initAP(funcvoid_t func) {
   processorTable[apIndex].install(frameManager);
   kernelSpace.activate();
   Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
-  processorTable[apIndex].init2(*apIdleThread, Gdb::setupGdb(apIndex));
+  processorTable[apIndex].init(*apIdleThread, Gdb::setupGdb(apIndex));
 
   // print brief message -> confirm startup, output *after* interrupts enabled
   DBG::out(DBG::Basic, ' ', apIndex);
@@ -269,11 +269,14 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   }
   DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
-  // install IDT entries
+  // initialize gdb object -> move up, but need to coordinate with IDT setup
+  Gdb::init(cpuCount);
+
+  // install IDT entries -> global
   setupAllIDTs();
   loadIDT(idt, sizeof(idt));
 
-  // install GDT (replacing boot loader's GDT), TSS, TR, LDT
+  // install GDT (replacing boot loader's GDT), TSS, TR, LDT -> per proc!
   memset(gdt, 0, sizeof(gdt));
   setupGDT(kernCodeSelector, 0, 0, true);
   setupGDT(kernDataSelector, 0, 0, false);
@@ -285,16 +288,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   loadTR(tssSelector * sizeof(SegmentDescriptor));
   clearLDT();
 
-  // initialize gdb object -> move up, but need to coordinate with IDT setup
-  Gdb::init(cpuCount);
-
   // configure BSP processor
   processorTable[bspIndex].install(frameManager);
   Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
-  processorTable[bspIndex].init2(*bspIdleThread, Gdb::setupGdb(bspIndex));
-
-  // start gdb
-  Gdb::start();
+  processorTable[bspIndex].init(*bspIdleThread, Gdb::setupGdb(bspIndex));
 
   // leave boot stack & invoke main thread -> 'func' will call initBSP2
   bspIdleThread->runDirect(func);
@@ -302,6 +299,9 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
 // 2nd init routine for BSP - on new stack, with proper processor object
 void Machine::initBSP2() {
+  // start gdb
+  Gdb::start();
+
   // set up RTC & PIT
   rtc.init();
   pit.init();
