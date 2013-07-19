@@ -51,6 +51,8 @@ static VContAction* prevAction = nullptr;   // previous vContAction
 static bool allstop = false;
 void *mem_fault_return_addr = nullptr;
 
+static bool* preempt;
+
 // GCpu is used for querying specific CPU by gdb
 static void setGCpu(int cpuIdx) {
   int currCpuIdx = Processor::getApicID();
@@ -66,7 +68,20 @@ static GdbCpu* getGCpu() {
 // Therefore, it seems like we do not need to call decLockCount
 // separately to balance doNotPreempt flag (because of entry_q lock?)
 static void disablePreemption() {
+  preempt[Processor::getApicID()] = false;
   Processor::incLockCount();
+}
+
+static void enablePreemption() {
+  if (!preempt[Processor::getApicID()]) {
+    Processor::decLockCount();
+    preempt[Processor::getApicID()] = true;
+  }
+}
+
+static void scheduleVContAction(bool isContinue = false) {
+  vContActionQueue.front()->executed = true;
+  if (!isContinue) disablePreemption();
 }
 
 void __returnFromException() {
@@ -316,6 +331,7 @@ VContAction* parse_vcont(char* ptr)
   VContAction* result = nullptr;
   int res_signal, res_thread, res = 0;
   long threadId;
+  bool isStep = false;
 
   while (*ptr++ == ';') {
     int action; long signal;
@@ -327,6 +343,7 @@ VContAction* parse_vcont(char* ptr)
       res = 0;
       break;
     }
+    if (action == 's') isStep = true;
     threadId = 0;
     if (*ptr++ == ':') KASSERT0(hexToInt(&ptr, &threadId));
     action = tolower(action);
@@ -337,6 +354,7 @@ VContAction* parse_vcont(char* ptr)
       DBG::outln(DBG::GDBDebug, "action: ", (char)res, " signal: ", res_signal,
         " thread: ", res_thread);
     }
+    if (res == 's' && action == 'c') isStep = false;    // vCont;s:threadId;c is typical pkt for next
   }
   if (res) {
     VContAction* vContAction = new VContAction;
@@ -345,11 +363,12 @@ VContAction* parse_vcont(char* ptr)
       vContAction->action[1] = hexchars[res_signal >> 4];
       vContAction->action[2] = hexchars[res_signal % 16];
     }
-    vContAction->empty = false;
+    vContAction->isStep = isStep;
+    // thread = -1 means to run vCont packet for all threads (allstop?)
+    // thread = 0 means to run vCont packet on any free thread
     if (res_thread != -1 && res_thread != 0) {
       KASSERT1(res_thread <= Gdb::getNumCpusInitialized(), res_thread);
       vContAction->threadId = res_thread;
-      vContAction->threadAssigned = true;
     }
     vContActionQueue.push(vContAction);
     result = vContAction;
@@ -373,17 +392,19 @@ void consumeVContAction() {
   DBG::outln(DBG::GDBDebug, "Consuming vContAction - ", *action, " isFree ", isFree);
 
   lockHolder = Processor::getApicID();    // keep entry lock
-  if (action->action[0] == 'c') {         // could be from step or next
-    if (prevAction && prevAction->action[0] == 's') {   // do not switch thread for 'next'
+  if (action->action[0] == 'c') {         // could be from next or continue
+    // next
+    if (prevAction && prevAction->action[0] == 's' && !prevAction->isStep) {
+      // do not switch thread for 'next'
       isFree = false;                     // hold on to the baton
-      action->executed = true;            // generate stop reply packet after 'next'
-      disablePreemption();                // set preemption to off so that thread won't move to another CPU
-      _returnFromExceptionLocked();       // do 'next'
+      scheduleVContAction();
+      _returnFromExceptionLocked();
     }
+    // continue
     isFree = true;                        // free baton
     // increment rip only if it was actual breakpoint set by user (not set by gdb for next)
     if (prevAction == nullptr || prevAction->action[0] != 'c') Gdb::incrementRip();
-    // if there's a thread waiting on breakpoint, switch to that thread.
+    // first, look for a waiting thread to pass baton. If there is no one, release baton
     // TODO: smarter way of choosing a thread
     for (int i = 0; i < Gdb::getNumCpusInitialized(); i++) {
       if (waiting[i]) {
@@ -392,16 +413,21 @@ void consumeVContAction() {
         Gdb::V(i);
         DBG::outln(DBG::GDBDebug, "Passed baton from thread: ",
           Processor::getApicID() + 1, " to thread: ", i + 1);
-        action->executed = true;
+        scheduleVContAction(true);
         _returnFromException();
         // does not return here
       }
     }
+    // no other threads are stopped for gdb session. release baton and return
+    lockHolder = -1;
+    scheduleVContAction(true);
+    _returnFromExceptionLocked();
   }
 
+  // step or next
   // first thread that enters the interrupt handler
   // will send stop reply packet.
-  action->executed = true;
+  scheduleVContAction();
   _returnFromExceptionLocked();
 }
 
@@ -444,6 +470,8 @@ handle_exception (int64_t exceptionVector) {
   char *ptr;
 
   KASSERT0(!Processor::interruptsEnabled());
+
+  enablePreemption();
 
   int threadId = Processor::getApicID();
   Gdb::setCpuState(cpuState::BREAKPOINT);
@@ -727,10 +755,12 @@ void set_debug_traps(bool as) {
   waiting = new bool[Gdb::getNumCpus()];
   shouldReturnFromException = new bool[Gdb::getNumCpus()];
   gCpu = new GdbCpu*[Gdb::getNumCpus()];
+  preempt = new bool[Gdb::getNumCpus()];
   for (int i = 0; i < Gdb::getNumCpus(); i++) {
     waiting[i] = false;
     shouldReturnFromException[i] = false;
     gCpu[i] = nullptr;
+    preempt[i] = true;
   }
   entry_q.resetCounter(1);  // simulate mutex
 

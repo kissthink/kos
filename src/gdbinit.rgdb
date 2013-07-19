@@ -7,13 +7,11 @@
 # Finally, turn it on!
 #set non-stop on
 
+set debug remote 1
+
 set remotebaud 38400
 set remotetimeout 10
 target remote :2345
-
-#set debug remote 1
-#break Machine::initAP2
-#break Scheduler::schedule
 
 source gdbinit
 # rgdb has problem with breakpoints set inside interrupt handler
