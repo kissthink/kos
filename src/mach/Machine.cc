@@ -133,8 +133,10 @@ void Machine::initAP(funcvoid_t func) {
   kernelSpace.activate();
   Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
   processorTable[apIndex].init(*apIdleThread, Gdb::setupGdb(apIndex));
+  // enable APIC
+  Processor::enableAPIC(0xf8);             // confirm spurious vector at 0xf8
 
-  // print brief message -> confirm startup, output *after* interrupts enabled
+  // print brief message -> confirm startup
   DBG::out(DBG::Basic, ' ', apIndex);
 
   // leave boot stack & invoke idle thread -> 'func' will call initAP2
@@ -143,9 +145,6 @@ void Machine::initAP(funcvoid_t func) {
 
 // 2nd init routine for APs - on new stack, processor object initialized
 void Machine::initAP2() {
-  // enable APIC
-  Processor::enableAPIC(0xf8);             // confirm spurious vector at 0xf8
-
   // enable interrupts, sync with BSP, then halt
   Processor::enableInterrupts();
   DBG::out(DBG::Basic, 'H');
@@ -239,6 +238,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   kernelSpace.setMemoryRange(kernelEnd, topkernel - kernelEnd);
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
+  // install IDT entries -> global
+  setupAllIDTs();
+  loadIDT(idt, sizeof(idt));
+
   // activate new page tables -> proper dynamic memory, but no identity mapping
   kernelSpace.activate();
 
@@ -269,12 +272,8 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   }
   DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
-  // initialize gdb object -> move up, but need to coordinate with IDT setup
+  // initialize gdb object
   Gdb::init(cpuCount);
-
-  // install IDT entries -> global
-  setupAllIDTs();
-  loadIDT(idt, sizeof(idt));
 
   // install GDT (replacing boot loader's GDT), TSS, TR, LDT -> per proc!
   memset(gdt, 0, sizeof(gdt));
