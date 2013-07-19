@@ -15,6 +15,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 #include "mach/Processor.h"
+#include "mach/asm_functions.h"
+#include "gdb/Gdb.h"
+#include "kern/AddressSpace.h"
+#include "kern/Thread.h"
 #include "kern/Debug.h"
 
 void Processor::checkCapabilities(bool print) {
@@ -27,4 +31,82 @@ void Processor::checkCapabilities(bool print) {
   if (CPUID::hasTSC_Deadline()) if (print) DBG::out(DBG::Basic, " TSC");
   if (CPUID::hasX2APIC())       if (print) DBG::out(DBG::Basic, " X2A");
   if (print) DBG::out(DBG::Basic, kendl);
+}
+
+void Processor::configure() {
+  checkCapabilities(false);                      // check CPU properties
+  MSR::enableNX();                               // enable NX paging bit
+  CPU::writeCR4(CPU::readCR4() | CPU::PGE());    // enable  G paging bit
+
+  MSR::enableSYSCALL();                          // enable syscall/sysret
+  MSR::write(MSR::SYSCALL_CSTAR, 0x0);           // set up registers
+  MSR::write(MSR::SYSCALL_SFMASK, 0x0);
+  MSR::write(MSR::SYSCALL_LSTAR, mword(syscallHandler));
+  //uint64_t star = ((((uint64_t)Machine::userCodeSelector|0x3) - 16)<<48)|((uint64_t)Machine::userCodeSelector<<32);
+  MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
+}
+
+void Processor::init(FrameManager& fm, AddressSpace& as,
+  InterruptDescriptor* idtTable, size_t idtSize) {
+
+  configure();                                   // basic setup
+
+  MSR::write(MSR::GS_BASE, mword(this));         // store 'this' in gs
+
+  frameManager = &fm;                            // set frame manager
+  as.activate();                                 // activate address space
+
+  memset(gdt, 0, sizeof(gdt));                   // set up GDT
+  setupGDT(kernCodeSelector, 0, 0, true);
+  setupGDT(kernDataSelector, 0, 0, false);
+  setupGDT(userCodeSelector, 3, 0, true);
+  setupGDT(userDataSelector, 3, 0, false);
+  setupTSS(tssSelector, (vaddr)&tss);
+  loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
+
+  memset(&tss, 0, sizeof(TaskStateSegment));     // set up TSS
+  vaddr stack = as.allocPages<1>(Thread::defaultStack, AddressSpace::Data);
+  KASSERT0(stack != topaddr);
+  tss.rsp[0] = stack + Thread::defaultStack;
+//  tss.rsp[1] = stack;
+//  tss.rsp[2] = stack;
+  loadTR(tssSelector * sizeof(SegmentDescriptor));
+
+  loadIDT(idtTable, idtSize);                    // install interrupt table
+  clearLDT();                                    // LDT is not used
+
+  enableAPIC();                                  // enable APIC
+
+  gdbCpu = Gdb::setupGdb(cpuID);                 // setup gdb
+
+  currThread = idleThread = Thread::create(as, "idle", pagesize<1>());
+}
+
+void Processor::start(funcvoid_t func) {
+  currThread->runDirect(func);                   // switch to proper stack
+}
+
+void Processor::setupGDT(unsigned int number, unsigned int dpl, uint32_t address, bool code) {
+  KASSERT1(number < maxGDT, number);
+  KASSERT1(dpl < 4, dpl);
+  gdt[number].Base00 = (address & 0x0000FFFF);
+  gdt[number].Base16 = (address & 0x00FF0000) >> 16;
+  gdt[number].Base24 = (address & 0xFF000000) >> 24;
+  gdt[number].RW = 1;
+  gdt[number].C = code ? 1 : 0;
+  gdt[number].S = 1;
+  gdt[number].DPL = dpl;
+  gdt[number].P = 1;
+  gdt[number].L = 1;
+}
+
+void Processor::setupTSS(unsigned int number, laddr address) {
+  SystemDescriptor* tssDesc = (SystemDescriptor*)&gdt[number];
+  tssDesc->Base00 = (address & 0x000000000000FFFF);
+  tssDesc->Base16 = (address & 0x0000000000FF0000) >> 16;
+  tssDesc->Type = 0x9;                                // available 64-bit TSS
+  tssDesc->DPL = 3;
+  tssDesc->P = 1;
+  tssDesc->Base24 = (address & 0x00000000FF000000) >> 24;
+  tssDesc->Base32 = (address & 0xFFFFFFFF00000000) >> 32;
 }

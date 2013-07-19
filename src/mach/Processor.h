@@ -20,13 +20,13 @@
 #include "util/Output.h"
 #include "mach/APIC.h"
 #include "mach/CPU.h"
+#include "mach/Descriptors.h"
 #include "mach/Memory.h"
 
-#include "mach/isr_wrapper.h"
-
-class Thread;
+class AddressSpace;
 class FrameManager;
 class GdbCpu;
+class Thread;
 
 class Processor {
   mword          apicID;
@@ -38,6 +38,16 @@ class Processor {
   volatile mword lockCount;
   GdbCpu*        gdbCpu;
 
+  static const unsigned int nullSelector     = 0; // invalid null selector
+  static const unsigned int kernCodeSelector = 1; // 1nd descriptor by convention?
+  static const unsigned int kernDataSelector = 2; // 2nd descriptor by convention?
+  static const unsigned int userCodeSelector = 3; // 3rd descriptor by convention?
+  static const unsigned int userDataSelector = 4; // 4th descriptor by convention?
+  static const unsigned int tssSelector      = 5; // uses 2 entries
+  static const unsigned int maxGDT           = 7;
+  SegmentDescriptor gdt[maxGDT];
+  TaskStateSegment tss;
+
   static constexpr volatile LAPIC* apic() { return (LAPIC*)lapicAddr; }
 
   friend class Machine;
@@ -48,31 +58,29 @@ class Processor {
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
+  static void checkCapabilities(bool print)            __section(".boot.text");
+  static void configure()                              __section(".boot.text");
+  void setupGDT( uint32_t n, uint32_t dpl,
+                 uint32_t addr, bool code )            __section(".boot.text");
+  void setupTSS( uint32_t num, laddr addr )            __section(".boot.text");
+
+  void init(FrameManager& fm, AddressSpace& as,
+            InterruptDescriptor* it, size_t is)        __section(".boot.text");
+  void start(funcvoid_t func)                          __section(".boot.text");
+
+  void initDummy(FrameManager& fm) {
+    MSR::write(MSR::GS_BASE, mword(this));         // store 'this' in gs
+    frameManager = &fm;                            // set frame manager
+    configure();
+  }
+
+  static void enableAPIC() {
+    apic()->enable(0xf8);                          // confirm spurious vector at 0xf8
+  }
+
   void setup(mword apic, mword cpu) {
     apicID = apic;
     cpuID = cpu;
-  }
-
-  void install(FrameManager& fm) {
-    frameManager = &fm;
-    MSR::enableNX();                               // enable NX paging bit
-    CPU::writeCR4(CPU::readCR4() | CPU::PGE());    // enable  G paging bit
-
-    // write GS
-    MSR::write(MSR::GS_BASE, mword(this));
-
-    // prepare syscall/sysret registers
-		MSR::enableSYSCALL();
-		MSR::write(MSR::SYSCALL_CSTAR, 0x0);
-		MSR::write(MSR::SYSCALL_SFMASK, 0x0);
-		MSR::write(MSR::SYSCALL_LSTAR, mword(syscall_handler));
-		//uint64_t star = ((((uint64_t)Machine::userCodeSelector|0x3) - 16)<<48)|((uint64_t)Machine::userCodeSelector<<32);
-		MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
-	}
-
-  void init(Thread& t, GdbCpu* s) {
-    currThread = idleThread = &t;
-    gdbCpu = s;
   }
 
 public:
@@ -147,10 +155,6 @@ public:
    return RFlags::interruptsEnabled();
   }
 
-  static void enableAPIC(uint8_t sv) {
-    apic()->enable(sv);
-  }
-
   static uint8_t getLAPIC_ID() {
     return apic()->getLAPIC_ID();
   }
@@ -183,7 +187,6 @@ public:
     return apic()->sendIPI(dest, vec);
   }
 
-  static void checkCapabilities(bool print)            __section(".boot.text");
 } __packed;
 
 #endif /* Processor_h_ */

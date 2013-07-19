@@ -1,3 +1,5 @@
 target remote localhost:1234
 #break Machine::initBSP
+break Machine::parseACPI
+break Processor::start
 source gdbinit

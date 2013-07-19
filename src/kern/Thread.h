@@ -26,7 +26,9 @@
 class AddressSpace;
 
 class Thread : public EmbeddedElement<Thread> {
+public:
   static const size_t defaultStack = 2 * pagesize<1>();
+private:
   friend class Scheduler; // stackPointer
   AddressSpace* addressSpace;
   vaddr stackPointer;

@@ -17,23 +17,12 @@
 #ifndef _Machine_h_
 #define _Machine_h_ 1
 
-#include "mach/Descriptors.h"
+#include "util/basics.h"
+#include "mach/platform.h"
 
 class Processor;
 
 class Machine {
-  static const unsigned int nullSelector     = 0; // invalid null selector
-  static const unsigned int kernCodeSelector = 1; // 1nd descriptor by convention?
-  static const unsigned int kernDataSelector = 2; // 2nd descriptor by convention?
-  static const unsigned int userCodeSelector = 3; // 3rd descriptor by convention?
-  static const unsigned int userDataSelector = 4; // 4th descriptor by convention?
-  static const unsigned int tssSelector      = 5; // uses 2 entries
-  static const unsigned int maxGDT           = 7;
-  static SegmentDescriptor gdt[maxGDT];
-
-  static const unsigned int maxIDT = 256;
-  static InterruptDescriptor idt[maxIDT];
-
   static Processor* processorTable;
   static uint32_t cpuCount;
   static uint32_t bspIndex;
@@ -57,8 +46,6 @@ class Machine {
   static void parseACPI()                              __section(".boot.text");
 
   static void setupIDT( uint32_t n, laddr addr )       __section(".boot.text");
-  static void setupGDT( uint32_t n, uint32_t dpl, uint32_t addr, bool ) __section(".boot.text");
-  static void setupTSS( uint32_t n, laddr addr )       __section(".boot.text");
   static void setupAllIDTs()                           __section(".boot.text");
 
 public:
@@ -71,9 +58,6 @@ public:
   static void initBSP(mword magic, vaddr mbi, funcvoid_t) __section(".boot.text");
   static void initBSP2();                              // not in .boot.text!
   static void staticEnableIRQ(mword irq, mword idtnum) __section(".boot.text");
-
-  static void loadTSSRSP(uint8_t privilegeLevel,vaddr RSP);
-
 
   static inline void timerInterrupt(mword);
 

@@ -60,3 +60,11 @@ clearLDT:
 loadTR:
 	ltr %di
 	ret
+
+.align   8
+.globl   syscallHandler
+syscallHandler:
+	pushq %rcx
+	call handleSysCall
+	popq %rcx
+	sysretq
