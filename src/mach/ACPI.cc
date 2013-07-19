@@ -161,7 +161,7 @@ laddr Machine::initACPI(vaddr r) {
   processorTable = new Processor[cpuCount];
   int idx = 0;
   for (const pair<uint32_t,uint32_t>& ap : apicMap) {
-    processorTable[idx].init(ap.second, ap.first);
+    processorTable[idx].setup(ap.second, ap.first);
     idx += 1;
   }
 

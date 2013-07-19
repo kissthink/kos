@@ -48,7 +48,7 @@ class Processor {
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
-  void init(mword apic, mword cpu) {
+  void setup(mword apic, mword cpu) {
     apicID = apic;
     cpuID = cpu;
   }
@@ -70,7 +70,7 @@ class Processor {
 		MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
 	}
 
-  void init2(Thread& t, GdbCpu* s) {
+  void init(Thread& t, GdbCpu* s) {
     currThread = idleThread = &t;
     gdbCpu = s;
   }
