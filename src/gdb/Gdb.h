@@ -12,95 +12,113 @@
 extern void set_debug_traps(bool);
 extern void breakpoint();
 
-#define GdbInstance Gdb::getInstance()
-
 class Gdb {
 public:
-  static Gdb& getInstance() {
-    static Gdb gdb;
-    return gdb;
-  }
-  void init(int numCPU) {
+  static void init(int numCPU) {
     if (!DBG::test(DBG::GDBEnable)) return;
     KASSERT1(numCPU > 0, numCPU);
     numCpu = numCPU;
-    cpuStates = new GdbCpu[numCpu];
+    gdbCPUs = new GdbCpu[numCpu];
     sem = new NonBlockSemaphore[numCpu];
-    for (int i = 0; i < numCpu; i++) cpuStates[i].setCpuId(i);
+    for (int i = 0; i < numCpu; i++) gdbCPUs[i].setCpuId(i);
     DBG::outln(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
   }
 
   // gives pointer to asked GdbCpu object
-  inline GdbCpu* getCurrentCpuState() {
+  static inline GdbCpu* getCurrentCpu() {
     return Processor::getGdbCpu();
   }
-  inline GdbCpu* getCpuState(int cpuIdx) {
+  static inline GdbCpu* getCpu(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    return &cpuStates[cpuIdx];
+    return &gdbCPUs[cpuIdx];
   }
-  inline void setCpuState(cpuState::cpuStateEnum state) {
+  static inline void setCpuState(cpuState::cpuStateEnum state) {
     Processor::getGdbCpu()->setCpuState(state);
   }
 
   // set current gdb CPU state
-  inline GdbCpu* setupGdb(int cpuIdx) {
+  static inline GdbCpu* setupGdb(int cpuIdx) {
     if (!DBG::test(DBG::GDBEnable)) return nullptr;
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
     numInitialized = cpuIdx+1;
-    cpuStates[cpuIdx].setCpuState(cpuState::RUNNING);
-    return &cpuStates[cpuIdx];
+    gdbCPUs[cpuIdx].setCpuState(cpuState::RUNNING);
+    return &gdbCPUs[cpuIdx];
   }
 
   // enumerate CPUs
-  inline void startEnumerate() {
+  static inline void startEnumerate() {
     ScopedLock<> so(mutex);
     enumIdx = 0;
   }
-  inline GdbCpu* next() {
+  static inline GdbCpu* next() {
     ScopedLock<> so(mutex);
-    if (enumIdx < numCpu) return &cpuStates[enumIdx++];
+    if (enumIdx < numCpu) return &gdbCPUs[enumIdx++];
     return nullptr;
   }
 
   // returns buffer storing gdb manipulated registers for current CPU
-  inline char* getRegs64() {
-    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs64());
+  static inline char* getRegs64() {
+    return reinterpret_cast<char *>(getCurrentCpu()->getRegs64());
   }
-  inline char* getRegs32() {
-    return reinterpret_cast<char *>(getCurrentCpuState()->getRegs32());
+  static inline char* getRegs32() {
+    return reinterpret_cast<char *>(getCurrentCpu()->getRegs32());
   }
-  inline reg64 getReg64(int regno) {
-    return getCurrentCpuState()->getRegs64()[regno];
+  static inline char* getRegs64(int cpuIdx) {
+    return reinterpret_cast<char *>(getCpu(cpuIdx)->getRegs64());
   }
-  inline reg32 getReg32(int regno) {
-    return getCurrentCpuState()->getRegs32()[regno];
+  static inline char* getRegs32(int cpuIdx) {
+    return reinterpret_cast<char *>(getCpu(cpuIdx)->getRegs32());
   }
-  inline void setReg64(int regno, reg64 val) {
-    getCurrentCpuState()->setReg64(regno, val);
+  static inline reg64 getReg64(int regno) {
+    return getCurrentCpu()->getRegs64()[regno];
   }
-  inline void setReg32(int regno, reg32 val) {
-    getCurrentCpuState()->setReg32(regno, val);
+  static inline reg32 getReg32(int regno) {
+    return getCurrentCpu()->getRegs32()[regno];
+  }
+  static inline reg64 getReg64(int regno, int cpuIdx) {
+    return getCpu(cpuIdx)->getRegs64()[regno];
+  }
+  static inline reg32 getReg32(int regno, int cpuIdx) {
+    return getCpu(cpuIdx)->getRegs32()[regno];
+  }
+  static inline void setReg64(int regno, reg64 val) {
+    getCurrentCpu()->setReg64(regno, val);
+  }
+  static inline void setReg32(int regno, reg32 val) {
+    getCurrentCpu()->setReg32(regno, val);
+  }
+  static inline void setReg64(int regno, reg64 val, int cpuIdx) {
+    getCpu(cpuIdx)->setReg64(regno, val);
+  }
+  static inline void setReg32(int regno, reg32 val, int cpuIdx) {
+    getCpu(cpuIdx)->setReg32(regno, val);
   }
 
-  inline void incrementRip() {
-    getCurrentCpuState()->incrementRip();
+  static inline void incrementRip() {
+    getCurrentCpu()->incrementRip();
+  }
+  static inline void decrementRip() {
+    getCurrentCpu()->decrementRip();
+  }
+  static inline void resetRip() {
+    getCurrentCpu()->resetRip();
   }
 
   // returns CPU name used by Gdb
-  inline const char* getCpuName(int cpuIdx) const {
+  static inline const char* getCpuName(int cpuIdx) {
     KASSERT1(cpuIdx >= 0 && cpuIdx < numCpu, cpuIdx);
-    return cpuStates[cpuIdx].getName();
+    return gdbCPUs[cpuIdx].getName();
   }
   // total # of CPUs in the system
-  inline int getNumCpus() const {
+  static inline int getNumCpus() {
     return numCpu;
   }
   // total # of CPUs initialized for gdb use
-  inline int getNumCpusInitialized() const {
+  static inline int getNumCpusInitialized() {
     return numInitialized;
   }
 
-  void start() {
+  static void start() {
     if (!DBG::test(DBG::GDBEnable)) return;
     KASSERT1(numCpu > 0, numCpu);
     set_debug_traps(DBG::test(DBG::GDBAllStop));
@@ -109,23 +127,23 @@ public:
   }
 
   // sends IPI to other available cores
-  void sendIPIToAllOtherCores(int ipiNum) const {
+  static void sendIPIToAllOtherCores(int ipiNum) {
     for (int i = 0; i < numCpu; i++) {
-      if (cpuStates[i].getCpuState() != cpuState::BREAKPOINT &&
-          cpuStates[i].getCpuState() != cpuState::UNKNOWN) {
+      if (gdbCPUs[i].getCpuState() != cpuState::BREAKPOINT &&
+          gdbCPUs[i].getCpuState() != cpuState::UNKNOWN) {
         sendIPI(i, ipiNum);
       }
     }
   }
 
   // semaphores to synchronize cores access to Gdb interrupt handlers
-  void P(int cpuIdx) {
+  static void P(int cpuIdx) {
     KASSERT1(cpuIdx >=0 && cpuIdx < numCpu && cpuIdx < numInitialized, cpuIdx);
     DBG::outln(DBG::GDBDebug, "enter P(", cpuIdx+1, ')');
     sem[cpuIdx].P();
     DBG::outln(DBG::GDBDebug, "leave P(", cpuIdx+1, ')');
   }
-  void V(int cpuIdx) {
+  static void V(int cpuIdx) {
     KASSERT1(cpuIdx >=0 && cpuIdx < numCpu && cpuIdx < numInitialized, cpuIdx);
     sem[cpuIdx].V();
     DBG::outln(DBG::GDBDebug, "V(", cpuIdx+1, ')');
@@ -133,20 +151,23 @@ public:
 
 private:
   // sends an IPI to a specified CPU core
-  void sendIPI(int cpuIdx, int ipiNum) const {
+  static void sendIPI(int cpuIdx, int ipiNum) {
     DBG::outln(DBG::GDBDebug, "sending IPI ", FmtHex(ipiNum),
         " from ", Processor::getApicID() + 1, " to core: ", cpuIdx+1);
     mword err = Processor::sendIPI(cpuIdx, ipiNum);
     KASSERT1(!err, FmtHex(err));
   }
 
-  Gdb(): cpuStates(nullptr), numCpu(0), numInitialized(0), enumIdx(0), sem(nullptr) {}
-  GdbCpu* cpuStates;
-  int numCpu;
-  int numInitialized;
-  int enumIdx;
-  NonBlockSemaphore* sem;                           // split binary semaphore
-  mutable SpinLock mutex;
+  Gdb() = delete;                         // no creation
+  Gdb(const Gdb&) = delete;               // no copy
+  Gdb& operator=(const Gdb&) = delete;    // no assignment
+
+  static GdbCpu* gdbCPUs;
+  static int numCpu;
+  static int numInitialized;
+  static int enumIdx;
+  static NonBlockSemaphore* sem;          // split binary semaphore
+  static SpinLock mutex;
 };
 
 #endif // Gdb_h_
