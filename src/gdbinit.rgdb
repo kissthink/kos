@@ -7,7 +7,7 @@
 # Finally, turn it on!
 #set non-stop on
 
-set debug remote 1
+#set debug remote 1
 
 set remotebaud 38400
 set remotetimeout 10

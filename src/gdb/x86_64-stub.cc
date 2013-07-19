@@ -8,6 +8,7 @@
 #include "gdb/gdb_asm_functions.h"
 #include "gdb/NonBlockSemaphore.h"
 #include "gdb/VContAction.h"
+#include "gdb/List.h"
 #include "kern/Thread.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
@@ -28,15 +29,24 @@ void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
   Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
 }
 
-extern "C" void handle_exception(int64_t);
-
-static const int BUFMAX = 4096;             // max number of chars in inbound/outbound buffers
-static char initialized;                    // boolean flag. != 0 means we've been initialized
-
-static const char hexchars[]="0123456789abcdef";
+class BreakPoint {
+  mword addr;
+  char opcode;
+public:
+  BreakPoint(): addr(0), opcode(0) {}
+  void set(mword a, char op) { addr = a; opcode = op; }
+  char getOpcode() const { return opcode; }
+  bool operator==(const BreakPoint& bp) const {
+    return addr == bp.addr;
+  }
+};
+static List<BreakPoint> bpList;             // tracks breakpoints inserted from gdb's requests
 
 #define BREAKPOINT() asm("int $3");
-
+extern "C" void handle_exception(int64_t);
+static const int BUFMAX = 4096;             // max number of chars in inbound/outbound buffers
+static char initialized;                    // boolean flag. != 0 means we've been initialized
+static const char hexchars[]="0123456789abcdef";
 static atomic<bool>isFree(true);            // baton is not picked up.
 static atomic<int>lockHolder(-1);           // used for holding baton.
 static bool* waiting;                       // represents a CPU waiting on entry queue.
@@ -51,7 +61,8 @@ static VContAction* prevAction = nullptr;   // previous vContAction
 static bool allstop = false;
 void *mem_fault_return_addr = nullptr;
 
-static bool* preempt;
+static bool* preempt;                       // tracks whether preemption was disabled by gdb on the processor
+static bool breakOnUnwindDebugHook = false; // detect if breakpoint was inserted on _Unwind_DebugHook
 
 // GCpu is used for querying specific CPU by gdb
 static void setGCpu(int cpuIdx) {
@@ -393,9 +404,7 @@ void consumeVContAction() {
 
   lockHolder = Processor::getApicID();    // keep entry lock
   if (action->action[0] == 'c') {         // could be from next or continue
-    // next
-    if (prevAction && prevAction->action[0] == 's' && !prevAction->isStep) {
-      // do not switch thread for 'next'
+    if (breakOnUnwindDebugHook) {         // next
       isFree = false;                     // hold on to the baton
       scheduleVContAction();
       _returnFromExceptionLocked();
@@ -553,6 +562,7 @@ handle_exception (int64_t exceptionVector) {
   if (allstop) Gdb::sendIPIToAllOtherCores(0x1);
   entry_q.V();
 
+  breakOnUnwindDebugHook = false;
   while (true) {
     outputBuffer[0] = 0;        // reset out buffer to 0
     memset(outputBuffer, 0, BUFMAX);
@@ -725,6 +735,60 @@ handle_exception (int64_t exceptionVector) {
         }
         if (ptr) {
           strcpy (outputBuffer, "E02");
+        }
+      }
+      break;
+      case 'Z': {
+        long int type;
+        if (hexToInt(&ptr, &type)) {
+          switch (type) {
+            case 0: {
+              ptr++;
+              if (hexToInt(&ptr, &addr)) {
+                if (*(ptr++) == ',') {
+                  if (hexToInt(&ptr, &length)) {
+                    BreakPoint* bp = new BreakPoint;
+                    char opcode = *(char *)addr;
+                    bp->set(addr, opcode);
+                    bpList.insertEnd(*bp, true);
+                    DBG::outln(DBG::Basic, "address: ", FmtHex(addr), " data: ", FmtHex(opcode));
+                    KASSERT1(length == 1, length);    // 1 byte for x86?
+                    *(char *)addr = 0xcc;
+                    DBG::outln(DBG::Basic, "\t\t\tinserted breakpoint ", FmtHex(*(char *)addr));
+                    if ((mword)addr == (mword)0xffffffff802bbf00) {
+                      breakOnUnwindDebugHook = true;
+                      DBG::outln(DBG::Basic, "debughook on break");
+                    }
+                    strcpy(outputBuffer, "OK");
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      break;
+      case 'z': {
+        long int type;
+        if (hexToInt(&ptr, &type)) {
+          switch (type) {
+            case 0: {
+              ptr++;
+              if (hexToInt(&ptr, &addr)) {
+                if (*(ptr++) == ',') {
+                  if (hexToInt(&ptr, &length)) {
+                    BreakPoint curBp;
+                    curBp.set(addr, *(char *)addr);
+                    Node<BreakPoint>* bp = bpList.search(curBp);
+                    KASSERT0(bp);
+                    DBG::outln(DBG::Basic, "Remove breakpoint at ", FmtHex(addr), " ", FmtHex(bp->getElement().getOpcode()));
+                    *(char *)addr = bp->getElement().getOpcode();
+                    strcpy(outputBuffer, "OK");
+                  }
+                }
+              }
+            }
+          }
         }
       }
       break;
