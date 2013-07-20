@@ -52,7 +52,6 @@ class Processor {
 
   friend class Machine;
 
-  // start with interrupts disable -> lockCount = 1
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
     frameManager(nullptr), doNotPreempt(0), lockCount(0), gdbCpu(nullptr) {}
   Processor(const Processor&) = delete;            // no copy
@@ -66,7 +65,7 @@ class Processor {
 
   void init(FrameManager& fm, AddressSpace& as,
             InterruptDescriptor* it, size_t is)        __section(".boot.text");
-  void start(funcvoid_t func)                          __section(".boot.text");
+  static void start(funcvoid_t func)                   __section(".boot.text");
 
   void initDummy(FrameManager& fm) {
     MSR::write(MSR::GS_BASE, mword(this));         // store 'this' in gs
@@ -89,63 +88,58 @@ public:
   }
   static mword getApicID() {
     mword x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, apicID)));
     return x;
   }
   static mword getCpuID() {
     mword x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, cpuID)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, cpuID)));
     return x;
   }
   static Thread* getCurrThread() {
     Thread* x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, currThread)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, currThread)));
     return x;
   }
   static void setCurrThread(Thread* x) {
-    asm volatile("mov %0, %%gs:%c1" :: "r"(x), "i"(offsetof(struct Processor, currThread)) : "memory");
+    asm volatile("movq %0, %%gs:%c1" :: "r"(x), "i"(offsetof(struct Processor, currThread)) : "memory");
   }
   static Thread* getIdleThread() {
     Thread* x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, idleThread)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, idleThread)));
     return x;
   }
   static FrameManager* getFrameManager() {
     FrameManager* x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, frameManager)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, frameManager)));
     return x;
   }
   static GdbCpu* getGdbCpu() {
     GdbCpu* x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, gdbCpu)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, gdbCpu)));
     return x;
   }
   static bool preempt() {
     mword x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, doNotPreempt)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, doNotPreempt)));
     return !x;
   }
   static mword getLockCount() {
     mword x;
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)));
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)));
     return x;
   }
-  static mword incLockCount() {
-    asm volatile("mov %0, %%gs:%c1" :: "r"(1), "i"(offsetof(struct Processor, doNotPreempt)) : "memory");
+  static void incLockCount() {
     mword x;
-    // TODO: can use add instruction?
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
-    asm volatile("mov %0, %%gs:%c1" :: "r"(x+1), "i"(offsetof(struct Processor, lockCount)) : "memory");
-    return x+1;
+    asm volatile("movq $1, %%gs:%c0" :: "i"(offsetof(struct Processor, doNotPreempt)) : "memory");
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
+    asm volatile("movq %0, %%gs:%c1" :: "r"(x+1), "i"(offsetof(struct Processor, lockCount)) : "memory");
   }
-  static mword decLockCount() {
+  static void decLockCount() {
     mword x;
-    // TODO: can use sub instruction?
-    asm volatile("mov %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
-    asm volatile("mov %0, %%gs:%c1" :: "r"(x-1), "i"(offsetof(struct Processor, lockCount)) : "memory");
-
-    asm volatile("mov %0, %%gs:%c1" :: "r"(x-1), "i"(offsetof(struct Processor, doNotPreempt)) : "memory");
-    return x-1;
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, lockCount)) : "memory");
+    asm volatile("movq %0, %%gs:%c1" :: "r"(x-1), "i"(offsetof(struct Processor, lockCount)) : "memory");
+    asm volatile("movq %0, %%gs:%c1" :: "r"(x-1), "i"(offsetof(struct Processor, doNotPreempt)) : "memory");
   }
   static void enableInterrupts(){
    KASSERT0(!interruptsEnabled());

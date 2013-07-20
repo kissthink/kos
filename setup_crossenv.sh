@@ -16,7 +16,7 @@ source $(pwd)/config
 cd -
 
 BINUTILS=binutils-2.22   # GNU mirror
-BOCHS=bochs-2.6.1        # http://bochs.sourceforge.net/
+BOCHS=bochs-2.6.2        # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.5.1            # GNU mirror
 GRUB=grub-2.00           # GNU mirror

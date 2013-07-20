@@ -25,14 +25,12 @@ extern void Breakpoint2(vaddr ia) {
 void Reboot(vaddr ia) {
   mword rbp;
   asm volatile("mov %%rbp, %0" : "=r"(rbp) :: "memory");
-#if 0
   StdOut.out("Backtrace:");
   for (int i = 0; i < 20 && rbp != 0; i += 1) {
     StdOut.out(' ', FmtHex(*(mword*)(rbp + sizeof(mword))));
     rbp = *(mword*)(rbp);
   }
   StdOut.out(kendl);
-#endif
   Breakpoint(ia);
   asm volatile("cli" ::: "memory");       // disable interrupts
   while (in8(0x64) & 0x01) in8(0x60);     // clear read buffer

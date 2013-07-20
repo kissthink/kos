@@ -53,8 +53,15 @@ void Processor::init(FrameManager& fm, AddressSpace& as,
 
   MSR::write(MSR::GS_BASE, mword(this));         // store 'this' in gs
 
+  loadIDT(idtTable, idtSize);                    // install interrupt table
+
   frameManager = &fm;                            // set frame manager
   as.activate();                                 // activate address space
+
+  memset(&tss, 0, sizeof(TaskStateSegment));     // set up TSS
+  vaddr stack = as.allocPages<1>(Thread::defaultStack, AddressSpace::Data);
+  KASSERT0(stack != topaddr);
+  tss.rsp[0] = stack + Thread::defaultStack;     // stack for CPL 0
 
   memset(gdt, 0, sizeof(gdt));                   // set up GDT
   setupGDT(kernCodeSelector, 0, 0, true);
@@ -63,16 +70,7 @@ void Processor::init(FrameManager& fm, AddressSpace& as,
   setupGDT(userDataSelector, 3, 0, false);
   setupTSS(tssSelector, (vaddr)&tss);
   loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-
-  memset(&tss, 0, sizeof(TaskStateSegment));     // set up TSS
-  vaddr stack = as.allocPages<1>(Thread::defaultStack, AddressSpace::Data);
-  KASSERT0(stack != topaddr);
-  tss.rsp[0] = stack + Thread::defaultStack;
-//  tss.rsp[1] = stack;
-//  tss.rsp[2] = stack;
   loadTR(tssSelector * sizeof(SegmentDescriptor));
-
-  loadIDT(idtTable, idtSize);                    // install interrupt table
   clearLDT();                                    // LDT is not used
 
   enableAPIC();                                  // enable APIC
@@ -83,7 +81,7 @@ void Processor::init(FrameManager& fm, AddressSpace& as,
 }
 
 void Processor::start(funcvoid_t func) {
-  currThread->runDirect(func);                   // switch to proper stack
+  getCurrThread()->runDirect(func);              // switch to proper stack
 }
 
 void Processor::setupGDT(unsigned int number, unsigned int dpl, uint32_t address, bool code) {

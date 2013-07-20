@@ -75,8 +75,8 @@ Machine::IrqOverrideInfo* Machine::irqOverrideTable = nullptr;
 
 // static keyboard and RTC object
 static Keyboard keyboard;
-volatile static PIT pit;
-volatile static RTC rtc;
+static PIT pit;
+static RTC rtc;
 
 // check various assumptions about data type sizes
 static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
@@ -103,15 +103,17 @@ static void keybLoop(ptr_t) {
 
 // init routine for APs, on boot stack and identity paging
 void Machine::initAP(funcvoid_t func) {
+  // init and install processor object
   processorTable[apIndex].init(frameManager, kernelSpace, idt, sizeof(idt));
-  Processor::enableInterrupts();
-  processorTable[apIndex].start(func);
+  // start main/idle loop
+  Processor::start(func);
 }
 
-// on proper stack, processor initialized, interrupts enabled
+// on proper stack, processor initialized
 void Machine::initAP2() {
+  Processor::enableInterrupts();         // enable interrupts (off boot stack)
   DBG::out(DBG::Basic, ' ', apIndex);
-  apIndex = bspIndex;                             // sync with BSP, then halt
+  apIndex = bspIndex;                    // sync with BSP, then halt
   Halt();
 }
 
@@ -237,6 +239,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   }
   DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
+  // init and install processor object
   processorTable[bspIndex].init(frameManager, kernelSpace, idt, sizeof(idt));
 
   // start gdb -> need to have IDT installed
@@ -264,7 +267,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, " done.");
 #endif
 
-  // with interrupts enabled (needed for timeouts): set up keyboard
+  // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();
 
   // send test IPI to self
@@ -273,12 +276,13 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   rtc.wait(5);
   KASSERT0(tipiReceived);
 
-  processorTable[bspIndex].start(func);
+  // start main/idle loop
+  Processor::start(func);
 }
 
-// on proper stack, processor initialized, interrupts enabled
+// on proper stack, processor initialized
 void Machine::initBSP2() {
-  // start up APs -> serialized, APs go into long mode and then halt
+  // start up APs (must be off boot stack): APs go into long mode and halt
   DBG::out(DBG::Basic, "AP init:");
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
     if ( i != bspIndex ) {
@@ -326,7 +330,10 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
 
 inline void Machine::timerInterrupt(mword counter) {
   if (counter % cpuCount == bspIndex) {
-    if (Processor::preempt()) kernelScheduler.yield();
+    if (Processor::preempt()) {
+      Processor::enableInterrupts(); // new thread on way out won't enable
+      kernelScheduler.yield();
+    }
   } else {
     processorTable[counter % cpuCount].sendWakeUpIPI();
   }
@@ -384,7 +391,10 @@ extern "C" void isr_handler_0x2c() { // mouse interrupt
 
 extern "C" void isr_handler_0x40() {
   Processor::sendEOI();              // EOI *before* switching stacks
-  if (Processor::preempt()) kernelScheduler.yield();
+  if (Processor::preempt()) {
+    Processor::enableInterrupts();   // new thread on way out won't enable
+    kernelScheduler.yield();
+  }
 }
 
 extern "C" void isr_handler_0x41() {

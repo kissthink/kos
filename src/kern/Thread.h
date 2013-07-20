@@ -73,7 +73,7 @@ public:
     stackPointer = stackInitIndirect(stackPointer, func, data, (void*)Thread::invoke);
     kernelScheduler.start(*this);
   }
-  void runDirect(funcvoid_t func) { // combine stackInitSimple and stackStart?
+  void runDirect(funcvoid_t func) {
     stackPointer = stackInitSimple(stackPointer, func);
     stackStart(stackPointer);
   }
