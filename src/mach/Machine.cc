@@ -33,6 +33,16 @@
 #include <atomic>
 #include <list>
 
+// check various assumptions about data type sizes
+static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
+static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
+static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
+static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
+static_assert(sizeof(LAPIC) == 0x400, "sizeof(LAPIC) != 0x400" );
+static_assert(sizeof(LAPIC) <= pagesize<1>(), "sizeof(LAPIC) <= pagesize<1>()" );
+static_assert(sizeof(InterruptDescriptor) == 2 * sizeof(mword), "sizeof(InterruptDescriptor) != 2 * sizeof(mword)" );
+static_assert(sizeof(SegmentDescriptor) == sizeof(mword), "sizeof(SegmentDescriptor) != sizeof(mword)" );
+
 // symbols from boot.asm that point to 16-bit boot code location
 extern const char boot16Begin, boot16End;
 
@@ -77,16 +87,6 @@ Machine::IrqOverrideInfo* Machine::irqOverrideTable = nullptr;
 static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
-
-// check various assumptions about data type sizes
-static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
-static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
-static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
-static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
-static_assert(sizeof(LAPIC) == 0x400, "sizeof(LAPIC) != 0x400" );
-static_assert(sizeof(LAPIC) <= pagesize<1>(), "sizeof(LAPIC) <= pagesize<1>()" );
-static_assert(sizeof(InterruptDescriptor) == 2 * sizeof(mword), "sizeof(InterruptDescriptor) != 2 * sizeof(mword)" );
-static_assert(sizeof(SegmentDescriptor) == sizeof(mword), "sizeof(SegmentDescriptor) != sizeof(mword)" );
 
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
@@ -255,7 +255,13 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // find additional devices ("current thread" faked for ACPI)
   parseACPI();
 
-  // enable interrupts
+  // start main/idle loop
+  Processor::start(func);
+}
+
+// on proper stack, processor initialized
+void Machine::initBSP2() {
+  // enable interrupts (off boot stack)
   Processor::enableInterrupts();
 
 #if 0
@@ -276,12 +282,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   rtc.wait(5);
   KASSERT0(tipiReceived);
 
-  // start main/idle loop
-  Processor::start(func);
-}
-
-// on proper stack, processor initialized
-void Machine::initBSP2() {
   // start up APs (must be off boot stack): APs go into long mode and halt
   DBG::out(DBG::Basic, "AP init:");
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
