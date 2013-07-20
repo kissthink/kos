@@ -25,9 +25,13 @@ public:
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) gdbCPUs[i].setCpuId(i);
     DBG::outln(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
-    unWindDebugHookAddr = findUnwindDebugHookAddr();
-    KASSERT0(unWindDebugHookAddr);
-    DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
+//    unWindDebugHookAddr = findUnwindDebugHookAddr();
+//    KASSERT0(unWindDebugHookAddr);
+//    DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
+  }
+  static void setUnwindDebugHookAddr(mword addr) {
+    unWindDebugHookAddr = addr;
+    DBG::outln(DBG::Basic, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
   }
 
   // gives pointer to asked GdbCpu object

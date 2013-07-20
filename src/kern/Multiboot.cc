@@ -15,6 +15,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 #include "extern/multiboot/multiboot2.h"
+#include "extern/elfio/elf_types.hpp"
+#include "gdb/Gdb.h"
 #include "kern/FrameManager.h"
 #include "kern/Multiboot.h"
 #include "kern/Kernel.h"
@@ -91,9 +93,42 @@ void Multiboot::parseAll(laddr& modStart, laddr& modEnd) {
     case MULTIBOOT_TAG_TYPE_VBE:
       DBG::outln(DBG::Boot, "vbe info present");
       break;
-    case MULTIBOOT_TAG_TYPE_ELF_SECTIONS:
+    case MULTIBOOT_TAG_TYPE_ELF_SECTIONS: {
       DBG::outln(DBG::Boot, "elf section info present");
-      break;
+      multiboot_tag_elf_sections* elf = (multiboot_tag_elf_sections*)tag;
+      mword entry = (mword)elf->sections;
+      mword stringTable = 0;
+      for (uint32_t i = 0; i < elf->num; ++i) {
+        ELFIO::Elf64_Shdr* e = (ELFIO::Elf64_Shdr*)entry;
+        if (e->sh_type == SHT_STRTAB) {
+          DBG::outln(DBG::Boot, "found string table ", FmtHex(e->sh_addr));
+          if (!stringTable) stringTable = (mword)e->sh_addr;
+          DBG::outln(DBG::Boot, "string table name ", (char *)stringTable + e->sh_name);
+          if (!strncmp((char*)stringTable + e->sh_name, ".shstrtab", 9)) stringTable = 0;
+        }
+        entry += (mword)elf->entsize;
+      }
+      KASSERT0(stringTable);
+      entry = (mword)elf->sections;
+      for (uint32_t i = 0; i < elf->num; ++i) {
+        ELFIO::Elf64_Shdr* e = (ELFIO::Elf64_Shdr*)entry;
+        if (e->sh_type == SHT_SYMTAB) {
+          DBG::outln(DBG::Boot, "found symbol table");
+          mword end = e->sh_addr + e->sh_size;
+          for (mword start = (mword)e->sh_addr; start < end; start += e->sh_entsize) {
+            ELFIO::Elf64_Sym* sym = (ELFIO::Elf64_Sym*)start;
+            if (sym->st_name) {
+              DBG::outln(DBG::Boot, (char *)stringTable + sym->st_name, '/', FmtHex(sym->st_value));
+              if (!strncmp((char *)stringTable + sym->st_name, "_Unwind_DebugHook", 17)) {
+                Gdb::setUnwindDebugHookAddr((mword)sym->st_value);
+              }
+            }
+          }
+        }
+        entry += (mword)elf->entsize;
+      }
+      DBG::out(DBG::Boot, kendl);
+    } break;
     case MULTIBOOT_TAG_TYPE_APM:
       DBG::outln(DBG::Boot, "APM info present");
       break;

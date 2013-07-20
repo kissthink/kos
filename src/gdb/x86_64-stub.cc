@@ -749,12 +749,11 @@ handle_exception (int64_t exceptionVector) {
                   if (hexToInt(&ptr, &length)) {
                     BreakPoint* bp = new BreakPoint;
                     char opcode = *(char *)addr;
+                    DBG::outln(DBG::Basic, "opcode ", opcode);
                     bp->set(addr, opcode);
                     bpList.insertEnd(*bp, true);
-                    DBG::outln(DBG::Basic, "address: ", FmtHex(addr), " data: ", FmtHex(opcode));
                     KASSERT1(length == 1, length);    // 1 byte for x86?
                     *(char *)addr = 0xcc;
-                    DBG::outln(DBG::Basic, "\t\t\tinserted breakpoint ", FmtHex(*(char *)addr));
                     if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
                       breakOnUnwindDebugHook = true;
                       DBG::outln(DBG::Basic, "debughook on break");
