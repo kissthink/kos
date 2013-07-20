@@ -8,6 +8,9 @@
 #include "mach/Processor.h"
 #include "kern/Debug.h"
 #include "ipc/SpinLock.h"
+#include "world/File.h"
+#include "kern/Kernel.h"    // required by elfio.hpp
+#include "extern/elfio/elfio.hpp"
 
 extern void set_debug_traps(bool);
 extern void breakpoint();
@@ -22,6 +25,9 @@ public:
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) gdbCPUs[i].setCpuId(i);
     DBG::outln(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
+    unWindDebugHookAddr = findUnwindDebugHookAddr();
+    KASSERT0(unWindDebugHookAddr);
+    DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
   }
 
   // gives pointer to asked GdbCpu object
@@ -94,15 +100,9 @@ public:
     getCpu(cpuIdx)->setReg32(regno, val);
   }
 
-  static inline void incrementRip() {
-    getCurrentCpu()->incrementRip();
-  }
-  static inline void decrementRip() {
-    getCurrentCpu()->decrementRip();
-  }
-  static inline void resetRip() {
-    getCurrentCpu()->resetRip();
-  }
+  static inline void incrementRip() { getCurrentCpu()->incrementRip(); }
+  static inline void decrementRip() { getCurrentCpu()->decrementRip(); }
+  static inline void resetRip() { getCurrentCpu()->resetRip(); }
 
   // returns CPU name used by Gdb
   static inline const char* getCpuName(int cpuIdx) {
@@ -110,13 +110,9 @@ public:
     return gdbCPUs[cpuIdx].getName();
   }
   // total # of CPUs in the system
-  static inline int getNumCpus() {
-    return numCpu;
-  }
+  static inline int getNumCpus() { return numCpu; }
   // total # of CPUs initialized for gdb use
-  static inline int getNumCpusInitialized() {
-    return numInitialized;
-  }
+  static inline int getNumCpusInitialized() { return numInitialized; }
 
   static void start() {
     if (!DBG::test(DBG::GDBEnable)) return;
@@ -149,6 +145,10 @@ public:
     DBG::outln(DBG::GDBDebug, "V(", cpuIdx+1, ')');
   }
 
+  static inline mword getUnwindDebugHookAddr() {
+    return unWindDebugHookAddr;
+  }
+
 private:
   // sends an IPI to a specified CPU core
   static void sendIPI(int cpuIdx, int ipiNum) {
@@ -156,6 +156,35 @@ private:
         " from ", Processor::getApicID() + 1, " to core: ", cpuIdx+1);
     mword err = Processor::sendIPI(cpuIdx, ipiNum);
     KASSERT1(!err, FmtHex(err));
+  }
+
+  // read virtual address of _Unwind_DebugHook symbol
+  static mword findUnwindDebugHookAddr() {
+    ELFIO::elfio elfReader;
+    File* kernelElf = kernelFS.find("kernel.sys.debug")->second;
+    KASSERT0(elfReader.load(kernelElf->startptr(), kernelElf->size()));
+    KASSERT1(elfReader.get_class() == ELFCLASS64, elfReader.get_class());
+    ELFIO::Elf_Half sec_num = elfReader.sections.size();
+    for (int i = 0; i < sec_num; ++i) {
+      ELFIO::section* psec = elfReader.sections[i];
+      if (psec->get_type() == SHT_SYMTAB) {
+        const ELFIO::symbol_section_accessor symbols(elfReader, psec);
+        for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
+          kstring name;
+          ELFIO::Elf64_Addr value;
+          ELFIO::Elf_Xword size;
+          unsigned char bind;
+          unsigned char type;
+          ELFIO::Elf_Half sec_idx;
+          unsigned char other;
+          symbols.get_symbol(j, name, value, size, bind, type, sec_idx, other);
+          if (name == "_Unwind_DebugHook") {
+            return (mword)value;
+          }
+        }
+      }
+    }
+    return 0;
   }
 
   Gdb() = delete;                         // no creation
@@ -168,6 +197,7 @@ private:
   static int enumIdx;
   static NonBlockSemaphore* sem;          // split binary semaphore
   static SpinLock mutex;
+  static mword unWindDebugHookAddr;
 };
 
 #endif // Gdb_h_

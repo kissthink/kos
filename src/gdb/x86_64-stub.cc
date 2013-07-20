@@ -755,7 +755,7 @@ handle_exception (int64_t exceptionVector) {
                     KASSERT1(length == 1, length);    // 1 byte for x86?
                     *(char *)addr = 0xcc;
                     DBG::outln(DBG::Basic, "\t\t\tinserted breakpoint ", FmtHex(*(char *)addr));
-                    if ((mword)addr == (mword)0xffffffff802bba10) {
+                    if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
                       breakOnUnwindDebugHook = true;
                       DBG::outln(DBG::Basic, "debughook on break");
                     }
