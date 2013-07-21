@@ -15,9 +15,8 @@ struct VContAction : public EmbeddedElement<VContAction> {
   char action[3];     // 'c','C sig', 's', 'S sig'
   int threadId;       // used for sanity check
   bool executed;      // do not reply until action completes
-  bool isStep;        // used to differentiate step/next
   VContAction()
-  : threadId(-1), executed(false), isStep(false) {
+  : threadId(-1), executed(false) {
     action[0] = 0;    // 'op'
     action[1] = 0;    // 'signal'
     action[2] = 0;    // 'signal'
@@ -41,8 +40,7 @@ struct VContAction : public EmbeddedElement<VContAction> {
 ostream& operator<<(ostream& os, const VContAction& va) {
   os << "action: " << va.action
      << " threadId: " << va.threadId
-     << " executed: " << va.executed
-     << " isStep: " << va.isStep;
+     << " executed: " << va.executed;
   return os;
 }
 

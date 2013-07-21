@@ -45,24 +45,27 @@ static List<BreakPoint> bpList;             // tracks breakpoints inserted from 
 
 #define BREAKPOINT() asm("int $3");
 extern "C" void handle_exception(int64_t);
-static const int BUFMAX = 8096;             // max number of chars in inbound/outbound buffers
-static char initialized;                    // boolean flag. != 0 means we've been initialized
 static const char hexchars[]="0123456789abcdef";
-static atomic<bool>isBatonFree(true);       // baton is not picked up.
-static atomic<int>lockHolder(-1);           // used for holding baton.
+static const int BUFMAX = 8096;             // in/out buffer for communication with gdb frontend
+                                            // XXX be sure to let gdb frontend know when this changes
+static char initialized;                    // Gdb initialized?
+static atomic<bool> isBatonFree(true);      // is baton free to be picked up?
+static atomic<int> lockHolder(-1);          // who is holding the baton?
 static bool* waiting;                       // represents a CPU waiting on entry queue.
-static bool* shouldReturnFromException;     // return from interrupt handler right away (used for allstop mode)
-static NonBlockSemaphore entry_q;           // baton; only allows one thread to talk to gdb frontend at a time
+static bool* shouldReturnFromException;     // return from interrupt handler right away (allstop)
+static NonBlockSemaphore entry_q;           // entry/exit protocol
 static GdbCpu** gCpu = nullptr;             // cpu states used exclusively for 'g' operations
-static EmbeddedQueue<VContAction> vContActionQueue;
-static Thread* gdbThread = nullptr;         // thread talking to gdb (remember because it moves among cores)
+static EmbeddedQueue<VContAction> vContActionQueue;   // vCont packets are queued here
 static VContAction* prevAction = nullptr;   // previous vContAction
-
-static bool allstop = false;
-void *mem_fault_return_addr = nullptr;
-
-static bool* preempt;                       // tracks whether preemption was disabled by gdb on the processor
+static bool allstop = false;                // allstop mode
+void *mem_fault_return_addr = nullptr;      // where to return from fault handler?
+static bool* preempt;                       // tracks whether preemption was disabled by gdb
 static bool breakOnUnwindDebugHook = false; // detect if breakpoint was inserted on _Unwind_DebugHook
+
+// current thread ID to 1-based
+static int getCurrCpuId() {
+  return Processor::getApicID()+1;
+}
 
 // GCpu is used for querying specific CPU by gdb
 static void setGCpu(int cpuIdx) {
@@ -74,40 +77,39 @@ static GdbCpu* getGCpu() {
   if (gCpu[cpuIdx] == nullptr) setGCpu(cpuIdx);
   return gCpu[cpuIdx];
 }
-
-// Processor::doNotPreempt is set to --lockCount in decLockCount()
-// Therefore, it seems like we do not need to call decLockCount
-// separately to balance doNotPreempt flag (because of entry_q lock?)
+// disable preemption for step/next will prevent
+// the current thread from migrating to another CPU
 static void disablePreemption() {
   preempt[Processor::getApicID()] = false;
   Processor::incLockCount();
 }
-
 static void enablePreemption() {
   if (!preempt[Processor::getApicID()]) {
     Processor::decLockCount();
     preempt[Processor::getApicID()] = true;
   }
 }
-
+// baton available if nobody has it or I am holding it
 static bool canGrabBaton(int threadId) {
   if (isBatonFree) return true;
   if (lockHolder == threadId) return true;
   return false;
 }
-
+// use this before returning from step/next/continue
 static void scheduleVContAction(bool isContinue = false) {
   vContActionQueue.front()->executed = true;
   if (!isContinue) disablePreemption();
 }
 
+// internal method for _returnFromException
+// set CPU state to running, and wake up all other threads if in allstop
 void __returnFromException() {
   Gdb::setCpuState(cpuState::RUNNING);
-  if (allstop) {    // wake other threads if in all-stop mode
+  if (allstop) {
     int threadId = Processor::getApicID();
     for (int i = 0; i < Gdb::getNumCpusInitialized(); i++) {
       if (i == threadId) continue;
-      if (waiting[i]) {
+      if (waiting[i]) {         // wake up all waiting threads
         waiting[i] = false;
         shouldReturnFromException[i] = true;
         Gdb::V(i);
@@ -115,112 +117,91 @@ void __returnFromException() {
     }
   }
 }
-
-// get out of interrupt handler
 void _returnFromException() {
   __returnFromException();
 //  entry_q.releaseISR();
-  restoreRegisters(Gdb::getCurrentCpu());
+  restoreRegisters(Gdb::getCurrentCpu());   // restore back to current CPU's stored state
 }
-
-// use if entry_q is not locked
-void _returnFromExceptionLocked() {
+void _returnFromExceptionLocked() {         // called with entry_q locked (exit protocol)
   __returnFromException();
   entry_q.V();
-  restoreRegisters(Gdb::getCurrentCpu());
+  restoreRegisters(Gdb::getCurrentCpu());   // restore back to current CPU's stored state
 }
 
+// hex character to integer
 int hex(char ch) {
   if ((ch >= 'a') && (ch <= 'f')) return (ch - 'a' + 10);
   if ((ch >= '0') && (ch <= '9')) return (ch - '0');
   if ((ch >= 'A') && (ch <= 'F')) return (ch - 'A' + 10);
-  return (-1);
+  return -1;
 }
 
-static char inputBuffer[BUFMAX];             // input buffer
-static char outputBuffer[BUFMAX];            // output buffer
+// Routines for gdb frontend communication
+static char inputBuffer[BUFMAX];    // buffers for communication
+static char outputBuffer[BUFMAX];
 
 // scan for the sequence $<data>#<checksum>
-char* getpacket () {
+char* getpacket() {
   char *buffer = &inputBuffer[0];
-  char checksum;
-  char xmitcsum;
+  char checksum, xmitcsum, ch;
   int count;
-  char ch;
 
-  while (1) {
-    /* wait around for the start character, ignore all other characters */
-    while ((ch = getDebugChar ()) != '$')
-    ;
-
-  retry:
-    checksum = 0;
-    xmitcsum = -1;
-    count = 0;
-
-    /* now, read until a # or end of buffer is found */
-    while (count < BUFMAX - 1) {
-      ch = getDebugChar ();
+  while (true) {
+    while ((ch = getDebugChar()) != '$');             // find start of packet
+retry:
+    checksum = 0, xmitcsum = -1, count = 0;
+    while (count < BUFMAX - 1) {                      // read to end of packet '#' or buffer
+      ch = getDebugChar();
       if (ch == '$') goto retry;
       if (ch == '#') break;
-      checksum = checksum + ch;
+      checksum += ch;
       buffer[count] = ch;
-      count = count + 1;
+      count++;
     }
     buffer[count] = 0;
-
-    if (ch == '#') {
-      ch = getDebugChar ();
-      xmitcsum = hex (ch) << 4;
-      ch = getDebugChar ();
-      xmitcsum += hex (ch);
-
-      if (checksum != xmitcsum) {
-        putDebugChar ('-');   /* failed checksum */
-      } else {
-        putDebugChar ('+');   /* successful transfer */
-        /* if a sequence char is present, reply the sequence ID */
-        if (buffer[2] == ':') {
+    if (ch == '#') {                                  // found '#' now validate checksum
+      ch = getDebugChar();
+      xmitcsum = hex(ch) << 4;
+      ch = getDebugChar();
+      xmitcsum += hex(ch);                            // xmitsum is computed checksum
+      if (checksum != xmitcsum) putDebugChar ('-');   // failed checksum
+      else {
+        putDebugChar ('+');                           // success
+        if (buffer[2] == ':') {                       // if sequence char present, reply seq ID
           putDebugChar(buffer[0]);
           putDebugChar(buffer[1]);
           return &buffer[3];
         }
-
         return &buffer[0];
-      }
-    }
-  }
+      } // if
+    } // if
+  } // while
 }
-
 // send the packet in buffer
-void putpacket (char *buffer) {
+void putpacket(char *buffer) {
   unsigned char checksum;
   int count;
   char ch;
 
-  //  $<packet info>#<checksum>.
+  // $<packet info>#<checksum>.
   do {
-    putDebugChar ('$');
-    checksum = 0;
-    count = 0;
-
+    putDebugChar('$');                        // start of packet
+    checksum = 0, count = 0;
     while ( (ch = buffer[count]) ) {
       putDebugChar(ch);
       checksum += ch;
       count += 1;
     }
-
-    putDebugChar('#');
-    putDebugChar(hexchars[checksum >> 4]);
+    putDebugChar('#');                        // end of data
+    putDebugChar(hexchars[checksum >> 4]);    // write checksum
     putDebugChar(hexchars[checksum % 16]);
-  } while (getDebugChar () != '+');
+  } while (getDebugChar() != '+');            // try until ack ('+') is heard
 }
 
-/**
- * Routines for access/modifying memory
- */
+// Routines for access/modify memory
 volatile int gdbFaultHandlerSet = 0;  // can activate fault handler for gdb session
 volatile int mem_err = 0;             // flags an error from mem2hex/hex2mem
+
 // put mem to buf in hex format and return next buf position
 char* mem2hex (const char *mem, char *buf, int count, int may_fault) {
   gdbFaultHandlerSet = (may_fault > 0);
@@ -249,7 +230,7 @@ char* hex2mem (char *buf, char *mem, int count, int may_fault) {
 }
 
 // exception vector to unix signal value
-int computeSignal (int64_t exceptionVector) {
+int computeSignal(int64_t exceptionVector) {
   int sigval;
   switch (exceptionVector) {
     case 0: sigval = 8;   break;            // divide by zero
@@ -274,8 +255,7 @@ int computeSignal (int64_t exceptionVector) {
 
 // convert hex number in ptr to integer
 int hexToInt(char **ptr, long *intValue) {
-  int numChars = 0;
-  int hexValue;
+  int numChars = 0, hexValue = 0;
   *intValue = 0;
   while (**ptr) {
     hexValue = hex(**ptr);
@@ -293,62 +273,52 @@ void clearTFBit() {
   reg32 eflags = Gdb::getReg32(registers::EFLAGS);
   eflags &= 0xfffffeff;
   Gdb::setReg32(registers::EFLAGS, eflags);
-
-  DBG::outln(DBG::GDBDebug, "Cleared TF bit for thread ",
-    Processor::getApicID() + 1, " eflags: ", FmtHex(eflags));
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " TF cleared");
 }
 void setTFBit() {
   reg32 eflags = Gdb::getReg32(registers::EFLAGS);
   eflags &= 0xfffffeff;
   eflags |= 0x100;
   Gdb::setReg32(registers::EFLAGS, eflags);
-
-  DBG::outln(DBG::GDBDebug, "Set TF bit for thread ",
-    Processor::getApicID() + 1, " eflags: ", FmtHex(eflags));
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " TF set");
 }
 void clearTFBit(int cpuId) {
   reg32 eflags = Gdb::getReg32(registers::EFLAGS, cpuId);
   eflags &= 0xfffffeff;
   Gdb::setReg32(registers::EFLAGS, eflags, cpuId);
+  DBG::outln(DBG::GDBDebug, "T=", cpuId+1, " TF cleared");
 }
 void setTFBit(int cpuId) {
   reg32 eflags = Gdb::getReg32(registers::EFLAGS, cpuId);
   eflags &= 0xfffffeff;
   eflags |= 0x100;
   Gdb::setReg32(registers::EFLAGS, eflags, cpuId);
+  DBG::outln(DBG::GDBDebug, "T=", cpuId+1, " TF set");
 }
 
+// vCont packets
 // stop reply for vCont packets
 void sendStopReply(char* outputBuffer, int sigval) {
-  int threadId = Processor::getApicID() + 1;
-  outputBuffer[0] = 'T';
-  outputBuffer[1] = hexchars[sigval >> 4];
-  outputBuffer[2] = hexchars[sigval % 16];
-  outputBuffer[3] = 't';
-  outputBuffer[4] = 'h';
-  outputBuffer[5] = 'r';
-  outputBuffer[6] = 'e';
-  outputBuffer[7] = 'a';
-  outputBuffer[8] = 'd';
-  outputBuffer[9] = ':';
-  outputBuffer[10] = hexchars[threadId >> 4];
-  outputBuffer[11] = hexchars[threadId % 16];
-  outputBuffer[12] = ';';
-  outputBuffer[13] = 0;
-
-  DBG::outln(DBG::GDBDebug, "Sending stop reply: ", outputBuffer,
-    " from thread ", threadId);
+  int threadId = getCurrCpuId();
+  char* buf = outputBuffer;
+  buf[0] = 'T';
+  buf[1] = hexchars[sigval >> 4];
+  buf[2] = hexchars[sigval % 16];
+  buf += 3;
+  strcpy(buf, "thread:");
+  buf += 7;
+  buf[0] = hexchars[threadId >> 4];
+  buf[1] = hexchars[threadId % 16];
+  buf[2] = ';';
+  buf[3] = 0;
+  DBG::outln(DBG::GDBDebug, "T=", threadId, " sending stop reply:", outputBuffer);
   putpacket(outputBuffer);
 }
-
 // parse and queue vContActions (referenced QEMU's gdbstub)
-// assem only 1 action is given from each vCont packet (QEMU does this)
-VContAction* parse_vcont(char* ptr)
-{
+VContAction* parseVCont(char* ptr) {
   VContAction* result = nullptr;
   int res_signal, res_thread, res = 0;
   long threadId;
-  bool isStep = false;
 
   while (*ptr++ == ';') {
     int action; long signal;
@@ -360,27 +330,24 @@ VContAction* parse_vcont(char* ptr)
       res = 0;
       break;
     }
-    if (action == 's') isStep = true;
     threadId = 0;
     if (*ptr++ == ':') KASSERT0(hexToInt(&ptr, &threadId));
     action = tolower(action);
-    if (res == 0 || (res == 'c' && action == 's')) {
+    if (res == 0 || (res == 'c' && action == 's')) {  // ignore 'c' in vCont;c;s
       res = action;
       res_signal = signal;
       res_thread = threadId;
-      DBG::outln(DBG::GDBDebug, "action: ", (char)res, " signal: ", res_signal,
-        " thread: ", res_thread);
+      DBG::outln(DBG::GDBDebug, "T=", res_thread,
+        " action: ", (char)res, " signal: ", res_signal);
     }
-    if (res == 's' && action == 'c') isStep = false;    // vCont;s:threadId;c is typical pkt for next
   }
-  if (res) {
+  if (res) {    // res is action we decided for current vCont packet
     VContAction* vContAction = new VContAction;
     vContAction->action[0] = res;
     if (res_signal) {
       vContAction->action[1] = hexchars[res_signal >> 4];
       vContAction->action[2] = hexchars[res_signal % 16];
     }
-    vContAction->isStep = isStep;
     // thread = -1 means to run vCont packet for all threads (allstop?)
     // thread = 0 means to run vCont packet on any free thread
     if (res_thread != -1 && res_thread != 0) {
@@ -389,95 +356,72 @@ VContAction* parse_vcont(char* ptr)
     }
     vContActionQueue.push(vContAction);
     result = vContAction;
-    DBG::outln(DBG::GDBDebug, "Parsed vContAction - ", *vContAction);
+    DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " parsed vCont ", *vContAction);
   }
-
   return result;
 }
-
 // Consumes and executes vContAction for the current thread.
 // Precondition: entry_q lock must be held.
 void consumeVContAction() {
   VContAction* action = vContActionQueue.front();
-  DBG::outln(DBG::GDBDebug, *action, " from thread: ", Processor::getApicID() + 1);
-  KASSERT0(action);
-  KASSERT1(!action->executed, action->action);
-  KASSERT0(action->isForCurrentThread());
-
-  clearTFBit();
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), "consuming: ", *action);
+  KASSERT0(action && !action->executed && action->isForCurrentThread());
+  clearTFBit();   // set TF bit if 's' (stepi/step/next)
   if (action->action[0] == 's') setTFBit();
-  DBG::outln(DBG::GDBDebug, "Consuming vContAction - ", *action, " isBatonFree ", isBatonFree);
-
   lockHolder = Processor::getApicID();    // keep entry lock
   if (action->action[0] == 'c') {         // could be from next or continue
     if (breakOnUnwindDebugHook) {         // next
-      isBatonFree = true;                // hold on to the baton
+      isBatonFree = true;                 // put down baton to give chance to bp on other threads
       scheduleVContAction();
       _returnFromExceptionLocked();
-    }
+    } // no return here
     // continue
-    isBatonFree = true;                        // free baton
+    isBatonFree = false;                  // keep baton for now and look for thread to pass it to
     // increment rip only if it was actual breakpoint set by user (not set by gdb for next)
     if (prevAction == nullptr || prevAction->action[0] != 'c') Gdb::incrementRip();
-//    Gdb::incrementRip();
-    // first, look for a waiting thread to pass baton. If there is no one, release baton
-    // TODO: smarter way of choosing a thread
+    // first, look for a waiting thread to pass baton. If there is no one, then release baton
     for (int i = 0; i < Gdb::getNumCpusInitialized(); i++) {
       if (waiting[i]) {
-        isBatonFree = false;
         waiting[i] = false;
         Gdb::V(i);
-        DBG::outln(DBG::GDBDebug, "Passed baton from thread: ",
-          Processor::getApicID() + 1, " to thread: ", i + 1);
+        DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " passing baton to ", i+1);
         scheduleVContAction(true);
-        _returnFromException();
-        // does not return here
-      }
+        _returnFromException();           // do not let other thread race to grab baton before this
+      } // no return here
     }
-    // no other threads are stopped for gdb session. release baton and return
+    isBatonFree = true;                   // put down baton
     lockHolder = -1;
     scheduleVContAction(true);
     _returnFromExceptionLocked();
-  }
+  } // no return here
 
-  // step or next
-  // first thread that enters the interrupt handler
-  // will send stop reply packet.
+  // step/next
   scheduleVContAction();
   _returnFromExceptionLocked();
-}
-
-// Handles 'vCont' commands.
-// TODO: support vAttach, vFile, vFlashErase, vFlashWrite, vFlashDone, vKill, vRun, vStopped.
-void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
-{
+} // no return here
+// handles basic 'vCont' commands.
+void handleVContPacket(char* ptr, int64_t exceptionVector) {
   if (strncmp(ptr, "Cont", strlen("Cont")) == 0) {
-    ptr += strlen("Cont");
-    if (*ptr == '?') {    // vCont? requests a list of actions supported by 'vCont' packet
-      strcpy(outputBuffer, "vCont;c;C;s;S");
-    } else {
-      // vCont[;action[:thread-id]]...
-      // FIXME: currently assumes only one action per vCont
-      // (referenced QEMU 1.4.1, gdbstub.c)
-      VContAction* action = parse_vcont(ptr);
-      KASSERT0(action);
+    ptr += 4;
+    if (*ptr == '?') strcpy(outputBuffer, "vCont;c;C;s;S");   // supported vCont packets
+    else {
+      VContAction* action = parseVCont(ptr);
+      if (!action) return;                          // must not fail
       entry_q.P();
-      // if 'vCont' packet is not for current thread, wake the target thread and block
-      if (!action->isForCurrentThread()) {
-        KASSERT0(waiting[action->threadId-1]);  // target thread for 'c' or 's' must be waiting in interrupt handler
-        if (waiting[action->threadId-1]) {
-          DBG::outln(DBG::GDBDebug, "baton passed from ", Processor::getApicID()+1, " to ", action->threadId);
-          Gdb::V(action->threadId-1);    // pass baton
-          handle_exception(exceptionVector);    // block current thread
-        }
+      if (!action->isForCurrentThread()) {          // wake target thread for vCont packet
+        if (!waiting[action->threadId-1]) return;   // must not fail
+        DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " passing baton to ", action->threadId);
+        Gdb::V(action->threadId-1);                 // pass baton
+        handle_exception(exceptionVector);          // fully give control to target thread
       } else {
-        isBatonFree = false;                         // hold on to the baton
+        isBatonFree = false;                        // make sure I am the only thread talking
         consumeVContAction();
       }
     }
   }
 }
 
+// query packet handlers
 // gdb front-end queries gdb stub's supported features
 static bool handleQSupported(char* in, char* out) {
   if (!strncmp(in, "Supported", 9)) {
@@ -486,7 +430,6 @@ static bool handleQSupported(char* in, char* out) {
   }
   return false;
 }
-
 // return current thread ID
 static bool handleQC(char* in, char* out) {
   if (*in == 'C') {
@@ -499,7 +442,6 @@ static bool handleQC(char* in, char* out) {
   }
   return false;
 }
-
 // tells if gdb stub process is attached to existing processor created new
 static bool handleQAttached(char* in, char* out) {
   if (!strncmp(in, "Attached", 8)) {
@@ -509,7 +451,6 @@ static bool handleQAttached(char* in, char* out) {
   }
   return false;
 }
-
 // tell section offsets target used when relocating kernel image?
 static bool handleQOffsets(char* in, char* out) {
   if (!strncmp(in, "Offsets", 7)) {
@@ -518,7 +459,6 @@ static bool handleQOffsets(char* in, char* out) {
   }
   return false;
 }
-
 // gdb stub can ask for symbol lookups
 static bool handleQSymbol(char* in, char* out) {
   if (!strncmp(in, "Symbol::", 8)) {
@@ -529,7 +469,6 @@ static bool handleQSymbol(char* in, char* out) {
   }
   return false;
 }
-
 // parse replies from above symbol lookup requests (Only looks up _Unwind_DebugHook for now)
 static bool handleQSymbolLookup(char* in, char* out) {
   if (!strncmp(in, "Symbol:", 7)) {
@@ -547,7 +486,6 @@ static bool handleQSymbolLookup(char* in, char* out) {
   }
   return false;
 }
-
 // query if trace experiment running now
 static bool handleQTStatus(char* in, char* out) {
   if (!strncmp(in, "TStatus", 7)) {
@@ -556,7 +494,6 @@ static bool handleQTStatus(char* in, char* out) {
   }
   return false;
 }
-
 // query list of all active thread IDs
 static bool handleQfThreadInfo(char* in, char* out) {
   if (!strncmp(in, "fThreadInfo", 11)) {
@@ -574,7 +511,6 @@ static bool handleQfThreadInfo(char* in, char* out) {
   }
   return false;
 }
-
 // continued querying list of all active thread IDs
 static bool handleQsThreadInfo(char* in, char* out) {
   if (!strncmp(in, "sThreadInfo", 11)) {
@@ -583,7 +519,6 @@ static bool handleQsThreadInfo(char* in, char* out) {
   }
   return false;
 }
-
 // ask printable string description of a thread's attribute (used by 'info threads')
 static bool handleQThreadExtraInfo(char* in, char* out) {
   if (!strncmp(in, "ThreadExtraInfo", 15)) {
@@ -599,6 +534,7 @@ static bool handleQThreadExtraInfo(char* in, char* out) {
   return false;
 }
 
+// other handlers
 // thread alive status
 static bool handleT(char* in, char* out) {
   long threadId;
@@ -611,7 +547,6 @@ static bool handleT(char* in, char* out) {
   strcpy(out, "E05");   // unfortunately not well-defined
   return false;
 }
-
 // set which thread will run subsequent operations ('m','M','g','G',etc)
 // for step/continue ops ('c'), vCont should be used, instead
 static bool handleH(char* in, char* out) {
@@ -628,7 +563,6 @@ static bool handleH(char* in, char* out) {
   strcpy(out, "E05");   // unfortunately not well-defined
   return false;
 }
-
 // tells reason target halted (specifically, which thread stopped with what signal)
 static bool handleReasonTargetHalted(char* in, char* out, int sigval) {
   int threadId = Processor::getApicID() + 1;
@@ -641,7 +575,6 @@ static bool handleReasonTargetHalted(char* in, char* out, int sigval) {
   out[2] = ';';
   return true;
 }
-
 // read general registers
 static bool handleReadRegisters(char* in, char* out) {
   GdbCpu* gCpu = getGCpu();
@@ -649,7 +582,6 @@ static bool handleReadRegisters(char* in, char* out) {
   out = mem2hex((char*)gCpu->getRegs32(), out, numRegs32 * sizeof(reg32), 0);
   return true;
 }
-
 // write general registers
 static bool handleWriteRegisters(char* in, char* out) {
   GdbCpu* gCpu = getGCpu();
@@ -658,7 +590,6 @@ static bool handleWriteRegisters(char* in, char* out) {
   strcpy(out, "OK");
   return true;
 }
-
 // write register n with value r
 // TODO check if register in thread set from 'H' packet is used for current thread
 static bool handleWriteRegister(char* in, char* out) {
@@ -678,7 +609,6 @@ static bool handleWriteRegister(char* in, char* out) {
   else strcpy(out, "E05");        // not well-defined
   return success;
 }
-
 // read memory from given address
 static bool handleReadMemory(char* in, char* out) {
   long addr, length;
@@ -691,7 +621,6 @@ static bool handleReadMemory(char* in, char* out) {
   strcpy(out, "E01");
   return false;
 }
-
 // write to memory at given address
 static bool handleWriteMemory(char* in, char* out) {
   long addr, length;
@@ -705,11 +634,10 @@ static bool handleWriteMemory(char* in, char* out) {
   strcpy(out, "E02");
   return false;
 }
-
 // set software breakpoints
 static bool handleSetSoftBreak(char* in, char* out) {
   long addr, length;
-  gdbFaultHandlerSet = 1;
+  gdbFaultHandlerSet = 1;             // enable fault handler
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
     BreakPoint* bp = new BreakPoint;
     mem_err = 0;
@@ -736,11 +664,10 @@ softbreak_err:
   strcpy(out, "E03");     // not well-defined
   return false;
 }
-
 // remove software breakpoints
 static bool handleRemoveSoftBreak(char* in, char* out) {
   long addr, length;
-  gdbFaultHandlerSet = 1;
+  gdbFaultHandlerSet = 1;             // enable fault handler
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
     BreakPoint curBp = { (mword)addr, *(char *)addr };
     Node<BreakPoint>* bp = bpList.search(curBp);
@@ -764,7 +691,6 @@ softbreak_err:
   strcpy(out, "E03");       // not well-defined
   return false;
 }
-
 // kill request (how to kill?)
 static bool handleKill(char* in, char* out) {
   ABORT0();   // No description on what to do when individual thread is selected
@@ -774,19 +700,17 @@ static bool handleKill(char* in, char* out) {
 // does all command processing for interfacing to gdb
 extern "C" void handle_exception (int64_t exceptionVector) {
   int sigval = computeSignal(exceptionVector);
-  char *ptr = outputBuffer;
+  int threadId = Processor::getApicID();
+  char* ptr = outputBuffer;
 
   KASSERT0(!Processor::interruptsEnabled());
   enablePreemption();     // restore preemption if disabled by gdb stub
-  Gdb::resetRip();
-
-  int threadId = Processor::getApicID();
+  Gdb::resetRip();        // restore rip manipulation
   Gdb::setCpuState(cpuState::BREAKPOINT);
-  Thread* currThread = Processor::getCurrThread();
-  DBG::outln(DBG::GDBDebug, "T=", threadId+1, ", vector=", exceptionVector,
+
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), ", vector=", exceptionVector,
             ", eflags=", FmtHex(Gdb::getReg32(registers::EFLAGS)),
-            ", pc=", FmtHex(Gdb::getReg64(registers::RIP)),
-            ", thread=", FmtHex(currThread));
+            ", pc=", FmtHex(Gdb::getReg64(registers::RIP)));
 
   // for breakpoints that gdb frontend sets, it inserts 0xCC to first byte of an instruction
   // instead of setting TF bit. gdb frontend does not replace the original byte. Therefore,
@@ -799,17 +723,17 @@ extern "C" void handle_exception (int64_t exceptionVector) {
     }
   }
 
-  DBG::outln(DBG::GDBDebug, "T=", threadId+1, " trying to grab a baton");
-  entry_q.P();
+  // baton grabbing procedure
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " trying to grab a baton");
+  entry_q.P();    // entry protocol
   if (!canGrabBaton(threadId)) {
-    waiting[threadId] = true;
-    DBG::outln(DBG::GDBDebug, "T=", threadId+1, " will wait for ", lockHolder+1);
-    entry_q.V();
-
-    Gdb::P(threadId);     // wait till the baton is passed
-    DBG::outln(DBG::GDBDebug, "T=", threadId+1, " holds a baton");
+    waiting[threadId] = true;       // failed to grab a baton; wait until someone gives it to me
+    DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " will wait for ", lockHolder+1);
+    entry_q.V();  // entry protocol end
+    Gdb::P(threadId);               // wait till the baton is passed
+    DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " holds a baton");
     if (shouldReturnFromException[threadId]) {    // for allstop mode
-      DBG::outln(DBG::GDBDebug, "T=", threadId+1, " exiting");
+      DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " exiting");
       shouldReturnFromException[threadId] = false;
       Gdb::setCpuState(cpuState::RUNNING);
       restoreRegisters(Gdb::getCurrentCpu());    // exit to KOS
@@ -817,40 +741,32 @@ extern "C" void handle_exception (int64_t exceptionVector) {
   }
 
   // you are a new baton owner!
-  isBatonFree = false;
-  waiting[threadId] = false;
-  lockHolder = threadId;
-  DBG::outln(DBG::GDBDebug, "T=", threadId+1, " holds a baton");
+  isBatonFree = false;                  // baton is not available to others
+  waiting[threadId] = false;            // I'm not waiting for a baton anymore
+  lockHolder = threadId;                // I'm the baton holder!
   memset(outputBuffer, 0, BUFMAX);      // reset output buffer
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " holds a baton");
 
   // send stop reply for executed vCont packet or consume a pending vCont packet
   if (!vContActionQueue.empty()) {
     VContAction* action = vContActionQueue.front();
-    if (action->executed) {
-      DBG::outln(DBG::GDBDebug, "pending operation done - ", *action);
+    if (action->executed) {             // did I just execute vCont packet?
+      DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " done:", *action);
       prevAction = action;              // remember previous action (if 'c' don't increment rip)
       vContActionQueue.pop();
       KASSERT0(vContActionQueue.empty());
       sendStopReply(outputBuffer, sigval);
-    } else {
-      DBG::outln(DBG::GDBDebug, "entering consumeVContAction: ", *action);
+    } else {                            // someone must have given me a baton to execute this
+      DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " consume:", *action);
       consumeVContAction();
     }
   }
-
-  /**
-   * All-Stop mode Only.
-   *
-   * Send INT 0x3 IPI to all available cores.
-   */
-  if (allstop) Gdb::sendIPIToAllOtherCores(0x1);
-  entry_q.V();
+  if (allstop) Gdb::sendIPIToAllOtherCores(0x1);    // break all other threads for allstop mode
+  entry_q.V();                  // entry protocol exit
 
   while (true) {
-    outputBuffer[0] = 0;        // reset out buffer to 0
     memset(outputBuffer, 0, BUFMAX);
-    ptr = getpacket ();         // get request from gdb
-
+    ptr = getpacket();          // get request from gdb
     switch (*ptr++) {
       case 'q': {   // queries
         if (handleQSupported(ptr, outputBuffer)) break;
@@ -866,7 +782,7 @@ extern "C" void handle_exception (int64_t exceptionVector) {
         // TODO if in any case you encounter this, time to support new packets
         // strcpy(outputBuffer, "qUnimplemented");
       } break;
-      case 'v': gdb_cmd_vresume(ptr, exceptionVector); break;   // vCont packets
+      case 'v': handleVContPacket(ptr, exceptionVector); break; // vCont packets
       case 'T': handleT(ptr, outputBuffer); break;              // is thread alive?
       case 'H': handleH(ptr, outputBuffer); break;    // set thread for subsequent operation
       case '?': handleReasonTargetHalted(ptr, outputBuffer, sigval); break;
@@ -901,7 +817,7 @@ extern "C" void handle_exception (int64_t exceptionVector) {
   }
 }
 
-// this function is used to set up exception handlers for tracing and breakpoints
+// hijack KOS ISR's to gdb stub's version
 void set_debug_traps(bool as) {
   exceptionHandler (0x00, catchException0x00);
   exceptionHandler (0x01, catchException0x01);
@@ -931,10 +847,7 @@ void set_debug_traps(bool as) {
   initialized = 1;
 }
 
-// This function will generate a breakpoint exception.  It is used at the
-// beginning of a program to sync up with a debugger and can be used
-// otherwise as a quick means to stop program execution and "break" into
-// the debugger
+// call this after set_debug_traps to initiate gdb session
 void breakpoint() {
   if (initialized) BREAKPOINT();
 }

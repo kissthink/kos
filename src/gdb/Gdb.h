@@ -7,7 +7,6 @@
 #include "mach/Memory.h"
 #include "mach/Processor.h"
 #include "kern/Debug.h"
-#include "ipc/SpinLock.h"
 #include "world/File.h"
 #include "kern/Kernel.h"    // required by elfio.hpp
 #include "extern/elfio/elfio.hpp"
@@ -25,9 +24,6 @@ public:
     sem = new NonBlockSemaphore[numCpu];
     for (int i = 0; i < numCpu; i++) gdbCPUs[i].setCpuId(i);
     DBG::outln(DBG::GDBDebug, "Gdb state initialized for ", numCpu, " cores");
-//    unWindDebugHookAddr = findUnwindDebugHookAddr();
-//    KASSERT0(unWindDebugHookAddr);
-//    DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
   }
   static void setUnwindDebugHookAddr(mword addr) {
     unWindDebugHookAddr = addr;
@@ -53,17 +49,6 @@ public:
     numInitialized = cpuIdx+1;
     gdbCPUs[cpuIdx].setCpuState(cpuState::RUNNING);
     return &gdbCPUs[cpuIdx];
-  }
-
-  // enumerate CPUs
-  static inline void startEnumerate() {
-    ScopedLock<> so(mutex);
-    enumIdx = 0;
-  }
-  static inline GdbCpu* next() {
-    ScopedLock<> so(mutex);
-    if (enumIdx < numCpu) return &gdbCPUs[enumIdx++];
-    return nullptr;
   }
 
   // returns buffer storing gdb manipulated registers for current CPU
@@ -106,7 +91,7 @@ public:
 
   static inline void incrementRip() { getCurrentCpu()->incrementRip(); }
   static inline void decrementRip() { getCurrentCpu()->decrementRip(); }
-  static inline void resetRip() { getCurrentCpu()->resetRip(); }
+  static inline void resetRip()     { getCurrentCpu()->resetRip(); }
 
   // returns CPU name used by Gdb
   static inline const char* getCpuName(int cpuIdx) {
@@ -198,9 +183,7 @@ private:
   static GdbCpu* gdbCPUs;
   static int numCpu;
   static int numInitialized;
-  static int enumIdx;
   static NonBlockSemaphore* sem;          // split binary semaphore
-  static SpinLock mutex;
   static mword unWindDebugHookAddr;
 };
 

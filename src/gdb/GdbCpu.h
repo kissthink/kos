@@ -55,31 +55,17 @@ class GdbCpu {
   uint64_t stack[bufferSize];
   uint64_t* stackEnd = stack + bufferSize;
   char cpuName[cpuNameLen];                 // in format (Core %d) [State]
-  char cpuIdxStr[cpuIndexLen];              // used by GDB RSP (remote serial protocol)
   int cpuIndex;
   cpuState::cpuStateEnum state;             // current state
   bool ripDecremented;                      // rip is decremented for int 3 with 's'
 
-
-  // initialize CPU info for human and gdb
-  inline void setCpuName() {
-    setString(cpuName, cpuNameLen, "CPU %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
-  }
-  inline void setCpuIdxStr() {
-    setString(cpuIdxStr, cpuIndexLen, "m%d", cpuIndex+1);
-    setCpuName();
-  }
-  void setString(char* buf, size_t len, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buf, len, format, args);
-    va_end(args);
+  inline void setCpuName() {                // CPU names for human (info thread)
+    snprintf(cpuName, cpuNameLen, "CPU %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
   }
 
 public:
   GdbCpu(): state(cpuState::UNKNOWN), ripDecremented(false) {
     memset(cpuName, 0, sizeof(char) * cpuNameLen);
-    memset(cpuIdxStr, 0, sizeof(char) * cpuIndexLen);
     memset(stack, 0, sizeof(uint64_t) * bufferSize); 
     memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
     memset(reg32Buffer, 0, numRegs32 * sizeof(reg32));
@@ -88,7 +74,7 @@ public:
   // name/idx manipulation
   inline void setCpuId(int cpuIdx) {
     cpuIndex = cpuIdx;
-    setCpuIdxStr();
+    setCpuName();
   }
   inline void setCpuState(cpuState::cpuStateEnum newState) {
     state = newState;
@@ -99,9 +85,6 @@ public:
   }
   inline const char* getName() const {
     return cpuName;
-  }
-  inline const char* getCpuIdxStr() const {
-    return cpuIdxStr;
   }
 
   inline uint64_t* stackPtr() const {   // per-CPU stack area reserved for gdb
