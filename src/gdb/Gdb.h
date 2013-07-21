@@ -27,7 +27,7 @@ public:
   }
   static void setUnwindDebugHookAddr(mword addr) {
     unWindDebugHookAddr = addr;
-    DBG::outln(DBG::Basic, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
+    DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook address: ", FmtHex(unWindDebugHookAddr));
   }
 
   // gives pointer to asked GdbCpu object

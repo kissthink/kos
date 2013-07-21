@@ -8,15 +8,17 @@
 #include "gdb/gdb_asm_functions.h"
 #include "gdb/NonBlockSemaphore.h"
 #include "gdb/VContAction.h"
-#include "gdb/List.h"
 #include "kern/Thread.h"
 #include "mach/Machine.h"
 #include "mach/Processor.h"
 #include "kern/Debug.h"
+#include "kern/KernelHeap.h"
 #include "util/EmbeddedQueue.h"
 
 #undef __STRICT_ANSI__
 #include <cstdio>
+
+#include <map>
 
 // function stubs for Gdb remote serial protocol
 void putDebugChar(unsigned char ch) {
@@ -29,19 +31,7 @@ void exceptionHandler(int exceptionNumber, void (*exceptionAddr)()) {
   Machine::setupIDT(exceptionNumber, reinterpret_cast<vaddr>(exceptionAddr));
 }
 
-class BreakPoint {
-  mword addr;
-  char opcode;
-public:
-  BreakPoint(): addr(0), opcode(0) {}
-  BreakPoint(mword addr, char opCode): addr(addr), opcode(opCode) {}
-  void set(mword a, char op) { addr = a; opcode = op; }
-  char getOpcode() const { return opcode; }
-  bool operator==(const BreakPoint& bp) const {
-    return addr == bp.addr;
-  }
-};
-static List<BreakPoint> bpList;             // tracks breakpoints inserted from gdb's requests
+static map<mword,char,less<mword>,KernelAllocator<mword>> bpMap;
 
 #define BREAKPOINT() asm("int $3");
 extern "C" void handle_exception(int64_t);
@@ -638,12 +628,10 @@ static bool handleSetSoftBreak(char* in, char* out) {
   long addr, length;
   gdbFaultHandlerSet = 1;             // enable fault handler
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
-    BreakPoint* bp = new BreakPoint;
     mem_err = 0;
     char opCode = get_char((char *)addr);
     if (mem_err) goto softbreak_err;
-    bp->set(addr, opCode);
-    bpList.insertEnd(*bp, true);      // reuse if duplicate exists
+    bpMap[(mword)addr] = opCode;
     KASSERT1(length == 1, length);    // 1 byte for x86-64?
     DBG::outln(DBG::GDBDebug, "set breakpoint at ", FmtHex(addr));
     MemoryBarrier();                  // unfortunately need this to protect above debug print
@@ -668,11 +656,9 @@ static bool handleRemoveSoftBreak(char* in, char* out) {
   long addr, length;
   gdbFaultHandlerSet = 1;             // enable fault handler
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
-    BreakPoint curBp = { (mword)addr, *(char *)addr };
-    Node<BreakPoint>* bp = bpList.search(curBp);
-    if (bp) {
+    if (bpMap.count((mword)addr)) {
       mem_err = 0;
-      set_char((char *)addr, bp->getElement().getOpcode());
+      set_char((char *)addr, bpMap[(mword)addr]);
       if (mem_err) goto softbreak_err;
       MemoryBarrier();
       DBG::outln(DBG::GDBDebug, "remove breakpoint at ", FmtHex(addr));
