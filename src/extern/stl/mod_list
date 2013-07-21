@@ -1,0 +1,17 @@
+#ifndef _mod_list_
+#define _mod_list_ 1
+
+#include <list>
+using namespace std;
+#include "mod_stl_list.h"
+#include "inplace_allocator.h"
+
+template <typename T>
+using InPlaceList = modstd::list<T,InPlaceAllocator<T,0>>;
+
+template <typename T>
+static constexpr size_t list_elem_size() {
+	return sizeof(_List_node<T>);
+}
+
+#endif /* _mod_list_ */

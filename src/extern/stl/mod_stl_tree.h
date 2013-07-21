@@ -65,8 +65,6 @@
 #include <bits/stl_function.h>
 #include <bits/cpp_type_traits.h>
 
-using namespace std;
-
 namespace modstd _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION

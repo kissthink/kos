@@ -17,7 +17,7 @@
 #ifndef _BlockingSync_h_
 #define _BlockingSync_h_ 1
 
-#include "util/EmbeddedQueue.h"
+#include "extern/stl/mod_list"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
 #include "kern/Scheduler.h"
@@ -25,7 +25,7 @@
 #include "ipc/SpinLock.h"
 
 class BlockingSync {
-  EmbeddedQueue<Thread> threadQueue;
+  InPlaceList<Thread*> threadQueue;
 protected:
   SpinLock lk;
   ~BlockingSync() {
@@ -33,12 +33,12 @@ protected:
     while (!threadQueue.empty()) resume();
   }
   void suspend() {
-    threadQueue.push(Processor::getCurrThread());
+    threadQueue.push_back(Processor::getCurrThread());
     kernelScheduler.suspend(lk);
   }
   Thread* resume() {
     Thread* t = threadQueue.front();
-    threadQueue.pop();
+    threadQueue.pop_front();
     kernelScheduler.start(*t);
     return t;
   }

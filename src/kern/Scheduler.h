@@ -17,7 +17,7 @@
 #ifndef _Scheduler_h_
 #define _Scheduler_h_ 1
 
-#include "util/EmbeddedQueue.h"
+#include "extern/stl/mod_list"
 #include "ipc/SpinLock.h"
 
 class Thread;
@@ -25,7 +25,7 @@ class Thread;
 class Scheduler {
   friend class Thread; // lk
   volatile SpinLock lk;
-  EmbeddedQueue<Thread> readyQueue[2];
+  InPlaceList<Thread*> readyQueue[2];
   void ready(Thread& t);
   void schedule();
   void yieldInternal();

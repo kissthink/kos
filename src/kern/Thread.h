@@ -17,7 +17,7 @@
 #ifndef _Thread_h_
 #define _Thread_h_ 1
 
-#include "util/EmbeddedQueue.h"
+#include "extern/stl/mod_set"
 #include "mach/platform.h"
 #include "mach/stack.h"
 #include "kern/Kernel.h"
@@ -25,7 +25,8 @@
 
 class AddressSpace;
 
-class Thread : public EmbeddedElement<Thread> {
+class Thread {
+  char meta[set_elem_size<Thread*>()];
 public:
   static const size_t defaultStack = 2 * pagesize<1>();
 private:

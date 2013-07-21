@@ -21,7 +21,7 @@
 #include "kern/Thread.h"
 
 void Scheduler::ready(Thread& t) {
-  readyQueue[t.getPrio()].push(&t);
+  readyQueue[t.getPrio()].push_back(&t);
 }
 
 // extremely simple 2-class prio scheduling!
@@ -30,10 +30,10 @@ void Scheduler::schedule() {
   Thread* prevThread = Processor::getCurrThread();
   if unlikely(!readyQueue[1].empty()) {
     nextThread = readyQueue[1].front();
-    readyQueue[1].pop();
+    readyQueue[1].pop_front();
   } else if likely(!readyQueue[0].empty()) {
     nextThread = readyQueue[0].front();
-    readyQueue[0].pop();
+    readyQueue[0].pop_front();
   } else {
     nextThread = Processor::getIdleThread();
   }
