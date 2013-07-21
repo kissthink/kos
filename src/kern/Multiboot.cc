@@ -95,6 +95,7 @@ void Multiboot::parseAll(laddr& modStart, laddr& modEnd) {
       break;
     case MULTIBOOT_TAG_TYPE_ELF_SECTIONS: {
       DBG::outln(DBG::Boot, "elf section info present");
+#if 0
       multiboot_tag_elf_sections* elf = (multiboot_tag_elf_sections*)tag;
       mword entry = (mword)elf->sections;
       mword stringTable = 0;
@@ -128,6 +129,7 @@ void Multiboot::parseAll(laddr& modStart, laddr& modEnd) {
         entry += (mword)elf->entsize;
       }
       DBG::out(DBG::Boot, kendl);
+#endif
     } break;
     case MULTIBOOT_TAG_TYPE_APM:
       DBG::outln(DBG::Boot, "APM info present");

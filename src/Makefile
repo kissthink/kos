@@ -101,7 +101,7 @@ usb: kernel.sys setup_usb.sh
 	./setup_usb.sh $(USBDEV)
 
 kernel.sys: kernel.sys.debug
-	$(STRIP) $@.debug -K _Unwind_DebugHook -o $@
+	$(STRIP) $@.debug -o $@
 
 # rebuild binary from scratch to enforce file order: boot.o must be first
 kernel.sys.debug: linker.ld $(BOOT_OBJECTS) $(OBJECTS) $(AS_OBJECTS) $(LIBS)

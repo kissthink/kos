@@ -41,6 +41,7 @@ namespace cpuState {
 
 const int numRegs64  = 17;
 const int numRegs32  = 7;
+const int numRegs = numRegs64 + numRegs32;
 const int bufferSize = (1<<20);
 const int cpuNameLen = 20;
 const int cpuIndexLen = 10;

@@ -34,6 +34,7 @@ class BreakPoint {
   char opcode;
 public:
   BreakPoint(): addr(0), opcode(0) {}
+  BreakPoint(mword addr, char opCode): addr(addr), opcode(opCode) {}
   void set(mword a, char op) { addr = a; opcode = op; }
   char getOpcode() const { return opcode; }
   bool operator==(const BreakPoint& bp) const {
@@ -44,7 +45,7 @@ static List<BreakPoint> bpList;             // tracks breakpoints inserted from 
 
 #define BREAKPOINT() asm("int $3");
 extern "C" void handle_exception(int64_t);
-static const int BUFMAX = 4096;             // max number of chars in inbound/outbound buffers
+static const int BUFMAX = 8096;             // max number of chars in inbound/outbound buffers
 static char initialized;                    // boolean flag. != 0 means we've been initialized
 static const char hexchars[]="0123456789abcdef";
 static atomic<bool>isFree(true);            // baton is not picked up.
@@ -216,7 +217,7 @@ void putpacket (char *buffer) {
 volatile int gdbFaultHandlerSet = 0;  // can activate fault handler for gdb session
 volatile int mem_err = 0;             // flags an error from mem2hex/hex2mem
 // put mem to buf in hex format and return next buf position
-char* mem2hex (char *mem, char *buf, int count, int may_fault) {
+char* mem2hex (const char *mem, char *buf, int count, int may_fault) {
   gdbFaultHandlerSet = (may_fault > 0);
   for (int i = 0; i < count; i++) {
     unsigned char ch = get_char(mem++);
@@ -471,11 +472,289 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
   }
 }
 
+// gdb front-end queries gdb stub's supported features
+static bool handleQSupported(char* in, char* out) {
+  if (!strncmp(in, "Supported", 9)) {
+    strcpy(out, "PacketSize=1000");       // allow max 4096 bytes per packet
+    return true;
+  }
+  return false;
+}
+
+// return current thread ID
+static bool handleQC(char* in, char* out) {
+  if (*in == 'C') {
+    int threadId = Processor::getApicID()+1;
+    out[0] = 'Q'; out[1] = 'C';
+    out[2] = hexchars[threadId >> 4];
+    out[3] = hexchars[threadId % 16];
+    out[4] = 0;
+    return true;
+  }
+  return false;
+}
+
+// tells if gdb stub process is attached to existing processor created new
+static bool handleQAttached(char* in, char* out) {
+  if (!strncmp(in, "Attached", 8)) {
+    out[0] = '0';   // stub should be killed when session is ended with 'quit'
+    out[1] = 0;
+    return true;
+  }
+  return false;
+}
+
+// tell section offsets target used when relocating kernel image?
+static bool handleQOffsets(char* in, char* out) {
+  if (!strncmp(in, "Offsets", 7)) {
+    strcpy(out, "Text=0;Data=0;Bss=0");   // FIXME: not 100% sure
+    return true;
+  }
+  return false;
+}
+
+// gdb stub can ask for symbol lookups
+static bool handleQSymbol(char* in, char* out) {
+  if (!strncmp(in, "Symbol::", 8)) {
+    strcpy(out, "qSymbol:"); out += 8;
+    const char* symbolName = "_Unwind_DebugHook";
+    mem2hex(symbolName, out, strlen(symbolName), 0);
+    return true;
+  }
+  return false;
+}
+
+// parse replies from above symbol lookup requests (Only looks up _Unwind_DebugHook for now)
+static bool handleQSymbolLookup(char* in, char* out) {
+  if (!strncmp(in, "Symbol:", 7)) {
+    in = in + 7;
+    long addr;
+    if (hexToInt(&in, &addr)) {
+      char buf[50];
+      hex2mem(++in, buf, strlen("_Unwind_DebugHook"), 0);
+      KASSERT0(!strncmp(buf, "_Unwind_DebugHook", strlen("_Unwind_DebugHook")));
+      DBG::outln(DBG::GDBDebug, "lookup address ", FmtHex(addr), '/', buf);
+      Gdb::setUnwindDebugHookAddr((mword)addr);
+      strcpy(out, "OK");
+      return true;
+    }
+  }
+  return false;
+}
+
+// query if trace experiment running now
+static bool handleQTStatus(char* in, char* out) {
+  if (!strncmp(in, "TStatus", 7)) {
+    out[0] = 0;     // QEMU sends empty reply
+    return true;
+  }
+  return false;
+}
+
+// query list of all active thread IDs
+static bool handleQfThreadInfo(char* in, char* out) {
+  if (!strncmp(in, "fThreadInfo", 11)) {
+    int numCpus = Gdb::getNumCpus();
+    out[0] = 'm'; ++out;
+    for (int i = 0; i < numCpus; ++i) {
+      if (i > 0) {
+        out[0] = ','; ++out;
+      }
+      out[0] = hexchars[(i+1) >> 4];
+      out[1] = hexchars[(i+1) % 16];
+      out += 2;
+    }
+    return true;
+  }
+  return false;
+}
+
+// continued querying list of all active thread IDs
+static bool handleQsThreadInfo(char* in, char* out) {
+  if (!strncmp(in, "sThreadInfo", 11)) {
+    out[0] = 'l';
+    return true;
+  }
+  return false;
+}
+
+// ask printable string description of a thread's attribute (used by 'info threads')
+static bool handleQThreadExtraInfo(char* in, char* out) {
+  if (!strncmp(in, "ThreadExtraInfo", 15)) {
+    in += 16;
+    long threadId;
+    if (hexToInt(&in, &threadId)) {
+      const char* info = Gdb::getCpuName(threadId-1);
+      mem2hex(info, in, strlen(info), 0);
+      strcpy(out, in);
+      return true;
+    }
+  }
+  return false;
+}
+
+// thread alive status
+static bool handleT(char* in, char* out) {
+  long threadId;
+  if (hexToInt(&in, &threadId)) {
+    if (threadId >= 1 && threadId <= Gdb::getNumCpus()) {
+      strcpy(out, "OK");
+      return true;
+    }
+  }
+  strcpy(out, "E05");   // unfortunately not well-defined
+  return false;
+}
+
+// set which thread will run subsequent operations ('m','M','g','G',etc)
+// for step/continue ops ('c'), vCont should be used, instead
+static bool handleH(char* in, char* out) {
+  char op = *in++;
+  long threadId;
+  if (hexToInt(&in, &threadId)) {
+    if (threadId > -1) {    // threadId == -1 means all threads
+      // if threadId == 0, any thread can be used
+      if (threadId > 0 && op == 'g') setGCpu(threadId-1);
+      strcpy(out, "OK");
+      return true;
+    }
+  }
+  strcpy(out, "E05");   // unfortunately not well-defined
+  return false;
+}
+
+// tells reason target halted (specifically, which thread stopped with what signal)
+static bool handleReasonTargetHalted(char* in, char* out, int sigval) {
+  int threadId = Processor::getApicID() + 1;
+  out[0] = 'T';
+  out[1] = hexchars[sigval >> 4];
+  out[2] = hexchars[sigval % 16];     out += 3;
+  strcpy(out, "thread:");             out += 7;
+  out[0] = hexchars[threadId >> 4];
+  out[1] = hexchars[threadId % 16];
+  out[2] = ';';
+  return true;
+}
+
+// read general registers
+static bool handleReadRegisters(char* in, char* out) {
+  GdbCpu* gCpu = getGCpu();
+  out = mem2hex((char*)gCpu->getRegs64(), out, numRegs64 * sizeof(reg64), 0);
+  out = mem2hex((char*)gCpu->getRegs32(), out, numRegs32 * sizeof(reg32), 0);
+  return true;
+}
+
+// write general registers
+static bool handleWriteRegisters(char* in, char* out) {
+  GdbCpu* gCpu = getGCpu();
+  hex2mem(in, (char*)gCpu->getRegs64(), numRegs64 * sizeof(reg64), 0);
+  hex2mem(in+numRegs64, (char*)gCpu->getRegs32(), numRegs32 * sizeof(reg32), 0);
+  strcpy(out, "OK");
+  return true;
+}
+
+// write register n with value r
+// TODO check if register in thread set from 'H' packet is used for current thread
+static bool handleWriteRegister(char* in, char* out) {
+  long regno;
+  GdbCpu* gCpu = getGCpu();
+  bool success = false;
+  if (hexToInt(&in, &regno) && *in++ == '=') {
+    if (regno >= 0 && regno < numRegs64) {
+      hex2mem(in, (char *)gCpu->getReg64(regno), sizeof(reg64), 0);
+      success = true;
+    } else if (regno >= numRegs64 && regno < numRegs) {
+      hex2mem(in, (char *)gCpu->getReg32(regno-numRegs64), sizeof(reg32), 0);
+      success = true;
+    }
+  }
+  if (success) strcpy(out, "OK");
+  else strcpy(out, "E05");        // not well-defined
+  return success;
+}
+
+// read memory from given address
+static bool handleReadMemory(char* in, char* out) {
+  long addr, length;
+  if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
+    mem_err = 0;
+    mem2hex((char *)addr, out, length, 1);
+    if (mem_err) strcpy(out, "E03");
+    return !mem_err;
+  }
+  strcpy(out, "E01");
+  return false;
+}
+
+// write to memory at given address
+static bool handleWriteMemory(char* in, char* out) {
+  long addr, length;
+  if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length) && *in++ == ':') {
+    mem_err = 0;
+    hex2mem(in, (char *)addr, length, 1);
+    if (mem_err) strcpy(out, "E03");
+    else strcpy(out, "OK");
+    return !mem_err;
+  }
+  strcpy(out, "E02");
+  return false;
+}
+
+// set software breakpoints
+static bool handleSetSoftBreak(char* in, char* out) {
+  long addr, length;
+  if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
+    BreakPoint* bp = new BreakPoint;
+    char opCode = *(char *)addr;      // little-endian
+    bp->set(addr, opCode);
+    bpList.insertEnd(*bp, true);      // reuse if duplicate exists
+    KASSERT1(length == 1, length);    // 1 byte for x86-64?
+    DBG::outln(DBG::GDBDebug, "set breakpoint at ", FmtHex(addr));
+    MemoryBarrier();                  // unfortunately need this to protect above debug print
+    *(char *)addr = 0xcc;             // set break
+    if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
+      breakOnUnwindDebugHook = true;  // only set for step/next
+      DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook's break set");
+    }
+    strcpy(out, "OK");
+    return true;
+  }
+  strcpy(out, "E03");     // not well-defined
+  return false;
+}
+
+// remove software breakpoints
+static bool handleRemoveSoftBreak(char* in, char* out) {
+  long addr, length;
+  if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
+    BreakPoint curBp = { (mword)addr, *(char *)addr };
+    Node<BreakPoint>* bp = bpList.search(curBp);
+    if (bp) {
+      *(char *)addr = bp->getElement().getOpcode();
+      MemoryBarrier();
+      DBG::outln(DBG::GDBDebug, "remove breakpoint at ", FmtHex(addr));
+      if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
+        breakOnUnwindDebugHook = false;   // remove always as a last step before step/next returns
+        DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook's break removed");
+      }
+      strcpy(out, "OK");
+      return true;
+    }
+  }
+  strcpy(out, "E03");       // not well-defined
+  return false;
+}
+
+// kill request (how to kill?)
+static bool handleKill(char* in, char* out) {
+  ABORT0();   // No description on what to do when individual thread is selected
+  return true;
+}
+
 // does all command processing for interfacing to gdb
 extern "C" void
 handle_exception (int64_t exceptionVector) {
   int sigval;
-  long addr, length;
   char *ptr;
 
   KASSERT0(!Processor::interruptsEnabled());
@@ -562,238 +841,54 @@ handle_exception (int64_t exceptionVector) {
   if (allstop) Gdb::sendIPIToAllOtherCores(0x1);
   entry_q.V();
 
-  breakOnUnwindDebugHook = false;
   while (true) {
     outputBuffer[0] = 0;        // reset out buffer to 0
     memset(outputBuffer, 0, BUFMAX);
     ptr = getpacket ();         // get request from gdb
 
     switch (*ptr++) {
-      case 'q':   // qOffsets, qSupported, qSymbol::
-      {
-        if (strncmp(ptr, "Supported", strlen("Supported")) == 0) {
-          strcpy(outputBuffer, "PacketSize=3E8");  // max packet size = 1000 bytes
-          break;
-        } else if (*ptr == 'C') {
-          strcpy(outputBuffer, "QC1");             // from QEMU's gdbstub.c
-          break;
-        } else if (strncmp(ptr, "Attached", strlen("Attached")) == 0) {
-          outputBuffer[0] = 0;    // empty response, NOT on documentation
-          break;
-        } else if (strncmp(ptr, "Offsets", strlen("Offsets")) == 0) {
-          strcpy(outputBuffer, "Text=0;Data=0;Bss=0");
-          break;
-        } else if (strncmp(ptr, "Symbol::", strlen("Symbol::")) == 0) {
-          strcpy(outputBuffer, "OK");
-          break;
-        } else if (strncmp(ptr, "TStatus", strlen("TStatus")) == 0) {
-          outputBuffer[0] = 0;                     // empty response works instead
-          break;
-        } else if (strncmp(ptr, "fThreadInfo", strlen("fThreadInfo")) == 0) {
-          Gdb::startEnumerate();
-          GdbCpu* state = Gdb::next();
-          strcpy(outputBuffer, state->getCpuIdxStr());
-          break;
-        } else if (strncmp(ptr, "sThreadInfo", strlen("sThreadInfo")) == 0) {
-          GdbCpu* state = Gdb::next();
-          if (state) strcpy(outputBuffer, state->getCpuIdxStr());
-          else strcpy(outputBuffer, "l");
-          break;
-        } else if (strncmp(ptr, "ThreadExtraInfo", strlen("ThreadExtraInfo")) == 0) {
-          ptr += strlen("ThreadExtraInfo,");
-          long cpuIndex;
-          if (hexToInt(&ptr, &cpuIndex)) {
-            char* cpuId = const_cast<char*>(Gdb::getCpuName(cpuIndex-1));
-            mem2hex(cpuId, ptr, strlen(cpuId), 0);
-            strcpy(outputBuffer, ptr);
-            break;
-          }
-        }
-        strcpy(outputBuffer, "qUnimplemented");     // catches unimplemented commands
-      }
-      break;
-      case 'v':
-        gdb_cmd_vresume(ptr, exceptionVector);
-        break;
-      case 'T':
-      {
-        long threadId;
-        if (hexToInt(&ptr, &threadId)) {
-          if (threadId >= -1 && threadId <= Gdb::getNumCpus()) {
-            strcpy(outputBuffer, "OK");
-          } else {
-            strcpy(outputBuffer, "E05");
-          }
-          break;
-        }
-        strcpy(outputBuffer, "E05");
-      }
-      break;
-      case 'H':   // Hc, Hg
-      {
-        char op = ptr[0];
-        ptr++;
-        long threadId;
-        /**
-         * threadId: -1 indicates all threads, 0 implies to pick any thread.
-         */
-        if (hexToInt(&ptr, &threadId)) {
-          if (threadId > 0) {
-            switch (op) {
-              case 'g': setGCpu(threadId-1); break;
-              case 'c': break;
-              default: ABORT1("Invalid Hop"); break;
-            }
-          }
-          strcpy(outputBuffer, "OK");
-          break;
-        }
-        strcpy(outputBuffer, "HUnimplemented");     // catches unimplmented commands
-      }
-      break;
-      case '?':
-        outputBuffer[0] = 'S';
-        outputBuffer[1] = hexchars[sigval >> 4];
-        outputBuffer[2] = hexchars[sigval % 16];
-        outputBuffer[3] = 0;
-        break;
-      case 'g':       // return the value of the CPU registers
-      {
-        char* ptr = outputBuffer;
-        GdbCpu* gCpu = getGCpu();
-        ptr = mem2hex((char *) gCpu->getRegs64(), ptr, numRegs64 * sizeof(reg64), 0);
-        ptr = mem2hex((char *) gCpu->getRegs32(), ptr, numRegs32 * sizeof(reg32), 0);
-      }
-      break;
-      case 'G':       // set the value of the CPU registers - return OK
-      {
-        GdbCpu* gCpu = getGCpu();
-        hex2mem(ptr, (char *) gCpu->getRegs64(), numRegs64 * sizeof(reg64), 0);
-        hex2mem(ptr+numRegs64, (char *) gCpu->getRegs32(), numRegs32 * sizeof(reg32), 0);
-        strcpy (outputBuffer, "OK");
-      }
-        break;
-      case 'P':       // set the value of a single CPU register - return OK
-      {
-        long regno;
-        GdbCpu* gCpu = getGCpu();
-        if (hexToInt (&ptr, &regno) && *ptr++ == '=') {
-          if (regno >= 0 && regno < numRegs64) {
-            hex2mem (ptr, (char *) gCpu->getReg64(regno), sizeof(reg64), 0);
-            strcpy (outputBuffer, "OK");
-            break;
-          } else if (regno >= numRegs64 && regno < numRegs64 + numRegs32) {
-            hex2mem(ptr, (char *) gCpu->getReg32(regno-numRegs64), sizeof(reg32), 0);
-            strcpy(outputBuffer, "OK");
-            break;
-          }
-        }
-        strcpy(outputBuffer, "OK");      // force orig_rax write to pass
-      }
-      break;
-      // mAA..AA,LLLL  Read LLLL bytes at address AA..AA
-      // TRY TO READ %x,%x.  IF SUCCEED, SET PTR = 0
-      case 'm':
-      {
-        if (hexToInt (&ptr, &addr)) {
-          if (*(ptr++) == ',') {
-            if (hexToInt (&ptr, &length)) {
-              ptr = 0;
-              mem_err = 0;
-              mem2hex ((char *) addr, outputBuffer, length, 1);
-              if (mem_err) {
-                strcpy (outputBuffer, "E03");
-              }
-            }
-          }
-        }
-
-        if (ptr) {
-          strcpy (outputBuffer, "E01");
-        }
-      }
-      break;
-      // MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK
-      // TRY TO READ '%x,%x:'.  IF SUCCEED, SET PTR = 0
-      case 'M':
-      {
-        if (hexToInt (&ptr, &addr)) {
-          if (*(ptr++) == ',') {
-            if (hexToInt (&ptr, &length)) {
-              if (*(ptr++) == ':') {
-                mem_err = 0;
-                hex2mem (ptr, (char *) addr, length, 1);
-                if (mem_err) {
-                  strcpy (outputBuffer, "E03");
-                } else {
-                  strcpy (outputBuffer, "OK");
-                }
-                ptr = 0;
-              }
-            }
-          }
-        }
-        if (ptr) {
-          strcpy (outputBuffer, "E02");
-        }
-      }
-      break;
-      case 'Z': {
+      case 'q': {   // queries
+        if (handleQSupported(ptr, outputBuffer)) break;
+        else if (handleQC(ptr, outputBuffer)) break;
+        else if (handleQAttached(ptr, outputBuffer)) break;
+        else if (handleQOffsets(ptr, outputBuffer)) break;
+        else if (handleQSymbol(ptr, outputBuffer)) break;
+        else if (handleQSymbolLookup(ptr, outputBuffer)) break;
+        else if (handleQTStatus(ptr, outputBuffer)) break;
+        else if (handleQfThreadInfo(ptr, outputBuffer)) break;
+        else if (handleQsThreadInfo(ptr, outputBuffer)) break;
+        else if (handleQThreadExtraInfo(ptr, outputBuffer)) break;
+        // TODO if in any case you encounter this, time to support new packets
+        // strcpy(outputBuffer, "qUnimplemented");
+      } break;
+      case 'v': gdb_cmd_vresume(ptr, exceptionVector); break;   // vCont packets
+      case 'T': handleT(ptr, outputBuffer); break;              // is thread alive?
+      case 'H': handleH(ptr, outputBuffer); break;    // set thread for subsequent operation
+      case '?': handleReasonTargetHalted(ptr, outputBuffer, sigval); break;
+      case 'g': handleReadRegisters(ptr, outputBuffer); break;  // read general registers
+      case 'G': handleWriteRegisters(ptr, outputBuffer); break; // write general registers
+      case 'P': handleWriteRegister(ptr, outputBuffer); break;  // write a register
+      case 'm': handleReadMemory(ptr, outputBuffer); break;     // read memory
+      case 'M': handleWriteMemory(ptr, outputBuffer); break;    // write to memory
+      case 'Z': {   // set breaks, watchpoints, etc
         long int type;
         if (hexToInt(&ptr, &type)) {
+          ptr++;
           switch (type) {
-            case 0: {
-              ptr++;
-              if (hexToInt(&ptr, &addr)) {
-                if (*(ptr++) == ',') {
-                  if (hexToInt(&ptr, &length)) {
-                    BreakPoint* bp = new BreakPoint;
-                    char opcode = *(char *)addr;
-                    DBG::outln(DBG::Basic, "opcode ", opcode);
-                    bp->set(addr, opcode);
-                    bpList.insertEnd(*bp, true);
-                    KASSERT1(length == 1, length);    // 1 byte for x86?
-                    *(char *)addr = 0xcc;
-                    if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
-                      breakOnUnwindDebugHook = true;
-                      DBG::outln(DBG::Basic, "debughook on break");
-                    }
-                    strcpy(outputBuffer, "OK");
-                  }
-                }
-              }
-            }
+            case 0: handleSetSoftBreak(ptr, outputBuffer); break;     // set soft breakpoint
           }
         }
-      }
-      break;
+      } break;
       case 'z': {
         long int type;
         if (hexToInt(&ptr, &type)) {
+          ptr++;
           switch (type) {
-            case 0: {
-              ptr++;
-              if (hexToInt(&ptr, &addr)) {
-                if (*(ptr++) == ',') {
-                  if (hexToInt(&ptr, &length)) {
-                    BreakPoint curBp;
-                    curBp.set(addr, *(char *)addr);
-                    Node<BreakPoint>* bp = bpList.search(curBp);
-                    KASSERT0(bp);
-                    DBG::outln(DBG::Basic, "Remove breakpoint at ", FmtHex(addr), " ", FmtHex(bp->getElement().getOpcode()));
-                    *(char *)addr = bp->getElement().getOpcode();
-                    strcpy(outputBuffer, "OK");
-                  }
-                }
-              }
-            }
+            case 0: handleRemoveSoftBreak(ptr, outputBuffer); break;  // remove soft breakpoint
           }
         }
-      }
-      break;
-      // kill the program
-      case 'k':       // do nothing
-          break;
+      } break;
+      case 'k': handleKill(ptr, outputBuffer); break;           // kill KOS
     } // switch
 
     // reply to the request
