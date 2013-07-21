@@ -57,14 +57,13 @@ class GdbCpu {
   char cpuName[cpuNameLen];                 // in format (Core %d) [State]
   int cpuIndex;
   cpuState::cpuStateEnum state;             // current state
-  bool ripDecremented;                      // rip is decremented for int 3 with 's'
 
   inline void setCpuName() {                // CPU names for human (info thread)
     snprintf(cpuName, cpuNameLen, "CPU %d [%s]", cpuIndex+1, cpuState::cpuStateStr[state]);
   }
 
 public:
-  GdbCpu(): state(cpuState::UNKNOWN), ripDecremented(false) {
+  GdbCpu(): state(cpuState::UNKNOWN) {
     memset(cpuName, 0, sizeof(char) * cpuNameLen);
     memset(stack, 0, sizeof(uint64_t) * bufferSize); 
     memset(reg64Buffer, 0, numRegs64 * sizeof(reg64));
@@ -115,20 +114,15 @@ public:
   // manipulate stored registers
   // thread-safe as only called by its own CPU
   inline void decrementRip() {
-    if (!ripDecremented) {
-      reg64Buffer[registers::RIP] -= 1;
-      ripDecremented = true;
-    }
+    reg64Buffer[registers::RIP] -= 1;
   }
   inline void incrementRip() {
-    if (ripDecremented) {
+    unsigned char opCode = *(unsigned char *) reg64Buffer[registers::RIP];
+    if (opCode == 0xcc) {
       reg64Buffer[registers::RIP] += 1;
-      ripDecremented = false;
       DBG::outln(DBG::GDBDebug, "rip incremented");
     }
   }
-  inline void resetRip() { ripDecremented = false; }
-
 } __attribute__((aligned(4096)));   // required to compile
 
 

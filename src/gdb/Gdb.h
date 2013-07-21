@@ -91,7 +91,6 @@ public:
 
   static inline void incrementRip() { getCurrentCpu()->incrementRip(); }
   static inline void decrementRip() { getCurrentCpu()->decrementRip(); }
-  static inline void resetRip()     { getCurrentCpu()->resetRip(); }
 
   // returns CPU name used by Gdb
   static inline const char* getCpuName(int cpuIdx) {

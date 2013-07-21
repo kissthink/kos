@@ -56,7 +56,6 @@ static bool* shouldReturnFromException;     // return from interrupt handler rig
 static NonBlockSemaphore entry_q;           // entry/exit protocol
 static GdbCpu** gCpu = nullptr;             // cpu states used exclusively for 'g' operations
 static EmbeddedQueue<VContAction> vContActionQueue;   // vCont packets are queued here
-static VContAction* prevAction = nullptr;   // previous vContAction
 static bool allstop = false;                // allstop mode
 void *mem_fault_return_addr = nullptr;      // where to return from fault handler?
 static bool* preempt;                       // tracks whether preemption was disabled by gdb
@@ -364,7 +363,7 @@ VContAction* parseVCont(char* ptr) {
 // Precondition: entry_q lock must be held.
 void consumeVContAction() {
   VContAction* action = vContActionQueue.front();
-  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), "consuming: ", *action);
+  DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " consuming: ", *action);
   KASSERT0(action && !action->executed && action->isForCurrentThread());
   clearTFBit();   // set TF bit if 's' (stepi/step/next)
   if (action->action[0] == 's') setTFBit();
@@ -377,9 +376,9 @@ void consumeVContAction() {
     } // no return here
     // continue
     isBatonFree = false;                  // keep baton for now and look for thread to pass it to
-    // increment rip only if it was actual breakpoint set by user (not set by gdb for next)
-    if (prevAction == nullptr || prevAction->action[0] != 'c') Gdb::incrementRip();
-    // first, look for a waiting thread to pass baton. If there is no one, then release baton
+    Gdb::incrementRip();                  // we must increment rip if original instruction was 'int3'
+                                          // since we do not set TF bit for 'continue', 'int3' will
+                                          // be invoked again. (int3 is considered as FAULT??)
     for (int i = 0; i < Gdb::getNumCpusInitialized(); i++) {
       if (waiting[i]) {
         waiting[i] = false;
@@ -705,7 +704,6 @@ extern "C" void handle_exception (int64_t exceptionVector) {
 
   KASSERT0(!Processor::interruptsEnabled());
   enablePreemption();     // restore preemption if disabled by gdb stub
-  Gdb::resetRip();        // restore rip manipulation
   Gdb::setCpuState(cpuState::BREAKPOINT);
 
   DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), ", vector=", exceptionVector,
@@ -731,7 +729,7 @@ extern "C" void handle_exception (int64_t exceptionVector) {
     DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " will wait for ", lockHolder+1);
     entry_q.V();  // entry protocol end
     Gdb::P(threadId);               // wait till the baton is passed
-    DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " holds a baton");
+    DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " received a baton");
     if (shouldReturnFromException[threadId]) {    // for allstop mode
       DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " exiting");
       shouldReturnFromException[threadId] = false;
@@ -751,8 +749,7 @@ extern "C" void handle_exception (int64_t exceptionVector) {
   if (!vContActionQueue.empty()) {
     VContAction* action = vContActionQueue.front();
     if (action->executed) {             // did I just execute vCont packet?
-      DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " done:", *action);
-      prevAction = action;              // remember previous action (if 'c' don't increment rip)
+      DBG::outln(DBG::GDBDebug, "T=", getCurrCpuId(), " done ", *action);
       vContActionQueue.pop();
       KASSERT0(vContActionQueue.empty());
       sendStopReply(outputBuffer, sigval);
