@@ -20,8 +20,6 @@
 void Thread::invoke(function_t func, ptr_t data) {
   KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
   kernelScheduler.lk.release();
-//  KASSERT0(!Processor::interruptsEnabled());
-  CPU::enableInterrupts();
   func(data);
   /* sync/lock with join */
   kernelScheduler.suspend();

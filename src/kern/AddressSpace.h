@@ -64,6 +64,7 @@ private:
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
       KASSERT1(lma != topaddr, size);
       PageManager::map<N>(vma, lma, owner, t, *Processor::getFrameManager());
+      DBG::outln(DBG::VM, "AS/map ", FmtHex(lma), " -> ", FmtHex(vma));
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();
     }
@@ -81,6 +82,7 @@ private:
       KASSERTN((idx >= pagesizebits<N>() && idx < pagebits), FmtHex(vma), '/', idx)
       laddr lma = PageManager::unmap<N>(vma, *Processor::getFrameManager(), (idx - pagesizebits<N>()) / pagetablebits);
       if (alloc) Processor::getFrameManager()->release(lma, pagesize<N>());
+      DBG::outln(DBG::VM, "AS/unmap ", FmtHex(lma), " -> ", FmtHex(vma));
       vma += pagesize<N>();
     }
     return true;

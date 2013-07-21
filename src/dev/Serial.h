@@ -36,14 +36,11 @@ class SerialDevice0 { // see http://wiki.osdev.org/Serial_Ports
     out8(SerialPort0 + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
 //    out8(SerialPort0 + 4, 0x0B);    // IRQs enabled, RTS/DSR set
   }
-  static void setGdb(bool g) {      // DBG::test(DBG::GDBEnable) not usable until multiboot::init
-    gdb = g;
-  }
 public:
   static void write(char c) {
     while ((in8(SerialPort0 + 5) & 0x20) == 0);
     out8(SerialPort0, c);
-    if likely(gdb || c != '\n') return;
+    if (gdb || c != '\n') return;
     // inject LF to make serial output appear properly
     while ((in8(SerialPort0 + 5) & 0x20) == 0);
     out8(SerialPort0, '\r');

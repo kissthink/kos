@@ -77,6 +77,6 @@ stackInitSimple:            # stack, func -> new stack
 # movq $0, -40(%rdi)          # indirectly set r12 to 0
 # movq $0, -32(%rdi)          # indirectly set rbx to 0
 movq $0, -24(%rdi)          # indirectly set rbp to 0
-movq %rsi, -16(%rdi)        # push stub function as return address
+movq %rsi, -16(%rdi)        # push 'func' function as return address
 leaq -64(%rdi), %rax        # prepare return value
 ret

@@ -23,5 +23,6 @@ extern "C" void loadIDT(ptr_t idt, uint16_t size);
 extern "C" void loadGDT(ptr_t gdt, uint16_t size);
 extern "C" void clearLDT();
 extern "C" void loadTR(uint16_t selector);
+extern "C" void syscallHandler(void);
 
 #endif /* _asm_functions_h_ */

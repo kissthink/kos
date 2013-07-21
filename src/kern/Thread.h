@@ -26,7 +26,9 @@
 class AddressSpace;
 
 class Thread : public EmbeddedElement<Thread> {
+public:
   static const size_t defaultStack = 2 * pagesize<1>();
+private:
   friend class Scheduler; // stackPointer
   AddressSpace* addressSpace;
   vaddr stackPointer;
@@ -71,7 +73,7 @@ public:
     stackPointer = stackInitIndirect(stackPointer, func, data, (void*)Thread::invoke);
     kernelScheduler.start(*this);
   }
-  void runDirect(funcvoid_t func) { // combine stackInitSimple and stackStart?
+  void runDirect(funcvoid_t func) {
     stackPointer = stackInitSimple(stackPointer, func);
     stackStart(stackPointer);
   }

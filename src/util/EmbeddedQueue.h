@@ -19,23 +19,23 @@
 
 #include "Output.h"
 
-template<typename T, int ID = 0> class EmbeddedQueue;
+template<typename T> class EmbeddedQueue;
 
-template<typename T, int ID = 0> class EmbeddedElement {
-  friend class EmbeddedQueue<T,ID>;
+template<typename T> class EmbeddedElement {
+  friend class EmbeddedQueue<T>;
   T* next;
 };
 
-template<typename T, int ID> class EmbeddedQueue {
+template<typename T> class EmbeddedQueue {
   T* head;
   T* tail;
 public:
   EmbeddedQueue() : head(nullptr) {}
   bool empty() const { return head == nullptr; }
   void push(T* e) {
-    e->EmbeddedElement<T,ID>::next = nullptr;
+    e->EmbeddedElement<T>::next = nullptr;
     if unlikely(empty()) head = e;
-    else tail->EmbeddedElement<T,ID>::next = e;
+    else tail->EmbeddedElement<T>::next = e;
     tail = e;
   }
   T* front() {
@@ -48,7 +48,7 @@ public:
   }
   void pop() {
     KASSERT0(!empty());
-    head = head->EmbeddedElement<T,ID>::next;
+    head = head->EmbeddedElement<T>::next;
   }
 };
 

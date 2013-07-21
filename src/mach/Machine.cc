@@ -33,6 +33,16 @@
 #include <atomic>
 #include <list>
 
+// check various assumptions about data type sizes
+static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
+static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
+static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
+static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
+static_assert(sizeof(LAPIC) == 0x400, "sizeof(LAPIC) != 0x400" );
+static_assert(sizeof(LAPIC) <= pagesize<1>(), "sizeof(LAPIC) <= pagesize<1>()" );
+static_assert(sizeof(InterruptDescriptor) == 2 * sizeof(mword), "sizeof(InterruptDescriptor) != 2 * sizeof(mword)" );
+static_assert(sizeof(SegmentDescriptor) == sizeof(mword), "sizeof(SegmentDescriptor) != sizeof(mword)" );
+
 // symbols from boot.asm that point to 16-bit boot code location
 extern const char boot16Begin, boot16End;
 
@@ -49,17 +59,13 @@ extern const char __BootHeap,   __BootHeapEnd;
 char Screen::buffer[xmax * ymax];
 char* Screen::video = nullptr;
 
-// descriptor tables
-InterruptDescriptor Machine::idt[Machine::maxIDT] __aligned(0x1000);
-SegmentDescriptor   Machine::gdt[Machine::maxGDT] __aligned(0x1000);
-
-// task state segment -> needed later...
-static TaskStateSegment tss;
+// interrupt descriptor tables
+static const unsigned int maxIDT = 256;
+InterruptDescriptor idt[maxIDT] __aligned(0x1000);
 
 // static global objects
 static FrameManager frameManager;
 static Multiboot multiboot                        __section(".boot.data");
-
 // flag to check for initial test IPI
 static bool tipiReceived                          __section(".boot.data");
 
@@ -79,21 +85,11 @@ Machine::IrqOverrideInfo* Machine::irqOverrideTable = nullptr;
 
 // static keyboard and RTC object
 static Keyboard keyboard;
-volatile static PIT pit;
-volatile static RTC rtc;
-
-// check various assumptions about data type sizes
-static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
-static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
-static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
-static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
-static_assert(sizeof(LAPIC) == 0x400, "sizeof(LAPIC) != 0x400" );
-static_assert(sizeof(LAPIC) <= pagesize<1>(), "sizeof(LAPIC) <= pagesize<1>()" );
-static_assert(sizeof(InterruptDescriptor) == 2 * sizeof(mword), "sizeof(InterruptDescriptor) != 2 * sizeof(mword)" );
-static_assert(sizeof(SegmentDescriptor) == sizeof(mword), "sizeof(SegmentDescriptor) != sizeof(mword)" );
+static PIT pit;
+static RTC rtc;
 
 // simple thread to print keycode on screen
-static void keybThread(ptr_t) {
+static void keybLoop(ptr_t) {
   StdErr.out(' ');
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
@@ -105,77 +101,43 @@ static void keybThread(ptr_t) {
   }
 }
 
-void Machine::loadTSSRSP(uint8_t privilegeLevel,vaddr RSP)
-{
-	if(privilegeLevel > 2)
-	{
-		StdErr.outln("Invalid Privilege Level!");
-		return;
-	}
-
-	tss.rsp[privilegeLevel] = RSP;
-}
-
-extern "C" void handleSysCall(){
-	StdErr.outln("YEAAHHHHH it's workinggggggg");
-  }
-
-// main init routine for APs, identity paging set up by bootstrap code
+// init routine for APs, on boot stack and identity paging
 void Machine::initAP(funcvoid_t func) {
-  // setup IDT, GDT
-  loadIDT(idt, sizeof(idt));
-  loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-  clearLDT();
-
-  // configure local processor, address space
-  Processor::checkCapabilities(false);
-  processorTable[apIndex].install(frameManager);
-  kernelSpace.activate();
-  Thread* apIdleThread = Thread::create(kernelSpace, "AP/idle", pagesize<1>());
-  processorTable[apIndex].init(*apIdleThread, Gdb::setupGdb(apIndex));
-
-  // print brief message -> confirm startup, output *after* interrupts enabled
-  DBG::out(DBG::Basic, ' ', apIndex);
-
-  // leave boot stack & invoke idle thread -> 'func' will call initAP2
-  apIdleThread->runDirect(func);
+  // init and install processor object
+  processorTable[apIndex].init(frameManager, kernelSpace, idt, sizeof(idt));
+  // start main/idle loop
+  Processor::start(func);
 }
 
-// 2nd init routine for APs - on new stack, processor object initialized
+// on proper stack, processor initialized
 void Machine::initAP2() {
-  // enable APIC
-  Processor::enableAPIC(0xf8);             // confirm spurious vector at 0xf8
-
-  // enable interrupts, sync with BSP, then halt
-  Processor::enableInterrupts();
-  DBG::out(DBG::Basic, 'H');
-  apIndex = bspIndex;
+  Processor::enableInterrupts();         // enable interrupts (off boot stack)
+  DBG::out(DBG::Basic, ' ', apIndex);
+  apIndex = bspIndex;                    // sync with BSP, then halt
   Halt();
 }
 
-// main init routine for BSP
+// init routine for BSP, on boot stack and identity paging
 void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // initialize bss
   memset((char*)&__KernelBss, 0, &__KernelBssEnd - &__KernelBss);
-
-  // initialize basic devices
-  Screen::init(kernelBase); // kernelBase, b/c no identity mapping later
-  SerialDevice0::init();    // no interrupts
-  DebugDevice::init();      // qemu debug device
 
   // initialize MBI & debugging: no debug output before this point!
   vaddr mbiEnd = multiboot.init(magic, mbiAddr + kernelBase);
   // determine end addresses of kernel overall (except modules)
   vaddr kernelEnd = align_up(mbiEnd, pagesize<2>());
 
-  SerialDevice0::setGdb(DBG::test(DBG::GDBEnable));   // DBG::test works here
+  // initialize basic devices
+  Screen::init(kernelBase);                        // no identity mapping later
+  SerialDevice0::init(DBG::test(DBG::GDBEnable));  // no interrupts
+  DebugDevice::init();                             // qemu debug device
 
   // give kernel heap pre-allocated memory -> limited dynamic memory available
   kernelHeap.init(vaddr(&__BootHeap), vaddr(&__BootHeapEnd));
 
   // need dummy processor for lock counter: no locking before this point!
   Processor dummyProcessor;
-  dummyProcessor.install(frameManager);
+  dummyProcessor.initDummy(frameManager);
 
   // call global constructors: %rbx is callee-saved, thus safe to use
   // ostream output cannot be used before this point (i.e. not DBG::out)
@@ -213,7 +175,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "FM/modules: ", frameManager);
   vaddr rsdp = multiboot.getRSDP() - kernelBase;     // get RSDP
 
-  // reserve initial kernel memory
+  // marked boot memory as used
   bool check = frameManager.reserve(vaddr(&__Boot) - kernelBase, kernelEnd - vaddr(&__Boot));
   KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(kernelEnd - vaddr(&__Boot)) );
   DBG::outln(DBG::Basic, "FM/alloc: ", frameManager);
@@ -234,15 +196,13 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   kernelHeap.addMemory(align_up(mbiEnd, pagesize<1>()), kernelEnd);
   DBG::outln(DBG::Basic, "VM/bootstrap: ", kernelHeap);
 
-  // init AddressSpace
+  // init kernel address space
   kernelSpace.setPagetable(pml4addr);
   kernelSpace.setMemoryRange(kernelEnd, topkernel - kernelEnd);
+  kernelSpace.activate();
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
-  // activate new page tables -> proper dynamic memory, but no identity mapping
-  kernelSpace.activate();
-
-  // initialize kernel FS with boot modules
+  // initialize kernel file system with boot modules
   modStart = align_down(modStart, pagesize<2>());
   modEnd = align_up(modEnd, pagesize<2>());
   vaddr modMapped = kernelSpace.mapPages<2>(modStart, modEnd - modStart, AddressSpace::Data);
@@ -250,74 +210,58 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   multiboot.readModules(modMapped - modStart, frameManager, pagesize<2>());
   check = kernelSpace.unmapPages<2>(modMapped, modEnd - modStart);
   KASSERTN(check, FmtHex(modMapped), '-', FmtHex(modEnd - modStart));
-  DBG::outln(DBG::Basic, "FM/modules: ", kernelSpace);
+  DBG::outln(DBG::Basic, "FM/modules: ", frameManager);
   DBG::outln(DBG::Basic, "AS/modules: ", kernelSpace);
 
   // release multiboot memory to heap
   kernelHeap.addMemory(vaddr(&__BootHeapEnd), align_up(mbiEnd, pagesize<1>()));
   DBG::outln(DBG::Basic, "VM/mbi: ", kernelHeap);
 
+  // install global IDT entries -> need to be done, before processor init
+  setupAllIDTs();
+
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
   laddr apicPhysAddr = initACPI(rsdp);
 
-  // map APIC page and enable local APIC
+  // initialize GDB object
+  Gdb::init(cpuCount);
+
+  // remap screen page, before boot memory disappears (later)
+  PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data, frameManager);
+  Screen::setAddress(videoAddr);
+
+  // map APIC page and enable local APIC, get bsp's apic ID
   PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data, frameManager);
-  Processor::enableAPIC(0xf8);              // confirm spurious vector at 0xf8
+  Processor::enableAPIC();
   bspApicID = Processor::getLAPIC_ID();
   for (size_t i = 0; i < cpuCount; i += 1) {
     if (processorTable[i].rApicID() == bspApicID) bspIndex = i;
   }
   DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
 
-  // initialize gdb object -> move up, but need to coordinate with IDT setup
-  Gdb::init(cpuCount);
+  // init and install processor object
+  processorTable[bspIndex].init(frameManager, kernelSpace, idt, sizeof(idt));
 
-  // install IDT entries -> global
-  setupAllIDTs();
-  loadIDT(idt, sizeof(idt));
-
-  // install GDT (replacing boot loader's GDT), TSS, TR, LDT -> per proc!
-  memset(gdt, 0, sizeof(gdt));
-  setupGDT(kernCodeSelector, 0, 0, true);
-  setupGDT(kernDataSelector, 0, 0, false);
-  setupGDT(userCodeSelector, 3, 0, true);
-  setupGDT(userDataSelector, 3, 0, false);
-  memset(&tss, 0, sizeof(TaskStateSegment));
-  setupTSS(tssSelector, (vaddr)&tss);
-  loadGDT(gdt, maxGDT * sizeof(SegmentDescriptor));
-  loadTR(tssSelector * sizeof(SegmentDescriptor));
-  clearLDT();
-
-  // configure BSP processor
-  processorTable[bspIndex].install(frameManager);
-  Thread* bspIdleThread = Thread::create(kernelSpace, "BSP/idle");
-  processorTable[bspIndex].init(*bspIdleThread, Gdb::setupGdb(bspIndex));
-
-  // leave boot stack & invoke main thread -> 'func' will call initBSP2
-  bspIdleThread->runDirect(func);
-}
-
-// 2nd init routine for BSP - on new stack, with proper processor object
-void Machine::initBSP2() {
-  // start gdb
+  // start gdb -> need to have IDT installed
   Gdb::start();
 
   // set up RTC & PIT
   rtc.init();
   pit.init();
 
-  // find additional devices, need "current thread" for ACPI subsystem init
-  parseACPI();
-
-//  kernelSpace.unmapPages<1>(lapicAddr, pagesize<1>()); // debugging only
-  DBG::outln(DBG::Basic, "FM/acpi: ", frameManager);
-  DBG::outln(DBG::Basic, "AS/acpi: ", kernelSpace);
-  DBG::outln(DBG::Basic, "VM/acpi: ", kernelHeap);
-
   // find PCI devices
   PCI::probeAll();
 
-  // enable interrupts; needed for rtc.wait below
+  // find additional devices ("current thread" faked for ACPI)
+  parseACPI();
+
+  // start main/idle loop
+  Processor::start(func);
+}
+
+// on proper stack, processor initialized
+void Machine::initBSP2() {
+  // enable interrupts (off boot stack)
   Processor::enableInterrupts();
 
 #if 0
@@ -329,7 +273,7 @@ void Machine::initBSP2() {
   DBG::outln(DBG::Basic, " done.");
 #endif
 
-  // with interrupts (needed for timeouts): set up keyboard
+  // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();
 
   // send test IPI to self
@@ -338,7 +282,7 @@ void Machine::initBSP2() {
   rtc.wait(5);
   KASSERT0(tipiReceived);
 
-  // start up APs -> serialized, APs go into long mode and then halt
+  // start up APs (must be off boot stack): APs go into long mode and halt
   DBG::out(DBG::Basic, "AP init:");
   for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
     if ( i != bspIndex ) {
@@ -351,19 +295,12 @@ void Machine::initBSP2() {
   }
   DBG::out(DBG::Basic, kendl);
 
-  // update screen's virtual address, before boot memory disappears
-  PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data, frameManager);
-  Screen::setAddress(videoAddr);
-
   // free kernel boot memory
   for ( vaddr x = kernelBase; x < vaddr(&__KernelCode); x += pagesize<2>() ) {
     PageManager::unmap<2>(x, frameManager);
   }
   bool check = frameManager.release(vaddr(&__Boot) - kernelBase, vaddr(&__KernelCode) - vaddr(&__Boot));
   KASSERTN( check, FmtHex(vaddr(&__Boot) - kernelBase), '-', FmtHex(vaddr(&__KernelCode) - vaddr(&__Boot)) );
-//  DBG::outln(DBG::Basic, "FM/free: ", frameManager);
-//  DBG::outln(DBG::Basic, "AS/free: ", kernelSpace);
-//  DBG::outln(DBG::Basic, "VM/free: ", kernelHeap);
 
   // free AP boot code
   check = frameManager.release(BOOT16, pagesize<1>());
@@ -378,7 +315,7 @@ void Machine::initBSP2() {
   }
 
   // create simple keyboard-to-screen thread
-  Thread::create(keybThread, nullptr, kernelSpace, "keyb")->setPrio(1);
+  Thread::create(keybLoop, nullptr, kernelSpace, "keyb")->setPrio(1);
 }
 
 void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
@@ -393,10 +330,17 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
 
 inline void Machine::timerInterrupt(mword counter) {
   if (counter % cpuCount == bspIndex) {
-    if (Processor::preempt()) kernelScheduler.yield();
+    if (Processor::preempt()) {
+      Processor::enableInterrupts(); // new thread on way out won't enable
+      kernelScheduler.yield();
+    }
   } else {
     processorTable[counter % cpuCount].sendWakeUpIPI();
   }
+}
+
+extern "C" void handleSysCall() {
+	StdDbg.outln("NOTE: system call");
 }
 
 extern "C" void isr_handler_0x08() { // double fault
@@ -447,7 +391,10 @@ extern "C" void isr_handler_0x2c() { // mouse interrupt
 
 extern "C" void isr_handler_0x40() {
   Processor::sendEOI();              // EOI *before* switching stacks
-  if (Processor::preempt()) kernelScheduler.yield();
+  if (Processor::preempt()) {
+    Processor::enableInterrupts();   // new thread on way out won't enable
+    kernelScheduler.yield();
+  }
 }
 
 extern "C" void isr_handler_0x41() {
@@ -483,34 +430,9 @@ void Machine::setupIDT(unsigned int number, laddr address) {
   idt[number].Offset00 = (address & 0x000000000000FFFF);
   idt[number].Offset16 = (address & 0x00000000FFFF0000) >> 16;
   idt[number].Offset32 = (address & 0xFFFFFFFF00000000) >> 32;
-  idt[number].SegmentSelector = kernCodeSelector * sizeof(SegmentDescriptor);
+  idt[number].SegmentSelector = Processor::kernCodeSelector * sizeof(SegmentDescriptor);
   idt[number].Type = 0x0E; // 64-bit interrupt gate (trap does not disable interrupts)
   idt[number].P = 1;
-}
-
-void Machine::setupGDT(unsigned int number, unsigned int dpl, uint32_t address, bool code) {
-  KASSERT1(number < maxGDT, number);
-  KASSERT1(dpl < 4, dpl);
-  gdt[number].Base00 = (address & 0x0000FFFF);
-  gdt[number].Base16 = (address & 0x00FF0000) >> 16;
-  gdt[number].Base24 = (address & 0xFF000000) >> 24;
-  gdt[number].RW = 1;
-  gdt[number].C = code ? 1 : 0;
-  gdt[number].S = 1;
-  gdt[number].DPL = dpl;
-  gdt[number].P = 1;
-  gdt[number].L = 1;
-}
-
-void Machine::setupTSS(unsigned int number, laddr address) {
-  SystemDescriptor* tssDesc = (SystemDescriptor*)&gdt[number];
-  tssDesc->Base00 = (address & 0x000000000000FFFF);
-  tssDesc->Base16 = (address & 0x0000000000FF0000) >> 16;
-  tssDesc->Type = 0x9;//Available 64-bit TSS
-  tssDesc->DPL = 3;
-  tssDesc->P = 1;
-  tssDesc->Base24 = (address & 0x00000000FF000000) >> 24;
-  tssDesc->Base32 = (address & 0xFFFFFFFF00000000) >> 32;
 }
 
 void Machine::setupAllIDTs() {

@@ -20,20 +20,6 @@
 # save callee-owned registers, caller-owned automatically saved by handler subroutines
 # see http://x86-64.org/documentation/abi.pdf, Sec 3.2.1
 
-.globl   syscall_handler
-.align   8
-syscall_handler:
-
-pushq %rcx
-call handleSysCall
-popq %rcx
-
-pushq %rcx
-call handleSysCall
-popq %rcx
-
-sysretq
-
 .macro ISR_TOP irq_num
 .globl   isr_wrapper_\irq_num
 .align   8
