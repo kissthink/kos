@@ -48,13 +48,12 @@ extern "C" void handle_exception(int64_t);
 static const int BUFMAX = 8096;             // max number of chars in inbound/outbound buffers
 static char initialized;                    // boolean flag. != 0 means we've been initialized
 static const char hexchars[]="0123456789abcdef";
-static atomic<bool>isFree(true);            // baton is not picked up.
+static atomic<bool>isBatonFree(true);       // baton is not picked up.
 static atomic<int>lockHolder(-1);           // used for holding baton.
 static bool* waiting;                       // represents a CPU waiting on entry queue.
 static bool* shouldReturnFromException;     // return from interrupt handler right away (used for allstop mode)
-static NonBlockSemaphore entry_q;
-static GdbCpu** gCpu = nullptr;
-
+static NonBlockSemaphore entry_q;           // baton; only allows one thread to talk to gdb frontend at a time
+static GdbCpu** gCpu = nullptr;             // cpu states used exclusively for 'g' operations
 static EmbeddedQueue<VContAction> vContActionQueue;
 static Thread* gdbThread = nullptr;         // thread talking to gdb (remember because it moves among cores)
 static VContAction* prevAction = nullptr;   // previous vContAction
@@ -89,6 +88,12 @@ static void enablePreemption() {
     Processor::decLockCount();
     preempt[Processor::getApicID()] = true;
   }
+}
+
+static bool canGrabBaton(int threadId) {
+  if (isBatonFree) return true;
+  if (lockHolder == threadId) return true;
+  return false;
 }
 
 static void scheduleVContAction(bool isContinue = false) {
@@ -401,24 +406,25 @@ void consumeVContAction() {
 
   clearTFBit();
   if (action->action[0] == 's') setTFBit();
-  DBG::outln(DBG::GDBDebug, "Consuming vContAction - ", *action, " isFree ", isFree);
+  DBG::outln(DBG::GDBDebug, "Consuming vContAction - ", *action, " isBatonFree ", isBatonFree);
 
   lockHolder = Processor::getApicID();    // keep entry lock
   if (action->action[0] == 'c') {         // could be from next or continue
     if (breakOnUnwindDebugHook) {         // next
-      isFree = false;                     // hold on to the baton
+      isBatonFree = true;                // hold on to the baton
       scheduleVContAction();
       _returnFromExceptionLocked();
     }
     // continue
-    isFree = true;                        // free baton
+    isBatonFree = true;                        // free baton
     // increment rip only if it was actual breakpoint set by user (not set by gdb for next)
     if (prevAction == nullptr || prevAction->action[0] != 'c') Gdb::incrementRip();
+//    Gdb::incrementRip();
     // first, look for a waiting thread to pass baton. If there is no one, release baton
     // TODO: smarter way of choosing a thread
     for (int i = 0; i < Gdb::getNumCpusInitialized(); i++) {
       if (waiting[i]) {
-        isFree = false;
+        isBatonFree = false;
         waiting[i] = false;
         Gdb::V(i);
         DBG::outln(DBG::GDBDebug, "Passed baton from thread: ",
@@ -465,7 +471,7 @@ void gdb_cmd_vresume(char* ptr, int64_t exceptionVector)
           handle_exception(exceptionVector);    // block current thread
         }
       } else {
-        isFree = false;                         // hold on to the baton
+        isBatonFree = false;                         // hold on to the baton
         consumeVContAction();
       }
     }
@@ -703,22 +709,30 @@ static bool handleWriteMemory(char* in, char* out) {
 // set software breakpoints
 static bool handleSetSoftBreak(char* in, char* out) {
   long addr, length;
+  gdbFaultHandlerSet = 1;
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
     BreakPoint* bp = new BreakPoint;
-    char opCode = *(char *)addr;      // little-endian
+    mem_err = 0;
+    char opCode = get_char((char *)addr);
+    if (mem_err) goto softbreak_err;
     bp->set(addr, opCode);
     bpList.insertEnd(*bp, true);      // reuse if duplicate exists
     KASSERT1(length == 1, length);    // 1 byte for x86-64?
     DBG::outln(DBG::GDBDebug, "set breakpoint at ", FmtHex(addr));
     MemoryBarrier();                  // unfortunately need this to protect above debug print
-    *(char *)addr = 0xcc;             // set break
+    mem_err = 0;
+    set_char((char *)addr, 0xcc);     // set break
+    if (mem_err) goto softbreak_err;
     if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
       breakOnUnwindDebugHook = true;  // only set for step/next
       DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook's break set");
     }
+    gdbFaultHandlerSet = 0;
     strcpy(out, "OK");
     return true;
   }
+softbreak_err:
+  gdbFaultHandlerSet = 0;
   strcpy(out, "E03");     // not well-defined
   return false;
 }
@@ -726,21 +740,27 @@ static bool handleSetSoftBreak(char* in, char* out) {
 // remove software breakpoints
 static bool handleRemoveSoftBreak(char* in, char* out) {
   long addr, length;
+  gdbFaultHandlerSet = 1;
   if (hexToInt(&in, &addr) && *in++ == ',' && hexToInt(&in, &length)) {
     BreakPoint curBp = { (mword)addr, *(char *)addr };
     Node<BreakPoint>* bp = bpList.search(curBp);
     if (bp) {
-      *(char *)addr = bp->getElement().getOpcode();
+      mem_err = 0;
+      set_char((char *)addr, bp->getElement().getOpcode());
+      if (mem_err) goto softbreak_err;
       MemoryBarrier();
       DBG::outln(DBG::GDBDebug, "remove breakpoint at ", FmtHex(addr));
       if ((mword)addr == Gdb::getUnwindDebugHookAddr()) {
         breakOnUnwindDebugHook = false;   // remove always as a last step before step/next returns
         DBG::outln(DBG::GDBDebug, "_Unwind_DebugHook's break removed");
       }
+      gdbFaultHandlerSet = 0;
       strcpy(out, "OK");
       return true;
     }
   }
+softbreak_err:
+  gdbFaultHandlerSet = 0;
   strcpy(out, "E03");       // not well-defined
   return false;
 }
@@ -752,74 +772,59 @@ static bool handleKill(char* in, char* out) {
 }
 
 // does all command processing for interfacing to gdb
-extern "C" void
-handle_exception (int64_t exceptionVector) {
-  int sigval;
-  char *ptr;
+extern "C" void handle_exception (int64_t exceptionVector) {
+  int sigval = computeSignal(exceptionVector);
+  char *ptr = outputBuffer;
 
   KASSERT0(!Processor::interruptsEnabled());
-
-  enablePreemption();
+  enablePreemption();     // restore preemption if disabled by gdb stub
+  Gdb::resetRip();
 
   int threadId = Processor::getApicID();
   Gdb::setCpuState(cpuState::BREAKPOINT);
-
   Thread* currThread = Processor::getCurrThread();
-
-  DBG::outln(DBG::GDBDebug, "thread=", threadId+1, ", vector=", exceptionVector,
+  DBG::outln(DBG::GDBDebug, "T=", threadId+1, ", vector=", exceptionVector,
             ", eflags=", FmtHex(Gdb::getReg32(registers::EFLAGS)),
             ", pc=", FmtHex(Gdb::getReg64(registers::RIP)),
             ", thread=", FmtHex(currThread));
 
-  // for int 3, rip pushed by interrupt handling mechanism may not be a correct value
-  // decrement rip value back to an instruction causing breakpoint and let it try again with a valid address
-  Gdb::resetRip();
+  // for breakpoints that gdb frontend sets, it inserts 0xCC to first byte of an instruction
+  // instead of setting TF bit. gdb frontend does not replace the original byte. Therefore,
+  // rip we get is one byte more than it should be because 0xCC (int3) is one instruction.
   if (exceptionVector == 3) {
     reg32 eflags = Gdb::getReg32(registers::EFLAGS);
-    DBG::outln(DBG::GDBDebug, "eflags & 0x100 = ", (eflags & 0x100));
-    if ((eflags & 0x100) == 0) {   // if TF is set, treat the rip valid
+    if ((eflags & 0x100) == 0) {    // gdb frontend inserted breakpoint
       Gdb::decrementRip();
-      DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " decrement rip to ",
-        FmtHex(Gdb::getReg64(registers::RIP)));
+      DBG::outln(DBG::GDBDebug, "rip decremented to ", FmtHex(Gdb::getReg64(registers::RIP)));
     }
   }
 
-  sigval = computeSignal(exceptionVector);
-  ptr = outputBuffer;
-
-  /**
-   * If a baton is held by another thread and the lockholder is not you,
-   * you have to wait until someone passes a baton.
-   */
-  DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " trying to enter");
+  DBG::outln(DBG::GDBDebug, "T=", threadId+1, " trying to grab a baton");
   entry_q.P();
-
-  if (gdbThread != nullptr && gdbThread != currThread && !isFree && (lockHolder == -1 || lockHolder != threadId)) {
+  if (!canGrabBaton(threadId)) {
     waiting[threadId] = true;
-    DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " is waiting for real lock holder: ", lockHolder+1);
+    DBG::outln(DBG::GDBDebug, "T=", threadId+1, " will wait for ", lockHolder+1);
     entry_q.V();
-    Gdb::P(threadId);
-    DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " woke up");
-    if (shouldReturnFromException[threadId]) {
-      DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " returning from exception");
+
+    Gdb::P(threadId);     // wait till the baton is passed
+    DBG::outln(DBG::GDBDebug, "T=", threadId+1, " holds a baton");
+    if (shouldReturnFromException[threadId]) {    // for allstop mode
+      DBG::outln(DBG::GDBDebug, "T=", threadId+1, " exiting");
       shouldReturnFromException[threadId] = false;
-      GdbCpu* state = Gdb::getCurrentCpu();
-      state->setCpuState(cpuState::RUNNING);
-      restoreRegisters(state);
+      Gdb::setCpuState(cpuState::RUNNING);
+      restoreRegisters(Gdb::getCurrentCpu());    // exit to KOS
     }
   }
 
-  // Got hold of a baton. You are free to enter.
-  isFree = false;
+  // you are a new baton owner!
+  isBatonFree = false;
   waiting[threadId] = false;
   lockHolder = threadId;
-  gdbThread = currThread;
-  DBG::outln(DBG::GDBDebug, "thread ", threadId+1, " got in");
-
+  DBG::outln(DBG::GDBDebug, "T=", threadId+1, " holds a baton");
   memset(outputBuffer, 0, BUFMAX);      // reset output buffer
 
+  // send stop reply for executed vCont packet or consume a pending vCont packet
   if (!vContActionQueue.empty()) {
-    DBG::outln(DBG::GDBDebug, "there is a pending operation.");
     VContAction* action = vContActionQueue.front();
     if (action->executed) {
       DBG::outln(DBG::GDBDebug, "pending operation done - ", *action);

@@ -144,9 +144,7 @@ public:
       DBG::outln(DBG::GDBDebug, "rip incremented");
     }
   }
-  inline void resetRip() {
-    ripDecremented = false;
-  }
+  inline void resetRip() { ripDecremented = false; }
 
 } __attribute__((aligned(4096)));   // required to compile
 
