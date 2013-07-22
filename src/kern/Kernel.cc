@@ -17,6 +17,7 @@
 #include "mach/Machine.h"
 #include "mach/Processor.h"
 #include "kern/AddressSpace.h"
+#include "kern/Kernel.h"
 #include "kern/OutputSafe.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"

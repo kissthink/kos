@@ -68,7 +68,6 @@
 namespace modstd _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
-
 #if 0
   // Red-black tree class, designed for use in implementing STL
   // associative containers (set, multiset, map, and multimap). The
@@ -326,7 +325,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   _Rb_tree_node_base*
   _Rb_tree_rebalance_for_erase(_Rb_tree_node_base* const __z,
 			       _Rb_tree_node_base& __header) throw ();
-
 #endif
 
   template<typename _Key, typename _Val, typename _KeyOfValue,

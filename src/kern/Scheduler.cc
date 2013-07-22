@@ -20,6 +20,10 @@
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 
+inline bool TimeoutCompare::operator()( const Thread* t1, const Thread* t2 ) {
+  return t1->timeout < t2->timeout;
+}
+
 void Scheduler::ready(Thread& t) {
   readyQueue[t.getPrio()].push_back(&t);
 }
@@ -51,7 +55,24 @@ void Scheduler::schedule() {
   // AS switch, if necessary...
 }
 
-void Scheduler::yieldInternal() {
+void Scheduler::timerEvent(mword ticks) {
+  ScopedLock<> lo(lk);
+  InPlaceSet<Thread*,0,TimeoutCompare>::iterator i = timerQueue.begin();
+  if (i != timerQueue.end() && ticks >= (*i)->timeout) {
+    Thread* t = *i;
+    timerQueue.erase(i);
+    ready(*t);
+  }
+}
+
+void Scheduler::sleep(Thread& t) {
+  ScopedLock<> lo(lk); 
+  timerQueue.insert(&t);
+  schedule();
+}
+
+void Scheduler::yield() {
+  ScopedLock<> lo(lk);
   if likely(Processor::getCurrThread() != Processor::getIdleThread()) {
     ready(*Processor::getCurrThread());
   }

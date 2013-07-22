@@ -20,16 +20,16 @@
 #include "extern/stl/mod_set"
 #include "mach/platform.h"
 #include "mach/stack.h"
-#include "kern/Kernel.h"
-#include "kern/Scheduler.h"
 
 class AddressSpace;
 
 class Thread {
-  char meta[set_elem_size<Thread*>()];
+  volatile char meta[set_elem_size<Thread*>()];
+  mword timeout;
 public:
   static const size_t defaultStack = 2 * pagesize<1>();
 private:
+  friend struct TimeoutCompare; // timeout 
   friend class Scheduler; // stackPointer
   AddressSpace* addressSpace;
   vaddr stackPointer;
@@ -37,7 +37,8 @@ private:
   int prio;
   const char* name;
 
-  Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr) : addressSpace(&as), stackPointer(sp), stackSize(s), prio(0), name(n) {}
+  Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
+    : timeout(0), addressSpace(&as), stackPointer(sp), stackSize(s), prio(0), name(n) {}
   ~Thread() { /* join */ }
   static void invoke( function_t func, ptr_t data );
 
@@ -47,37 +48,14 @@ public:
   const char* getName() const { return name; }
   AddressSpace& getAddressSpace() const { return *addressSpace; }
 
-  static Thread* create(AddressSpace& as, size_t stackSize = defaultStack) {
-    vaddr mem = kernelHeap.alloc(stackSize) + stackSize - sizeof(Thread);
-    return new (ptr_t(mem)) Thread(as, mem, stackSize);
-  }
-  static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack) {
-    vaddr mem = kernelHeap.alloc(stackSize) + stackSize - sizeof(Thread);
-    return new (ptr_t(mem)) Thread(as, mem, stackSize, n);
-  }
-  static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize = defaultStack) {
-    Thread* t = create(as, stackSize);
-    t->run(func, data);
-    return t;
-  }
-  static Thread* create(function_t func, ptr_t data, AddressSpace& as, const char *n, size_t stackSize = defaultStack) {
-    Thread* t = create(as, n, stackSize);
-    t->run(func, data);
-    return t;
-  }
-  static void destroy(Thread* t) {
-    t->~Thread();
-    vaddr mem = vaddr(t) + sizeof(Thread) - t->stackSize;
-    kernelHeap.release(mem, t->stackSize);
-  }
-  void run(function_t func, ptr_t data) {
-    stackPointer = stackInitIndirect(stackPointer, func, data, (void*)Thread::invoke);
-    kernelScheduler.start(*this);
-  }
-  void runDirect(funcvoid_t func) {
-    stackPointer = stackInitSimple(stackPointer, func);
-    stackStart(stackPointer);
-  }
+  static Thread* create(AddressSpace& as, size_t stackSize = defaultStack);
+  static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack);
+  static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize = defaultStack);
+  static Thread* create(function_t func, ptr_t data, AddressSpace& as, const char *n, size_t stackSize = defaultStack);
+  static void destroy(Thread* t);
+  void run(function_t func, ptr_t data);
+  void runDirect(funcvoid_t func);
+  void sleep(mword t);
 } __packed;
 
 #endif /* _Thread_h_ */
