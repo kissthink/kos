@@ -17,18 +17,28 @@
 #ifndef _Scheduler_h_
 #define _Scheduler_h_ 1
 
-#include "util/EmbeddedQueue.h"
+#include "extern/stl/mod_list"
+#include "extern/stl/mod_set"
 #include "ipc/SpinLock.h"
 
 class Thread;
 
+extern "C" void isr_handler_0x20();
+
+struct TimeoutCompare {
+  inline bool operator()( const Thread* t1, const Thread* t2 );
+};
+
 class Scheduler {
-  friend class Thread; // lk
+  friend class Thread;            // lk
+  friend void isr_handler_0x20(); // timerEvent
   volatile SpinLock lk;
-  EmbeddedQueue<Thread> readyQueue[2];
+  InPlaceList<Thread*> readyQueue[2];
+  InPlaceSet<Thread*,0,TimeoutCompare> timerQueue;
   void ready(Thread& t);
   void schedule();
   void yieldInternal();
+  void timerEvent(mword ticks);
 
   Scheduler(const Scheduler&) = delete;                  // no copy
   const Scheduler& operator=(const Scheduler&) = delete; // no assignment
@@ -48,10 +58,8 @@ public:
     ScopedLock<> lo(lk);
     schedule();
   }
-  void yield() {
-    ScopedLock<> lo(lk);
-    yieldInternal();
-  }
+  void sleep(Thread& t);
+  void yield();
 };
 
 #endif /* _Scheduler_h_ */

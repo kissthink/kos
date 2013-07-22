@@ -17,6 +17,7 @@
 #ifndef _SyncQueues_h_
 #define _SyncQueues_h_ 1
 
+#include "extern/stl/mod_list"
 #include "util/Output.h"
 #include "mach/Processor.h"
 #include "kern/Kernel.h"
@@ -28,18 +29,19 @@ class ProdConsQueue {
   volatile SpinLock lk;
   size_t unclaimedElements; // baton passing to guarantee FIFO access
   Buffer elementQueue;
-  EmbeddedQueue<Thread> waitQueue;
+  InPlaceList<Thread*> waitQueue;
 
   void suspend() {
-    waitQueue.push(Processor::getCurrThread());
+    waitQueue.push_back(Processor::getCurrThread());
     kernelScheduler.suspend(lk);
     lk.acquire();
   }
 
   bool resume() {
     if unlikely(waitQueue.empty()) return false;
-    kernelScheduler.start(*waitQueue.front());
-    waitQueue.pop();
+    Thread* t = waitQueue.front();
+    waitQueue.pop_front();
+    kernelScheduler.start(*t);
     return true;
   }
 

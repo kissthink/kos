@@ -90,6 +90,14 @@ static RTC rtc;
 
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
+#if 1
+  StdErr.out(" PIT test, 5 secs...");
+  for (int i = 0; i < 5; i++) {
+    Processor::getCurrThread()->sleep(1000);
+    StdErr.out(' ', i+1);
+  }
+  StdErr.outln(" done.");
+#endif
   StdErr.out(' ');
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
@@ -264,15 +272,6 @@ void Machine::initBSP2() {
   // enable interrupts (off boot stack)
   Processor::enableInterrupts();
 
-#if 0
-  DBG::out(DBG::Basic, "PIT test, 5 secs...");
-  for (int i = 0; i < 5; i++) {
-    pit.wait(1000);
-    DBG::out(DBG::Basic, ' ', i+1);
-  }
-  DBG::outln(DBG::Basic, " done.");
-#endif
-
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();
 
@@ -328,7 +327,11 @@ void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
   kernelSpace.unmapPages<1>( (vaddr)ioapic, pagesize<1>() );
 }
 
-inline void Machine::timerInterrupt(mword counter) {
+mword Machine::now() {
+  return pit.tick();
+}
+
+inline void Machine::rtcInterrupt(mword counter) {
   if (counter % cpuCount == bspIndex) {
     if (Processor::preempt()) {
       Processor::enableInterrupts(); // new thread on way out won't enable
@@ -366,6 +369,7 @@ extern "C" void isr_handler_0x0e(mword errcode, vaddr iAddr) { // page fault
 extern "C" void isr_handler_0x20() { // PIT interrupt
   pit.staticInterruptHandler();      // low-level processing before EOI
   Processor::sendEOI();
+  if (Processor::preempt()) kernelScheduler.timerEvent(pit.tick());
 }
 
 extern "C" void isr_handler_0x21() { // keyboard interrupt
@@ -381,7 +385,7 @@ extern "C" void isr_handler_0x27() { // parallel interrupt, spurious no problem
 extern "C" void isr_handler_0x28() { // RTC interrupt
   rtc.staticInterruptHandler();      // low-level processing before EOI
   Processor::sendEOI();              // EOI *before* switching stacks
-  if (rtc.tick() % 16 == 0) Machine::timerInterrupt(rtc.tick() / 16);
+  if (rtc.tick() % 16 == 0) Machine::rtcInterrupt(rtc.tick() / 16);
 }
 
 extern "C" void isr_handler_0x2c() { // mouse interrupt

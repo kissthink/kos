@@ -59,7 +59,8 @@ public:
   static void initBSP2();                              // not in .boot.text!
   static void staticEnableIRQ(mword irq, mword idtnum) __section(".boot.text");
 
-  static inline void timerInterrupt(mword);
+  static mword now();
+  static inline void rtcInterrupt(mword);
 
   friend void exceptionHandler(int, void (*)());
 };

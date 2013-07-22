@@ -62,8 +62,6 @@
 #include <initializer_list>
 #endif
 
-using namespace std;
-
 namespace modstd _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
