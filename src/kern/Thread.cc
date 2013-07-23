@@ -69,3 +69,8 @@ void Thread::sleep(mword t) {
   timeout = Machine::now() + t;
   kernelScheduler.sleep(*this);
 }
+
+void Thread::sleep(mword t, volatile SpinLock& rl) {
+  timeout = Machine::now() + t;
+  kernelScheduler.sleep(*this, rl);
+}

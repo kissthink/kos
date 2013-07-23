@@ -59,6 +59,7 @@ public:
     schedule();
   }
   void sleep(Thread& t);
+  void sleep(Thread& t, volatile SpinLock& rl);
   void yield();
 };
 

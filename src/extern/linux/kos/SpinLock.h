@@ -9,8 +9,6 @@ extern "C" {
   void SpinLockAcquire(void *lockImpl);
   int SpinLockTryAcquire(void *lockImpl);
   void SpinLockRelease(void *lockImpl);
-  void SpinLockAcquireISR(void *lockImpl);
-  void SpinLockReleaseISR(void *lockImpl);
 
 #ifdef __cplusplus
 }

@@ -56,6 +56,7 @@ public:
   void run(function_t func, ptr_t data);
   void runDirect(funcvoid_t func);
   void sleep(mword t);
+  void sleep(mword t, volatile SpinLock& rl);
 } __packed;
 
 #endif /* _Thread_h_ */

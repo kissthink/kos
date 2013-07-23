@@ -2,13 +2,13 @@
 #include <cstring>
 
 #include "extern/linux/kos/Memory.h"
-#include "kern/KernelVM.h"
+#include "kern/KernelHeap.h"
 
-extern KernelVM kernelVM;
+extern KernelHeap kernelHeap;
 
 void *kmalloc(size_t size, gfp_t flags) {
 //  if (flags != GFP_KERNEL) return 0;
-  return (void *)kernelVM.alloc(size);
+  return (void *)kernelHeap.alloc(size);
 }
 
 void *kzalloc(size_t size, gfp_t flags) {

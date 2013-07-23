@@ -1,5 +1,5 @@
 #include "extern/linux/kos/SpinLock.h"
-#include "util/SpinLock.h"
+#include "ipc/SpinLock.h"
 
 void *SpinLockCreate() {
   return new SpinLock();
@@ -18,14 +18,4 @@ int SpinLockTryAcquire(void *lockImpl) {
 void SpinLockRelease(void *lockImpl) {
   KASSERT0(lockImpl != nullptr);
   ((SpinLock *)lockImpl)->release();
-}
-
-void SpinLockAcquireISR(void *lockImpl) {
-  KASSERT0(lockImpl != nullptr);   // FIXME change to atomic allocation later
-  ((SpinLock *)lockImpl)->acquireISR();
-}
-
-void SpinLockReleaseISR(void *lockImpl) {
-  KASSERT0(lockImpl != nullptr);
-  ((SpinLock *)lockImpl)->releaseISR();
 }

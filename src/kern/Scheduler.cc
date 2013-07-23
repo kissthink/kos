@@ -71,6 +71,13 @@ void Scheduler::sleep(Thread& t) {
   schedule();
 }
 
+void Scheduler::sleep(Thread& t, volatile SpinLock& rl) {
+  ScopedLock<> lo(lk);
+  rl.release();
+  timerQueue.insert(&t);
+  schedule();
+}
+
 void Scheduler::yield() {
   ScopedLock<> lo(lk);
   if likely(Processor::getCurrThread() != Processor::getIdleThread()) {

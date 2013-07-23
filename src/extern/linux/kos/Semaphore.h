@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+  void* SemaphoreCreate();
   void SemaphoreP(void *semImpl);
   int SemaphorePInterruptible(void *semImpl);
   int SemaphorePKillable(void *semImpl);

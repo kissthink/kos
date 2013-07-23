@@ -36,6 +36,9 @@ protected:
     threadQueue.push_back(Processor::getCurrThread());
     kernelScheduler.suspend(lk);
   }
+  void sleep(mword ticks) {
+    Processor::getCurrThread()->sleep(ticks, lk);
+  }
   Thread* resume() {
     Thread* t = threadQueue.front();
     threadQueue.pop_front();
@@ -56,6 +59,17 @@ public:
     ScopedLock<> lo(lk);
     if likely(counter < 1) suspend();
     else counter -= 1;
+  }
+  bool Ptimeout(mword ticks) {
+    ScopedLock<> lo(lk);
+    if likely(counter < 1) {
+      sleep(ticks);
+      ScopedLock<> lo(lk);
+      if (counter < 1) return false;
+      counter -= 1;
+    }
+    else counter -= 1;
+    return true;
   }
   bool tryP() {
     ScopedLock<> lo(lk);
