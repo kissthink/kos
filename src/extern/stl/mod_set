@@ -10,9 +10,14 @@ using namespace std;
 template <typename _Key, size_t shift, typename _Compare = std::less<_Key>>
 using InPlaceSet = modstd::set<_Key,_Compare,InPlaceAllocator<_Key,shift>>;
 
+template <typename _Key, typename _Compare = std::less<_Key>>
+using EmbeddedSet = modstd::set<_Key,_Compare,EmbeddedAllocator<_Key>>;
+
 template <typename T>
-static constexpr size_t set_elem_size() {    
-  return sizeof(_Rb_tree_node<T>);     
-} 
+class mod_set_elem {
+	char _linkage[sizeof(_Rb_tree_node<T>)];
+public:
+	uintptr_t alloc() const { return (uintptr_t)(this); }
+};
 
 #endif /* _mod_set_ */

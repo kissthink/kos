@@ -22,7 +22,7 @@ mkfs.vfat ${1}1
 TMPDIR=$(mktemp -d /tmp/mount.XXXXXXXXXX)
 mount ${1}1 $TMPDIR
 
-$CROSSDIR/sbin/$TARGET-grub-install --no-floppy --root-directory=$TMPDIR $1
+$GRUBDIR/sbin/$TARGET-grub-install --no-floppy --root-directory=$TMPDIR $1
 cp kernel.sys $TMPDIR/boot
 echo "\
 set timeout=1

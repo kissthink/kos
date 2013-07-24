@@ -23,9 +23,7 @@
 
 class AddressSpace;
 
-class Thread {
-  volatile char meta[set_elem_size<Thread*>()];
-  mword timeout;
+class Thread : public mod_set_elem<Thread*> {
 public:
   static const size_t defaultStack = 2 * pagesize<1>();
 private:
@@ -34,11 +32,12 @@ private:
   AddressSpace* addressSpace;
   vaddr stackPointer;
   size_t stackSize;
+  mword timeout;
   int prio;
   const char* name;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
-    : timeout(0), addressSpace(&as), stackPointer(sp), stackSize(s), prio(0), name(n) {}
+    : addressSpace(&as), stackPointer(sp), stackSize(s), timeout(0), prio(0), name(n) {}
   ~Thread() { /* join */ }
   static void invoke( function_t func, ptr_t data );
 

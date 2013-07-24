@@ -17,6 +17,6 @@
 #include "kern/AddressSpace.h"
 
 ostream& operator<<(ostream& os, const AddressSpace& as) {
-  as.availableMemory.print(os);
+  as.unusedVirtAddrRange.print(os);
   return os;
 }

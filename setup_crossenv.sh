@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # see 'config' for installation directories:
+# . grub in $GRUBDIR
 # . cross compiler in $GCCDIR
-# . gdb and grub in $CROSSDIR
-# . bochs and qemu in $TOOLSDIR
+# . gdb, bochs, and qemu in $TOOLSDIR
 # note: use 'make info' and 'make pdf' to build GNU docs
 
 cpucount=$(fgrep processor /proc/cpuinfo|wc -l)
@@ -15,13 +15,13 @@ PTDIR=$(pwd)/patches
 source $(pwd)/config
 cd -
 
-BINUTILS=binutils-2.22   # GNU mirror
+BINUTILS=binutils-2.23.2 # GNU mirror
 BOCHS=bochs-2.6.2        # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER          # GNU mirror
-GDB=gdb-7.5.1            # GNU mirror
+GDB=gdb-7.6              # GNU mirror
 GRUB=grub-2.00           # GNU mirror
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
-QEMU=qemu-1.4.1          # http://www.qemu.org/
+QEMU=qemu-1.5.1          # http://www.qemu.org/
 
 mkdir -p $TMPDIR
 
@@ -61,12 +61,14 @@ function build_gcc() {
 	tar xaf $DLDIR/$NEWLIB.tar.gz --strip-components 1 || error "$NEWLIB extract"
 	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
 # for binutils 2.32.2:
-#	sed -i -e 's/@colophon/@@colophon/' \
-#	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
-	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure
-	sed -i 's/thread_local/thread_localX/' gcc/tree.h
+	sed -i -e 's/@colophon/@@colophon/' \
+	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
+# for gcc 4.7.2:
+#	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure
+#	sed -i 's/thread_local/thread_localX/' gcc/tree.h
 	cp $PTDIR/crt0.S libgloss/libnosys || error "crt0.S copy"
 	sed -i 's/OUTPUTS = /OUTPUTS = crt0.o /' libgloss/libnosys/Makefile.in
+	echo 'newlib_cflags="${newlib_cflags} -DMALLOC_PROVIDED"' >> newlib/configure.host
 	cd libgloss; autoconf || error "libgloss autoconf" ; cd ..
 	prebuild $GCC
 	../$GCC/configure --target=$TARGET --prefix=$GCCDIR\
@@ -91,14 +93,14 @@ function build_gcc() {
 function build_gdb() {
 	unpack $GDB tar.bz2
 	prebuild $GDB
-	../$GDB/configure --target=$TARGET --prefix=$CROSSDIR || error "$GDB configure"
+	../$GDB/configure --target=$TARGET --prefix=$TOOLSDIR || error "$GDB configure"
 	build $GDB
 }
 
 function build_grub() {
 	unpack $GRUB tar.xz
 	prebuild $GRUB
-	../$GRUB/configure --target=$TARGET --prefix=$CROSSDIR --disable-werror\
+	../$GRUB/configure --target=$TARGET --prefix=$GRUBDIR --disable-werror\
 	--disable-device-mapper || error "$GRUB configure"
 	build $GRUB
 }

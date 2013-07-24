@@ -1,8 +1,8 @@
-GCCDIR=/usr/local/crossgcc
-CROSSDIR=/usr/local/cross
+GCCDIR=/usr/local/cross/gcc
+GRUBDIR=/usr/local/cross/grub
 TOOLSDIR=/usr/local
 TARGET=x86_64-pc-elf
-GCCVER=4.7.2
+GCCVER=4.8.1
 LINUXVER=3.9.4
 
 # only used when setting up PXE booting

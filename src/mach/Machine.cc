@@ -34,7 +34,6 @@
 #include <list>
 
 // check various assumptions about data type sizes
-static_assert(__atomic_always_lock_free(sizeof(mword),0) == true, "atomicity of mword");
 static_assert(sizeof(uint64_t) == sizeof(mword), "mword != uint64_t" );
 static_assert(sizeof(size_t) == sizeof(mword), "mword != size_t");
 static_assert(sizeof(ptr_t) == sizeof(mword), "mword != ptr_t");
@@ -91,8 +90,8 @@ static RTC rtc;
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
 #if 1
-  StdErr.out(" PIT test, 5 secs...");
-  for (int i = 0; i < 5; i++) {
+  StdErr.out(" PIT test, 3 secs...");
+  for (int i = 0; i < 3; i++) {
     Processor::getCurrThread()->sleep(1000);
     StdErr.out(' ', i+1);
   }
@@ -208,6 +207,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   kernelSpace.setPagetable(pml4addr);
   kernelSpace.setMemoryRange(kernelEnd, topkernel - kernelEnd);
   kernelSpace.activate();
+  kernelHeap.init2();
   DBG::outln(DBG::Basic, "AS/bootstrap: ", kernelSpace);
 
   // initialize kernel file system with boot modules

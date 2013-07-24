@@ -53,19 +53,10 @@ void KernelHeap::expand(size_t size) {
   KASSERT1(check, newmem);
 }
 
-void KernelHeap::checkExpand(size_t size) {
-  if (!availableMemory.check(DEFAULT_GRANULARITY)) {
-    expand(DEFAULT_GRANULARITY);
-  }
-  if (!availableMemory.checkCond(size, DEFAULT_GRANULARITY)) {
-    expand(size);
-  }
-}
-
 vaddr KernelHeap::allocInternal(size_t size) {
   KASSERT1(aligned(size, pow2(min)), FmtHex(size));
   ScopedLock<> so(lock);
-  checkExpand(size);
+  if (!availableMemory.check(size)) expand(size);
   vaddr addr = availableMemory.retrieve(size);
   KASSERTN(addr != topaddr, *this);
   return addr;
@@ -89,6 +80,7 @@ void KernelHeap::releaseInternal(vaddr p, size_t size) {
 void KernelHeap::init(vaddr start, vaddr end) {
   KASSERTN( end - start >= DEFAULT_GRANULARITY, FmtHex(start), '-', FmtHex(end) );
   kmspace = create_mspace_with_base( (ptr_t)start, end - start, 0 );
+  initFull = false;
 }
 
 // memory is marked as available
@@ -97,7 +89,11 @@ void KernelHeap::addMemory(vaddr start, vaddr end) {
 }
 
 ptr_t KernelHeap::malloc(size_t s) {
-  return mspace_malloc(kmspace, s);
+  ptr_t ret = mspace_malloc(kmspace, s);
+  if likely(initFull) {
+    if (!availableMemory.check(DEFAULT_GRANULARITY)) expand(DEFAULT_GRANULARITY);
+  }
+  return ret;
 }
 
 void KernelHeap::free(ptr_t p) {

@@ -17,4 +17,18 @@ public:
   void deallocate(T*, size_t) {}
 };
 
+template<typename T> class EmbeddedAllocator : public std::allocator<T> {
+public:
+  template<typename U> struct rebind { typedef EmbeddedAllocator<U> other; };
+  EmbeddedAllocator() = default;
+  EmbeddedAllocator(const EmbeddedAllocator& x) = default;
+  template<typename U> EmbeddedAllocator (const EmbeddedAllocator<U>& x) : std::allocator<T>(x) {}
+  ~EmbeddedAllocator() = default;
+  template<typename V>
+  T* allocate(const V& val) {
+		return reinterpret_cast<T*>(val.alloc());
+	}
+  void deallocate(T*, size_t) {}
+};
+
 #endif /* _inplace_allocator_h_ */

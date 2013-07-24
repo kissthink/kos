@@ -89,7 +89,7 @@ qpxe: $(GRUBPXE)
 
 $(GRUBPXE):
 	rm -rf $(TFTPDIR)/boot
-	$(CROSSDIR)/sbin/$(TARGET)-grub-mknetdir --net-directory=$(TFTPDIR)
+	$(GRUBDIR)/sbin/$(TARGET)-grub-mknetdir --net-directory=$(TFTPDIR)
 	@echo ATTENTION: You also need pxelinux.0 pxelinux.cfg/default vesamenu.c32 in $(TFTPDIR)
 
 $(VDISK): kernel.sys setup_img.sh

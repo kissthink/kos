@@ -34,6 +34,7 @@ class KernelHeap {
   BuddyMap<min,max,BuddySet> availableMemory;
   SpinLock lock;
   void* kmspace;
+  bool initFull;
 
   vaddr allocInternal(size_t size);
   void releaseInternal(vaddr p, size_t size);
@@ -42,11 +43,11 @@ class KernelHeap {
   const KernelHeap& operator=(const KernelHeap&) = delete; // no assignment
 
   inline void expand(size_t size);
-  inline void checkExpand(size_t size);
 
 public:
   KernelHeap() {} // don't do anything, since constructor is called *after* init
   void init(vaddr start, vaddr end);
+  void init2() { initFull = true; }
   void addMemory(vaddr start, vaddr end);
   template<bool aligned=true>
   vaddr alloc(size_t size) {

@@ -22,9 +22,9 @@ systems configured for software development.
 The output of the cross compilation script should contain the following
 (among other output; grep for SUCCESS):
 
-SUCCESS: gcc-4.7.2 install
+SUCCESS: gcc-4.8.1 install
 SUCCESS: grub-2.00 install
-SUCCESS: gdb-7.5.1 install
+SUCCESS: gdb-7.6 install
 
 
 Hardware Emulation

@@ -46,5 +46,5 @@ if [ "$target" = "pxe" ]; then
 elif [ "$target" = "rpxe" ]; then
 	scp -rp $stage/boot $TFTPSERVER:$TFTPDIR
 else
-	$CROSSDIR/bin/$TARGET-grub-mkrescue -o $target $stage
+	$GRUBDIR/bin/$TARGET-grub-mkrescue -o $target $stage
 fi

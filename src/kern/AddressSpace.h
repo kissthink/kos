@@ -41,7 +41,7 @@ private:
   Owner owner;
 
   using BuddySet = set<vaddr,less<vaddr>,KernelAllocator<vaddr>>;
-  BuddyMap<pagesizebits<1>(),pagebits,BuddySet> availableMemory;
+  BuddyMap<pagesizebits<1>(),pagebits,BuddySet> unusedVirtAddrRange;
 
   AddressSpace(const AddressSpace&) = delete;                  // no copy
   const AddressSpace& operator=(const AddressSpace&) = delete; // no assignment
@@ -53,10 +53,10 @@ private:
     KASSERT1( aligned(size, pagesize<N>()), size );
     ScopedLock<> lo(lock);
     if (virt) {
-      bool check = availableMemory.remove(vma, size);
+      bool check = unusedVirtAddrRange.remove(vma, size);
       KASSERT1(check, (ptr_t)vma);
     } else {
-      vma = availableMemory.retrieve(size);
+      vma = unusedVirtAddrRange.retrieve(size);
       KASSERT1(vma != topaddr, size);
     }
     vaddr ret = vma;
@@ -78,7 +78,7 @@ private:
     KASSERT1( aligned(size, pagesize<N>()), size );
     ScopedLock<> lo(lock);
     for (; size > 0; size -= pagesize<N>()) {
-      size_t idx = availableMemory.insert2(vma, pagesizebits<N>());
+      size_t idx = unusedVirtAddrRange.insert2(vma, pagesizebits<N>());
       KASSERTN((idx >= pagesizebits<N>() && idx < pagebits), FmtHex(vma), '/', idx)
       laddr lma = PageManager::unmap<N>(vma, *Processor::getFrameManager(), (idx - pagesizebits<N>()) / pagetablebits);
       if (alloc) Processor::getFrameManager()->release(lma, pagesize<N>());
@@ -97,7 +97,7 @@ public:
   }
 
   void setMemoryRange(vaddr start, size_t length) {
-    availableMemory.insert(start, length);
+    unusedVirtAddrRange.insert(start, length);
   }
 
   void setPagetable(laddr pt) { pagetable = pt; }

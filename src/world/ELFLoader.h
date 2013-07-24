@@ -78,7 +78,7 @@ public:
 				const ELFIO::symbol_section_accessor symbols(elfReader, psec);
 				for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
 					kstring name;
-					ELFIO::Elf64_Addr value;
+					ELFIO::Elf64_Addr value = 0;
 					ELFIO::Elf_Xword size;
 					unsigned char bind;
 					unsigned char type;

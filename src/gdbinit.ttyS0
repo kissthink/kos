@@ -1,5 +1,6 @@
 set remotebaud 38400
 set remotetimeout 600
 target remote /dev/ttyS0
+info threads
 
 source gdbinit

@@ -42,6 +42,7 @@ void Scheduler::schedule() {
     nextThread = Processor::getIdleThread();
   }
   Processor::setCurrThread(nextThread);
+
   KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
   DBG::out(DBG::Scheduler, "CPU ", Processor::getApicID(), " switch: ");
   if (prevThread->getName()) DBG::out(DBG::Scheduler, prevThread->getName());
@@ -56,9 +57,11 @@ void Scheduler::schedule() {
 }
 
 void Scheduler::timerEvent(mword ticks) {
+  if likely(timerQueue.empty()) return;
   ScopedLock<> lo(lk);
-  InPlaceSet<Thread*,0,TimeoutCompare>::iterator i = timerQueue.begin();
-  if (i != timerQueue.end() && ticks >= (*i)->timeout) {
+  for (;;) {
+    InPlaceSet<Thread*,0,TimeoutCompare>::iterator i = timerQueue.begin();
+  if (i == timerQueue.end() || ticks < (*i)->timeout) break;
     Thread* t = *i;
     timerQueue.erase(i);
     ready(*t);

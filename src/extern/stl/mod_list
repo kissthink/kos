@@ -10,8 +10,13 @@ template <typename T>
 using InPlaceList = modstd::list<T,InPlaceAllocator<T,0>>;
 
 template <typename T>
-static constexpr size_t list_elem_size() {
-	return sizeof(_List_node<T>);
-}
+using EmbeddedList = modstd::list<T,EmbeddedAllocator<T>>;
+
+template <typename T>
+class mod_list_elem {
+	char _linkage[sizeof(_List_node<T>)];
+public:
+	uintptr_t alloc() const { return (uintptr_t)(this); }
+};
 
 #endif /* _mod_list_ */

@@ -12,6 +12,34 @@ extern "C" void abort() {
 }
 #endif
 
+extern "C" void* malloc(size_t s) {
+  return nullptr;
+}
+
+extern "C" void free(void* p) {}
+
+//extern "C" void* calloc(size_t nmemb, size_t size) {
+//  return nullptr;
+//}
+
+extern "C" void* realloc(void *p, size_t size) {
+  return nullptr;
+}
+
+extern "C" void* _malloc_r(void* r, size_t s) {
+  return nullptr;
+}
+
+extern "C" void _free_r(void* r, void* p) {}
+
+extern "C" void* _calloc_r(void* r, size_t n, size_t s) {
+  return nullptr;
+}
+
+extern "C" void* _realloc_r(void* r, void *p, size_t size) {
+  return nullptr;
+}
+
 extern "C" int close(int fd) {
   errno = EBADF;
   return -1;

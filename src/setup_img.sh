@@ -54,7 +54,7 @@ cat > $MNTDIR/$TARGET-boot/$TARGET-grub/device.map <<EOF
 EOF
 
 # install grub
-$CROSSDIR/sbin/$TARGET-grub-install --no-floppy\
+$GRUBDIR/sbin/$TARGET-grub-install --no-floppy\
 	--grub-mkdevicemap=$MNTDIR/$TARGET-boot/$TARGET-grub/device.map\
 	--root-directory=$MNTDIR $LOOPDEV0
 

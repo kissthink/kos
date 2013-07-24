@@ -22,6 +22,7 @@
 #include "kern/Debug.h"
 
 void Processor::checkCapabilities(bool print) {
+  KASSERT0(__atomic_always_lock_free(sizeof(mword),0));
   KASSERT0(RFlags::hasCPUID()); if (print) DBG::out(DBG::Basic, " CPUID");
   KASSERT0(CPUID::hasAPIC());   if (print) DBG::out(DBG::Basic, " APIC");
   KASSERT0(CPUID::hasMSR());    if (print) DBG::out(DBG::Basic, " MSR");

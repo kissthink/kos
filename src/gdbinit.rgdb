@@ -12,6 +12,8 @@
 set remotebaud 38400
 set remotetimeout 10
 target remote :2345
+info threads
 
 source gdbinit
+
 # rgdb has problem with breakpoints set inside interrupt handler
