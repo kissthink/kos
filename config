@@ -1,6 +1,7 @@
 GCCDIR=/usr/local/cross/gcc
 GRUBDIR=/usr/local/cross/grub
 TOOLSDIR=/usr/local
+UKOSDIR=/usr/local/ukos
 TARGET=x86_64-pc-elf
 GCCVER=4.8.1
 LINUXVER=3.9.4

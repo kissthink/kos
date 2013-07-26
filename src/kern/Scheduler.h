@@ -34,7 +34,7 @@ class Scheduler {
   friend void isr_handler_0x20(); // timerEvent
   volatile SpinLock lk;
   InPlaceList<Thread*> readyQueue[2];
-  InPlaceSet<Thread*,0,TimeoutCompare> timerQueue;
+  InPlaceMultiset<Thread*,0,TimeoutCompare> timerQueue;
   void ready(Thread& t);
   void schedule();
   void yieldInternal();

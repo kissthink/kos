@@ -19,6 +19,7 @@ BINUTILS=binutils-2.23.2 # GNU mirror
 BOCHS=bochs-2.6.2        # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.6              # GNU mirror
+GLIBC=glibc-2.17         # GNU mirror
 GRUB=grub-2.00           # GNU mirror
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
 QEMU=qemu-1.5.1          # http://www.qemu.org/
@@ -47,11 +48,49 @@ function prebuild() {
 
 function build() {
 	cd $TMPDIR/$1-build
-	nice -10 make -j $cpucount all || error "$1 build failed"
+	nice -10 make -j $cpucount $2 all || error "$1 build failed"
 }
 
 function install() {
 	$ROOTEXEC -c "make -C $TMPDIR/$1-build install && echo SUCCESS: $1 install"
+}
+
+function build_binutils() {
+	unpack $BINUTILS tar.bz2
+# for binutils 2.32.2:
+	sed -i -e 's/@colophon/@@colophon/' \
+	       -e 's/doc@cygnus.com/doc@@cygnus.com/' $BINUTILS/bfd/doc/bfd.texinfo
+	prebuild $BINUTILS
+	../$BINUTILS/configure --target=$TARGET --prefix=$UKOSDIR\
+	  || error "$BINUTILS configure"
+	build $BINUTILS
+}
+
+function build_kosgcc() {
+	unpack $GCC tar.bz2
+# for gcc 4.7.2:
+#	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' $GCC/gcc/configure
+#	sed -i 's/thread_local/thread_localX/' $GCC/gcc/tree.h
+	prebuild $GCC
+	../$GCC/configure --target=$TARGET --prefix=$UKOSDIR\
+		--disable-nls --enable-languages=c --disable-shared\
+		--disable-libssp --disable-libquadmath\
+		|| error "$GCC configure"
+	build $GCC
+	# --disable-threads --disable-tls
+}
+
+function build_glibc() {
+	unpack $GLIBC tar.xz
+	prebuild $GLIBC
+	libc_cv_z_relro=yes\
+	../$GLIBC/configure --host=$TARGET --prefix=$UKOSDIR\
+		--enable-hacker-mode --disable-shared\
+		|| error "$GLIBC configure"
+	build $GLIBC -i
+	cd $TMPDIR/$GLIBC-build
+	make -i 2>&1 | fgrep -v "a - " > $TMPDIR/glibc.out
+	return 1
 }
 
 function build_gcc() {
@@ -126,6 +165,23 @@ function build_qemu() {
 	build $QEMU
 }
 
+function build_kos_glibc() {
+	while [ $# -gt 0 ]; do case "$1" in
+	gcc)
+		build_binutils && install $BINUTILS
+		export PATH=$UKOSDIR/bin:$PATH
+		build_kosgcc && install $GCC;;
+	glibc)
+		export PATH=$UKOSDIR/bin:$PATH
+		build_glibc && install $GLIBC;;
+	allcross)
+		build_kosgcc && install $GCC
+		build_glibc && install $GLIBC;;
+	*)
+		echo unknown argument: $1;;
+	esac; shift; done
+}
+
 while [ $# -gt 0 ]; do case "$1" in
 bochs)
 	build_bochs && install $BOCHS;;
@@ -141,6 +197,9 @@ allcross)
 	build_gcc && install $GCC
 	build_gdb && install $GDB
 	build_grub && install $GRUB;;
+kos)
+	shift
+	build_kos_glibc $1;;
 *)
 	echo unknown argument: $1;;
 esac; shift; done

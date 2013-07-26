@@ -1,13 +1,13 @@
---- /usr/local/cross/gcc/x86_64-pc-elf/include/c++/4.8.1/bits/stl_set.h	2013-07-23 22:14:04.760151313 -0400
-+++ mod_stl_set.h	2013-07-26 14:49:08.960522202 -0400
+--- /usr/local/cross/gcc/x86_64-pc-elf/include/c++/4.8.1/bits/stl_multiset.h	2013-07-23 22:14:04.746818121 -0400
++++ mod_stl_multiset.h	2013-07-26 14:50:43.012947494 -0400
 @@ -53,15 +53,15 @@
   *  Do not attempt to use it directly. @headername{set}
   */
  
--#ifndef _STL_SET_H
--#define _STL_SET_H 1
-+#ifndef _MOD_STL_SET_H
-+#define _MOD_STL_SET_H 1
+-#ifndef _STL_MULTISET_H
+-#define _STL_MULTISET_H 1
++#ifndef _MOD_STL_MULTISET_H
++#define _MOD_STL_MULTISET_H 1
  
  #include <bits/concept_check.h>
  #if __cplusplus >= 201103L

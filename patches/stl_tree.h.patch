@@ -1,7 +1,7 @@
---- /usr/include/c++/4.7.1/bits/stl_tree.h	2012-07-21 22:29:56.000000000 -0400
-+++ mod_stl_tree.h	2012-08-13 17:32:19.868251210 -0400
-@@ -57,18 +57,18 @@
-  *  Do not attempt to use it directly. @headername{map or set}
+--- /usr/local/cross/gcc/x86_64-pc-elf/include/c++/4.8.1/bits/stl_tree.h	2013-07-23 22:14:04.770151207 -0400
++++ mod_stl_tree.h	2013-07-26 15:00:46.240466685 -0400
+@@ -55,8 +55,8 @@
+  *  Do not attempt to use it directly. @headername{map,set}
   */
  
 -#ifndef _STL_TREE_H
@@ -11,18 +11,29 @@
  
  #include <bits/stl_algobase.h>
  #include <bits/allocator.h>
- #include <bits/stl_function.h>
- #include <bits/cpp_type_traits.h>
+@@ -66,10 +66,10 @@
+ #include <bits/alloc_traits.h>
+ #endif
  
 -namespace std _GLIBCXX_VISIBILITY(default)
 +namespace modstd _GLIBCXX_VISIBILITY(default)
  {
  _GLIBCXX_BEGIN_NAMESPACE_VERSION
- 
+-
++#if 0
    // Red-black tree class, designed for use in implementing STL
    // associative containers (set, multiset, map, and multimap). The
    // insertion and deletion algorithms are based on those in Cormen,
-@@ -365,8 +369,8 @@
+@@ -326,7 +326,7 @@
+   _Rb_tree_node_base*
+   _Rb_tree_rebalance_for_erase(_Rb_tree_node_base* const __z,
+ 			       _Rb_tree_node_base& __header) throw ();
+-
++#endif
+ 
+   template<typename _Key, typename _Val, typename _KeyOfValue,
+            typename _Compare, typename _Alloc = allocator<_Val> >
+@@ -366,8 +366,8 @@
  
      protected:
        _Link_type
@@ -33,7 +44,7 @@
  
        void
        _M_put_node(_Link_type __p)
-@@ -376,7 +380,7 @@
+@@ -377,7 +377,7 @@
        _Link_type
        _M_create_node(const value_type& __x)
        {
@@ -42,7 +53,7 @@
  	__try
  	  { get_allocator().construct
  	      (std::__addressof(__tmp->_M_value_field), __x); }
-@@ -399,7 +403,7 @@
+@@ -400,7 +400,7 @@
          _Link_type
          _M_create_node(_Args&&... __args)
  	{
@@ -50,8 +61,8 @@
 +	  _Link_type __tmp = _M_get_node(__args...);
  	  __try
  	    {
- 	      _M_get_Node_allocator().construct(__tmp,
-@@ -422,7 +426,7 @@
+ 	      allocator_traits<_Node_allocator>::
+@@ -424,7 +424,7 @@
  #endif
  
        _Link_type

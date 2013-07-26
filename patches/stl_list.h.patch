@@ -1,6 +1,6 @@
---- /usr/local/crossgcc/x86_64-pc-elf/include/c++/4.7.2/bits/stl_list.h	2013-05-15 17:51:49.396277403 -0400
-+++ mod_stl_list.h	2013-07-21 17:42:44.288029022 -0400
-@@ -54,16 +54,17 @@
+--- /usr/local/cross/gcc/x86_64-pc-elf/include/c++/4.8.1/bits/stl_list.h	2013-07-23 22:14:04.736818225 -0400
++++ mod_stl_list.h	2013-07-26 14:53:49.154484992 -0400
+@@ -53,16 +53,17 @@
   *  Do not attempt to use it directly. @headername{list}
   */
  
@@ -10,7 +10,7 @@
 +#define _MOD_STL_LIST_H 1
  
  #include <bits/concept_check.h>
- #ifdef __GXX_EXPERIMENTAL_CXX0X__
+ #if __cplusplus >= 201103L
  #include <initializer_list>
  #endif
  
@@ -21,7 +21,7 @@
    namespace __detail
    {
    _GLIBCXX_BEGIN_NAMESPACE_VERSION
-@@ -99,7 +100,7 @@
+@@ -98,7 +99,7 @@
  
    _GLIBCXX_END_NAMESPACE_VERSION
    } // namespace detail
@@ -30,15 +30,7 @@
  _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
  
    /// An actual node in the %list.
-@@ -284,7 +285,6 @@
-                const _List_const_iterator<_Val>& __y)
-     { return __x._M_node != __y._M_node; }
- 
--
-   /// See bits/stl_deque.h's _Deque_base for an explanation.
-   template<typename _Tp, typename _Alloc>
-     class _List_base
-@@ -331,8 +331,8 @@
+@@ -330,8 +331,8 @@
        _List_impl _M_impl;
  
        _List_node<_Tp>*
@@ -49,27 +41,26 @@
  
        void
        _M_put_node(_List_node<_Tp>* __p)
-@@ -379,7 +379,9 @@
+@@ -378,7 +379,8 @@
        { _M_clear(); }
  
        void
 -      _M_clear();
-+      _M_clear() {
-+        reinterpret_cast<std::_List_base<_Tp,_Alloc>*>(this)->_M_clear();
-+      }
++      _M_clear()
++      { reinterpret_cast<std::_List_base<_Tp,_Alloc>*>(this)->_M_clear(); }
  
        void
        _M_init()
-@@ -479,7 +481,7 @@
+@@ -481,7 +483,7 @@
        _Node*
        _M_create_node(const value_type& __x)
        {
 -	_Node* __p = this->_M_get_node();
-+	_Node* __p = this->_M_get_node(x);
++	_Node* __p = this->_M_get_node(__x);
  	__try
  	  {
  	    _M_get_Tp_allocator().construct
-@@ -497,7 +499,7 @@
+@@ -499,7 +501,7 @@
          _Node*
          _M_create_node(_Args&&... __args)
  	{
