@@ -175,8 +175,9 @@ public:
   }
 
   template<bool limit = false>
-  vaddr retrieve( size_t length, vaddr upperlimit = topaddr ) {
+  vaddr retrieve( size_t length, vaddr lowerlimit = 0, vaddr upperlimit = topaddr ) {
     length = length >> min;
+    lowerlimit = lowerlimit >> min;
     upperlimit = upperlimit >> min;
     size_t logsize = ceilinglog2( length );
     KASSERT1( logsize < max-min, length );
@@ -192,8 +193,8 @@ public:
       iterator it = buddyLevel[index].begin();
       vaddr addr = *it;
 
-      // test for upper limit
-      if (!limit || addr < upperlimit ) {
+      // test for lower/upper limit
+      if (!limit || (addr >= lowerlimit && addr < upperlimit) ) {
         // remove region from map
         removeDirect( it, index );
         // reinsert leftover regions -> no merging possible in this case

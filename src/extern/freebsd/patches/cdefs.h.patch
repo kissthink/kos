@@ -1,0 +1,139 @@
+--- sys/sys/cdefs.h	2013-07-26 22:38:58.276956869 -0400
++++ patches/cdefs.h	2013-07-26 23:37:10.056944810 -0400
+@@ -107,10 +107,10 @@
+  * Macro to test if we're using a specific version of gcc or later.
+  */
+ #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+-#define	__GNUC_PREREQ__(ma, mi)	\
++#define	__GNUC_PREREQ(ma, mi)	\
+ 	(__GNUC__ > (ma) || __GNUC__ == (ma) && __GNUC_MINOR__ >= (mi))
+ #else
+-#define	__GNUC_PREREQ__(ma, mi)	0
++#define	__GNUC_PREREQ(ma, mi)	0
+ #endif
+ 
+ /*
+@@ -187,7 +187,7 @@
+ #define	__aligned(x)
+ #define	__section(x)
+ #else
+-#if !__GNUC_PREREQ__(2, 5) && !defined(__INTEL_COMPILER)
++#if !__GNUC_PREREQ(2, 5) && !defined(__INTEL_COMPILER)
+ #define	__dead2
+ #define	__pure2
+ #define	__unused
+@@ -198,7 +198,7 @@
+ #define	__unused
+ /* XXX Find out what to do for __packed, __aligned and __section */
+ #endif
+-#if __GNUC_PREREQ__(2, 7)
++#if __GNUC_PREREQ(2, 7)
+ #define	__dead2		__attribute__((__noreturn__))
+ #define	__pure2		__attribute__((__const__))
+ #define	__unused	__attribute__((__unused__))
+@@ -218,7 +218,7 @@
+ #endif
+ #endif
+ 
+-#if !__GNUC_PREREQ__(2, 95)
++#if !__GNUC_PREREQ(2, 95)
+ #define	__alignof(x)	__offsetof(struct { char __a; x __b; }, __b)
+ #endif
+ 
+@@ -261,13 +261,13 @@
+ #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+ #define	__generic(expr, t, yes, no)					\
+ 	_Generic(expr, t: yes, default: no)
+-#elif __GNUC_PREREQ__(3, 1) && !defined(__cplusplus)
++#elif __GNUC_PREREQ(3, 1) && !defined(__cplusplus)
+ #define	__generic(expr, t, yes, no)					\
+ 	__builtin_choose_expr(						\
+ 	    __builtin_types_compatible_p(__typeof(expr), t), yes, no)
+ #endif
+ 
+-#if __GNUC_PREREQ__(2, 96)
++#if __GNUC_PREREQ(2, 96)
+ #define	__malloc_like	__attribute__((__malloc__))
+ #define	__pure		__attribute__((__pure__))
+ #else
+@@ -275,38 +275,38 @@
+ #define	__pure
+ #endif
+ 
+-#if __GNUC_PREREQ__(3, 1) || (defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 800)
++#if __GNUC_PREREQ(3, 1) || (defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 800)
+ #define	__always_inline	__attribute__((__always_inline__))
+ #else
+ #define	__always_inline
+ #endif
+ 
+-#if __GNUC_PREREQ__(3, 1)
++#if __GNUC_PREREQ(3, 1)
+ #define	__noinline	__attribute__ ((__noinline__))
+ #else
+ #define	__noinline
+ #endif
+ 
+-#if __GNUC_PREREQ__(3, 3)
++#if __GNUC_PREREQ(3, 3)
+ #define __nonnull(x)	__attribute__((__nonnull__(x)))
+ #else
+ #define __nonnull(x)
+ #endif
+ 
+-#if __GNUC_PREREQ__(3, 4)
++#if __GNUC_PREREQ(3, 4)
+ #define	__fastcall	__attribute__((__fastcall__))
+ #else
+ #define	__fastcall
+ #endif
+ 
+-#if __GNUC_PREREQ__(4, 1)
++#if __GNUC_PREREQ(4, 1)
+ #define	__returns_twice	__attribute__((__returns_twice__))
+ #else
+ #define	__returns_twice
+ #endif
+ 
+ /* XXX: should use `#if __STDC_VERSION__ < 199901'. */
+-#if !__GNUC_PREREQ__(2, 7) && !defined(__INTEL_COMPILER)
++#if !__GNUC_PREREQ(2, 7) && !defined(__INTEL_COMPILER)
+ #define	__func__	NULL
+ #endif
+ 
+@@ -367,7 +367,7 @@
+  *	  basic block reordering that this affects can often generate
+  *	  larger code.
+  */
+-#if __GNUC_PREREQ__(2, 96)
++#if __GNUC_PREREQ(2, 96)
+ #define __predict_true(exp)     __builtin_expect((exp), 1)
+ #define __predict_false(exp)    __builtin_expect((exp), 0)
+ #else
+@@ -375,7 +375,7 @@
+ #define __predict_false(exp)    (exp)
+ #endif
+ 
+-#if __GNUC_PREREQ__(4, 2)
++#if __GNUC_PREREQ(4, 2)
+ #define	__hidden	__attribute__((__visibility__("hidden")))
+ #define	__exported	__attribute__((__visibility__("default")))
+ #else
+@@ -387,7 +387,7 @@
+  * We define this here since <stddef.h>, <sys/queue.h>, and <sys/types.h>
+  * require it.
+  */
+-#if __GNUC_PREREQ__(4, 1)
++#if __GNUC_PREREQ(4, 1)
+ #define __offsetof(type, field)	 __builtin_offsetof(type, field)
+ #else
+ #ifndef __cplusplus
+@@ -409,7 +409,7 @@
+  * that are known to support the features properly (old versions of gcc-2
+  * didn't permit keeping the keywords out of the application namespace).
+  */
+-#if !__GNUC_PREREQ__(2, 7) && !defined(__INTEL_COMPILER)
++#if !__GNUC_PREREQ(2, 7) && !defined(__INTEL_COMPILER)
+ #define	__printflike(fmtarg, firstvararg)
+ #define	__scanflike(fmtarg, firstvararg)
+ #define	__format_arg(fmtarg)

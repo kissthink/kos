@@ -19,6 +19,7 @@
 
 #include "mach/Processor.h"
 #include "kern/globals.h"
+#include "kern/Thread.h"
 
 class SpinLock {
   bool locked;
@@ -68,6 +69,48 @@ class ScopedLock {
 public:
   ScopedLock(volatile Lock& lk) : lk(lk) { lk.acquire(); }
   ~ScopedLock() { lk.release(); }
+};
+
+class RecursiveSpinLock {
+  Thread* owner;
+  int recurse;
+  bool locked;
+  SpinLock lk;
+  void acquireInternal() volatile {
+    while (__atomic_test_and_set(&locked, __ATOMIC_SEQ_CST))
+      while (locked) Pause();
+  }
+  void releaseInternal() volatile {
+    __atomic_clear(&locked, __ATOMIC_SEQ_CST);
+  }
+public:
+  RecursiveSpinLock() : owner(nullptr), recurse(0), locked(false) {}
+  ptr_t operator new(size_t) { return ::operator new(size()); }
+  void operator delete(ptr_t ptr) { globaldelete(ptr, size()); }
+  static constexpr size_t size() {
+    return sizeof(RecursiveSpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(RecursiveSpinLock);
+  }
+  void acquire() volatile {
+    ScopedLock<> lo(lk);
+    if (owner && owner == Processor::getCurrThread()) {
+      recurse += 1;
+      return;
+    }
+    Processor::incLockCount();
+    acquireInternal();
+    owner = Processor::getCurrThread();
+  }
+  void release() volatile {
+    ScopedLock<> lo(lk);
+    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
+    if (recurse) {
+      recurse -= 1;
+      return;
+    }
+    releaseInternal();
+    owner = nullptr;
+    Processor::decLockCount();
+  }
 };
 
 #endif /* _SpinLock_h_ */

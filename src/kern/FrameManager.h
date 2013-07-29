@@ -39,15 +39,18 @@ class FrameManager {
   friend class AddressSpace;
   friend class PageManager;
 
+  friend void* kos_alloc_contig(unsigned long, vaddr, vaddr, unsigned long, unsigned long);
+  friend void kos_free_contig(void*, unsigned long);
+
   FileCache fc;
 
   using BuddySet = set<vaddr,less<vaddr>,KernelAllocator<vaddr>>;
   BuddyMap<pagesizebits<1>(),framebits,BuddySet> availableMemory;
 
   template<bool limit = false>
-  laddr alloc( size_t size, vaddr upperlimit = topaddr ) {
+  laddr alloc( size_t size, vaddr lowerlimit = 0, vaddr upperlimit = topaddr ) {
     KASSERT1( aligned(size, pagesize<1>()), size );
-    vaddr addr = availableMemory.retrieve<limit>(size, upperlimit);
+    vaddr addr = availableMemory.retrieve<limit>(size, 0, upperlimit);  // FIXME
     if (!limit && likely(addr == topaddr)) addr = fc.reclaim(size);
     DBG::outln(DBG::Frame, "FM alloc: ", FmtHex(size), " -> ", FmtHex(addr));
     return addr;

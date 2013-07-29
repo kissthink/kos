@@ -1,0 +1,71 @@
+NOTE
+----
+
+Include files in machine directory in FreeBSD can be found under sys/amd64/include.
+
+DONE
+----
+- kprintf
+- asserts
+- malloc/free/realloc/reallocf/contigmalloc/contigfree
+- mtx is patched to include KOS's locks
+- added recursive versions of KOS's spinlock and mutex
+- added a deadlock check on KOS's mutex
+- added try versions for KOS's mutex/recursive mutex
+- added mtx (sleep/spin) versions (FreeBSD)
+- added sx, rw (same as sx for now)
+- added rw mutex in KOS
+
+TODO
+----
+- uio (userspace)
+- support M_WAITOK for memory allocation
+- cond var
+- FreeBSD mutex supports priority propagation
+- thread
+- delay execution
+- PCI
+- sample drivers
+- add inInterrupt() to KOS (very easy)
+
+About sx lock
+-------------
+sx_slock() steps:
+* DO NOT block shared locks once there is an exclusive waiter
+1. If no other thread has an exclusive lock then try to bump up the sharers count.    <--- acquire lock here
+2. Some other thread already has an exclusive lock, so start blocking. (spin on sleep queue lock)
+3. If lock (exclusive) is released while spinning on sleep queue lock, loop back and retry.
+4. Try to set SX_LOCK_SHARED_WAITERS flag. If fail to set it, drop sleep queue lock and loop back.
+5. If we are here, we failed to acquire the shared lock, so sleep.
+6. Drop Giant lock.
+7. Add this lock to sleep queue and wait.
+8. If wake up from sleep queue, retry.
+9. If success, restore Giant lock.
+
+sx_xlock() steps:
+1. If we already hold an exclusive lock, recurse and return.
+2. While exclusive lock is not UNLOCKED,
+3. If lock was released while spinning on sleep queue chain lock, try again.
+4. If an exclusive lock was released with both shared and exclusive waiters and a shared waiter hasn't woken up and acquired the lock yet, sx_lock will be set to SX_LOCK_UNLOCKED | SX_LOCK_EXCLUSIVE_WAITERS.
+   If we see that value, try to acquire it once. Note that we have to preserve SX_LOCK_EXCLUSIVE_WAITERS as there are other exclusive waiters still. If we fail, restart the loop.
+5. Try to set SX_LOCK_EXCLUSIVE_WAITERS. If fails, loop back and retry.
+6. We failed to acquire exclusive lock and exclusive waiters flag is set, so sleep.
+7. Drop Giant lock.
+8. Add this lock to sleep queue and wait.
+9. Restore Giant lock.
+
+Why can you sleep holding sx lock and not mtx?
+- sx lock supports priority propagation and adaptive spinning, which if the sx lock sleeps while a thread holds it, all prior work (priority propagation, adaptive spinning) are invalidated.
+(Source: http://2009.asiabsdcon.org/papers/abc2009-P6A-paper.pdf)
+
+sx_slock() - acquire shared lock
+sx_xlock() - acquire exclusive lock
+sx_slock_sig() - acquire shared lock with interruptible sleep
+sx_xlock_sig() - acquire exclusive lock with interruptible sleep
+sx_try_slock()
+sx_try_xlock()
+sx_sunlock()
+sx_xunlock()
+sx_try_upgrade()
+sx_downgrade()
+sx_destroy()

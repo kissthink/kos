@@ -1,0 +1,10 @@
+--- sys/sys/_mutex.h	2013-07-28 13:34:29.720593742 -0400
++++ patches/_mutex.h	2013-07-28 13:34:12.580593801 -0400
+@@ -37,6 +37,7 @@
+ struct mtx {
+ 	struct lock_object	lock_object;	/* Common lock properties. */
+ 	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
++  void *kos_lock;              /* KOS lock is embedded */
+ };
+ 
+ #endif /* !_SYS__MUTEX_H_ */
