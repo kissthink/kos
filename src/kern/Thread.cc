@@ -65,7 +65,12 @@ void Thread::runDirect(funcvoid_t func) {
   stackStart(stackPointer);
 }
 
-void Thread::sleep(mword t) {
+int Thread::sleep(mword t) {
   timeout = Machine::now() + t;
-  kernelScheduler.sleep(*this);
+  return kernelScheduler.sleep(*this);
+}
+
+int Thread::sleep(mword t, volatile SpinLock& rl) {
+  timeout = Machine::now() + t;
+  return kernelScheduler.sleep(*this, rl);
 }

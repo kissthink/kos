@@ -16,6 +16,9 @@ DONE
 - added sx, rw (same as sx for now)
 - added rw mutex in KOS
 - simple condition var
+- tsleep, wakeup, wakeup_one, pause
+- added more functions to KOS scheduler
+- added mtx/sx/rw_sleep
 
 TODO
 ----
@@ -24,10 +27,11 @@ TODO
 - sx,rw recursive versions
 - FreeBSD mutex supports priority propagation
 - thread
-- delay execution
+- event handlers, callout, etc
+- SYSCTL
 - PCI
 - sample drivers
-- add inInterrupt() to KOS (very easy)
+- *****add inInterrupt() to KOS (very easy)*****
 
 About sx lock
 -------------

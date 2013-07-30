@@ -83,7 +83,8 @@ void mtx_init(struct mtx *m, const char *name, const char *type, int opts) {
   lock_init(&m->lock_object, class, name, type, flags);     // init for FreeBSD data
   kos_lock_init(&m->kos_lock, opts & MTX_SPIN, opts & MTX_RECURSE);
   m->lock_object.kos_lock = m->kos_lock;
-  m->lock_object.kos_lock_type = 0;
+  if (opts & MTX_SPIN) m->lock_object.kos_lock_type = 3;
+  else m->lock_object.kos_lock_type = 0;
 }
 
 void _mtx_lock_flags(struct mtx *m, int opts, const char *file, int line) {

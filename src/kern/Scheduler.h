@@ -58,7 +58,8 @@ public:
     ScopedLock<> lo(lk);
     schedule();
   }
-  void sleep(Thread& t);
+  int sleep(Thread& t);
+  int sleep(Thread& t, volatile SpinLock& rl);
   void yield();
 };
 

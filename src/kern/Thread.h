@@ -22,6 +22,7 @@
 #include "mach/stack.h"
 
 class AddressSpace;
+class SpinLock;
 
 class Thread : public mod_set_elem<Thread*> {
 public:
@@ -33,11 +34,12 @@ private:
   vaddr stackPointer;
   size_t stackSize;
   mword timeout;
+  bool timedout;
   int prio;
   const char* name;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
-    : addressSpace(&as), stackPointer(sp), stackSize(s), timeout(0), prio(0), name(n) {}
+    : addressSpace(&as), stackPointer(sp), stackSize(s), timeout(0), timedout(false), prio(0), name(n) {}
   ~Thread() { /* join */ }
   static void invoke( function_t func, ptr_t data );
 
@@ -54,7 +56,8 @@ public:
   static void destroy(Thread* t);
   void run(function_t func, ptr_t data);
   void runDirect(funcvoid_t func);
-  void sleep(mword t);
+  int sleep(mword t);
+  int sleep(mword t, volatile SpinLock& rl);
 } __packed;
 
 #endif /* _Thread_h_ */

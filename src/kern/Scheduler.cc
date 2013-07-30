@@ -19,6 +19,7 @@
 #include "kern/Debug.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
+#include <cerrno>
 
 inline bool TimeoutCompare::operator()( const Thread* t1, const Thread* t2 ) {
   return t1->timeout < t2->timeout;
@@ -26,6 +27,7 @@ inline bool TimeoutCompare::operator()( const Thread* t1, const Thread* t2 ) {
 
 void Scheduler::ready(Thread& t) {
   readyQueue[t.getPrio()].push_back(&t);
+  timerQueue.erase(&t);
 }
 
 // extremely simple 2-class prio scheduling!
@@ -64,14 +66,27 @@ void Scheduler::timerEvent(mword ticks) {
   if (i == timerQueue.end() || ticks < (*i)->timeout) break;
     Thread* t = *i;
     timerQueue.erase(i);
+    t->timedout = true;
     ready(*t);
   }
 }
 
-void Scheduler::sleep(Thread& t) {
+int Scheduler::sleep(Thread& t) {
   ScopedLock<> lo(lk); 
   timerQueue.insert(&t);
+  t.timedout = false;
   schedule();
+  return t.timedout ? -ETIMEDOUT : 0;
+}
+
+int Scheduler::sleep(Thread& t, volatile SpinLock& rl) {
+  ScopedLock<> lo(lk);
+  rl.release();
+  timerQueue.insert(&t);
+  t.timedout = false;
+  schedule();
+  rl.acquire();
+  return t.timedout ? -ETIMEDOUT : 0;
 }
 
 void Scheduler::yield() {
