@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 1997 Berkeley Software Design, Inc. All rights reserved.
+ * Copyright (c) 2006 John Baldwin <jhb@FreeBSD.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -9,14 +10,14 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Berkeley Software Design Inc's name may not be used to endorse or
- *    promote products derived from this software without specific prior
- *    written permission.
+ * 3. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY BERKELEY SOFTWARE DESIGN INC ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL BERKELEY SOFTWARE DESIGN INC BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -25,19 +26,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: release/9.1.0/sys/sys/_lock.h 179025 2008-05-15 20:10:06Z attilio $
+ * $FreeBSD: release/9.1.0/sys/sys/_rwlock.h 179025 2008-05-15 20:10:06Z attilio $
  */
 
-#ifndef _SYS__LOCK_H_
-#define	_SYS__LOCK_H_
+#ifndef _SYS__RWLOCK_H_
+#define	_SYS__RWLOCK_H_
 
-struct lock_object {
-	const	char *lo_name;		/* Individual lock name. */
-	u_int	lo_flags;
-	u_int	lo_data;		/* General class specific data. */
-	struct	witness *lo_witness;	/* Data for witness. */
+/*
+ * Reader/writer lock.
+ */
+struct rwlock {
+	struct lock_object	lock_object;
+	volatile uintptr_t	rw_lock;
   void *kos_lock;
-  int kos_lock_type;
 };
 
-#endif /* !_SYS__LOCK_H_ */
+#endif /* !_SYS__RWLOCK_H_ */

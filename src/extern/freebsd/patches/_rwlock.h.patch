@@ -1,0 +1,10 @@
+--- sys/sys/_rwlock.h	2013-07-29 14:54:10.067074748 -0400
++++ patches/_rwlock.h	2013-07-29 14:54:27.555813963 -0400
+@@ -38,6 +38,7 @@
+ struct rwlock {
+ 	struct lock_object	lock_object;
+ 	volatile uintptr_t	rw_lock;
++  void *kos_lock;
+ };
+ 
+ #endif /* !_SYS__RWLOCK_H_ */

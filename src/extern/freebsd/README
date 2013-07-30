@@ -15,12 +15,13 @@ DONE
 - added mtx (sleep/spin) versions (FreeBSD)
 - added sx, rw (same as sx for now)
 - added rw mutex in KOS
+- simple condition var
 
 TODO
 ----
 - uio (userspace)
 - support M_WAITOK for memory allocation
-- cond var
+- sx,rw recursive versions
 - FreeBSD mutex supports priority propagation
 - thread
 - delay execution

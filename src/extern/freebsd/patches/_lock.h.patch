@@ -1,0 +1,11 @@
+--- sys/sys/_lock.h	2013-07-29 13:19:59.837183943 -0400
++++ patches/_lock.h	2013-07-29 19:04:57.095959474 -0400
+@@ -36,6 +36,8 @@
+ 	u_int	lo_flags;
+ 	u_int	lo_data;		/* General class specific data. */
+ 	struct	witness *lo_witness;	/* Data for witness. */
++  void *kos_lock;
++  int kos_lock_type;
+ };
+ 
+ #endif /* !_SYS__LOCK_H_ */

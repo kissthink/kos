@@ -4,6 +4,16 @@
 #include "kos/kos_blockingSync.h"
 #include "kos/kos_kassert.h"
 
+struct lock_class lock_class_sx = {
+  .lc_name = "sx",
+  .lc_flags = LC_SLEEPLOCK | LC_SLEEPABLE | LC_RECURSABLE | LC_UPGRADABLE,
+#if 0
+  .lc_assert = assert_sx,
+  .lc_lock = lock_sx,
+  .lc_unlock = unlock_sx,
+#endif
+};
+
 /**
  * Possible flags
  *
@@ -27,6 +37,8 @@ void sx_init_flags(struct sx *sx, const char *description, int opts) {
 
   lock_init(&sx->lock_object, &lock_class_sx, description, NULL, flags);
   kos_rw_mutex_init(&sx->kos_lock, opts & SX_RECURSE);
+  sx->lock_object.kos_lock = sx->kos_lock;
+  sx->lock_object.kos_lock_type = 1;
 }
 
 // TODO support interruptible sleep
@@ -87,4 +99,11 @@ void _sx_downgrade(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_downgrade() of destroyed sx");
   kos_rw_mutex_downgrade(sx->kos_lock);
+}
+
+void sx_destroy(struct sx *sx) {
+  // TODO check if the lock is still held
+  // TODO check if lock is still recursed
+  sx->sx_lock = SX_LOCK_DESTROYED;
+  lock_destroy(&sx->lock_object);
 }

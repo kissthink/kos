@@ -136,6 +136,9 @@ public:
       lk.release();
     }
   }
+  bool locked() {
+    return owner != nullptr;
+  }
 };
 
 class RecursiveMutex : public BlockingSync {
@@ -253,6 +256,12 @@ public:
     } else {    // poor form of broadcast
       while (waiting()) resumeReader();
     }
+  }
+  bool locked() {
+    return (shared || exclusive);
+  }
+  bool isExclusive() {
+    return exclusive;
   }
 };
 
