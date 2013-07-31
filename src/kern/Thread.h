@@ -30,6 +30,7 @@ public:
 private:
   friend struct TimeoutCompare; // timeout 
   friend class Scheduler; // stackPointer
+  friend class DynamicTimer; // stackPointer
   AddressSpace* addressSpace;
   vaddr stackPointer;
   size_t stackSize;

@@ -25,6 +25,7 @@
 #include "dev/RTC.h"
 #include "dev/Screen.h"
 #include "gdb/Gdb.h"
+#include "kern/DynamicTimer.h"
 #include "kern/FrameManager.h"
 #include "kern/Kernel.h"
 #include "kern/Multiboot.h"
@@ -252,6 +253,9 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // start gdb -> need to have IDT installed
   Gdb::start();
+
+  // start dynamic timer
+  DynamicTimer::init();
 
   // set up RTC & PIT
   rtc.init();

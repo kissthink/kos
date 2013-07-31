@@ -17,6 +17,7 @@
 #include "mach/Processor.h"
 #include "mach/stack.h"
 #include "kern/Debug.h"
+#include "kern/DynamicTimer.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 #include <cerrno>

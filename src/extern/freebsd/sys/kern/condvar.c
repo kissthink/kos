@@ -4,6 +4,7 @@
 #include "sys/mutex.h"
 #include "sys/condvar.h"
 #include "kos/kos_condVar.h"
+#include "kos/kos_kassert.h"
 
 void cv_init(struct cv *cvp, const char *desc) {
   cvp->cv_description = desc;
