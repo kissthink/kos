@@ -18,6 +18,7 @@
 #include "kern/Debug.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
+#include "world/FDHandler.h"
 
 extern "C" void abort() {
   ABORT0();
@@ -42,6 +43,26 @@ extern "C" void free(void* p) {
   kernelHeap.free(p);
 }
 
+extern "C" void* _malloc_r(void* r, size_t s) {
+  return malloc(s);
+}
+
+extern "C" int open(const char *path, int oflag, int mode) {
+  return FDHandler::openHandle(path,oflag,mode);
+}
+
+extern "C" off_t lseek(int fd, off_t offset, int whence) {
+  return FDHandler::lseekHandle(fd,offset,whence);
+}
+
+extern "C" ssize_t read(int fd, char* buf, int len) {
+  return FDHandler::readHandle(fd,buf,len);
+}
+
+extern "C" int close(int fd) {
+  return FDHandler::closeHandle(fd);
+}
+
 /******* dummy functions *******/
 
 extern "C" void* calloc(size_t nmemb, size_t size) {
@@ -50,10 +71,6 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
 
 extern "C" void* realloc(void *p, size_t size) {
   ABORT1("realloc"); return 0;
-}
-
-extern "C" void* _malloc_r(void* r, size_t s) {
-  ABORT1("_malloc_r"); return 0;
 }
 
 extern "C" void _free_r(void* r, void* p) {
@@ -66,10 +83,6 @@ extern "C" void* _calloc_r(void* r, size_t n, size_t s) {
 
 extern "C" void* _realloc_r(void* r, void *p, size_t size) {
   ABORT1("realloc_r"); return 0;
-}
-
-extern "C" int close(int) {
-  ABORT1("close"); return -1;
 }
 
 extern "C" void _exit(int) {
@@ -97,19 +110,8 @@ extern "C" int kill(pid_t pid, int sig) {
   ABORT1("kill"); return -1;
 }
 
-extern "C" off_t lseek(int fd, off_t offset, int whence) {
-  ABORT1("lseek"); return -1;
-}
-  
-extern "C" int open(const char *path, int oflag, int mode) {
-  ABORT1("close"); return -1;
-}
-
-extern "C" ssize_t read(int fd, char* buf, int len) {
-  ABORT1("read"); return -1;
-}
-  
 extern "C" void* sbrk(intptr_t increment) {
+  Breakpoint(0);
   ABORT1("sbrk"); return nullptr;
 }
 

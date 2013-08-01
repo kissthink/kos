@@ -53,7 +53,7 @@ class segment
 
   protected:
     virtual void set_index( Elf_Half )                                             = 0;
-    virtual void load( std::istream& stream, std::streampos header_offset ) const = 0;
+    virtual void load( std::ifstream& stream, std::streampos header_offset ) const = 0;
     virtual void save( std::ofstream& f, std::streampos header_offset,
                        std::streampos data_offset )                                = 0;
 };
@@ -75,8 +75,7 @@ class segment_impl : public segment
 //------------------------------------------------------------------------------
     virtual ~segment_impl()
     {
-//        delete [] data;
-        globaldelete(data,get_file_size());
+        delete [] data;
     }
 
 //------------------------------------------------------------------------------
@@ -102,11 +101,12 @@ class segment_impl : public segment
     {
         return data;
     }
+
 //------------------------------------------------------------------------------
     Elf64_Off
     get_data_offset() const
     {
-    	return ph.p_offset;
+        return ph.p_offset;
     }
 
 //------------------------------------------------------------------------------
@@ -150,7 +150,7 @@ class segment_impl : public segment
 
 //------------------------------------------------------------------------------
     void
-    load( std::istream& stream,
+    load( std::ifstream& stream,
           std::streampos header_offset ) const
     {
         stream.seekg( header_offset );

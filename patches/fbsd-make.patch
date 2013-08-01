@@ -1,0 +1,35 @@
+diff -ruN make-orig/globals.h make/globals.h
+--- make-orig/globals.h	2012-12-03 22:42:21.000000000 -0500
++++ make/globals.h	2013-07-26 16:49:53.080215548 -0400
+@@ -41,6 +41,8 @@
+ #ifndef globals_h_1c1edb96
+ #define	globals_h_1c1edb96
+ 
++#include <stdint.h>
++
+ /*
+  * Global Variables
+  */
+diff -ruN make-orig/main.c make/main.c
+--- make-orig/main.c	2012-12-03 22:42:21.000000000 -0500
++++ make/main.c	2013-07-26 16:49:53.080215548 -0400
+@@ -368,6 +368,7 @@
+ 	int c;
+ 	Boolean	found_dd = FALSE;
+ 	char found_dir[MAXPATHLEN + 1];	/* for searching for sys.mk */
++	int optind, optreset;
+ 
+ rearg:
+ 	optind = 1;	/* since we're called more than once */
+diff -ruN make-orig/Makefile.dist make/Makefile.dist
+--- make-orig/Makefile.dist	2012-12-03 22:42:21.000000000 -0500
++++ make/Makefile.dist	2013-07-26 16:50:26.229869629 -0400
+@@ -3,7 +3,7 @@
+ pmake:
+ 	@echo 'make started.'
+ 	cc -D__dead2="" -D__unused="" -Darc4random=random -D__FBSDID="static const char *id=" -DDEFSHELLNAME=\"sh\" -I. -c *.c
+-	cc *.o -o pmake
++	cc *.o -o pmake -lbsd
+ 	@echo 'make completed.'
+ 
+ clean:

@@ -35,7 +35,6 @@ THE SOFTWARE.
 //#include <algorithm>
 #include <vector>
 #include <typeinfo>
-#include <sstream>      // std::istringstream
 
 #include "elf_types.hpp"
 #include "elfio_utils.hpp"
@@ -92,7 +91,7 @@ class elfio
     }
 
 //------------------------------------------------------------------------------
-    bool load( const kstring& file_name )
+    bool load( const std::string& file_name )
     {
         clean();
 
@@ -137,57 +136,9 @@ class elfio
 
         return true;
     }
-//------------------------------------------------------------------------------
-   bool load(char* fileData, unsigned int size )
-   {
-	   clean();
-
-	   std::istringstream stream;
-	   stream.rdbuf()->pubsetbuf(fileData,size);
-
-	   //stream.open( file_name.c_str(), std::ios::in | std::ios::binary );
-	   if ( !stream ) {
-		   return false;
-	   }
-
-	   unsigned char e_ident[EI_NIDENT];
-
-	   // Read ELF file signature
-	   stream.seekg( 0 );
-	   stream.read( reinterpret_cast<char*>( &e_ident ), sizeof( e_ident ) );
-
-	   // Is it ELF file?
-	   if ( stream.gcount() != sizeof( e_ident ) ||
-			e_ident[EI_MAG0] != ELFMAG0    ||
-			e_ident[EI_MAG1] != ELFMAG1    ||
-			e_ident[EI_MAG2] != ELFMAG2    ||
-			e_ident[EI_MAG3] != ELFMAG3 ) {
-		   return false;
-	   }
-
-	   if ( ( e_ident[EI_CLASS] != ELFCLASS64 ) &&
-			( e_ident[EI_CLASS] != ELFCLASS32 )) {
-		   return false;
-	   }
-
-	   convertor.setup( e_ident[EI_DATA] );
-
-	   header = create_header( e_ident[EI_CLASS], e_ident[EI_DATA] );
-	   if ( 0 == header ) {
-		   return false;
-	   }
-	   if ( !header->load( stream ) ) {
-		   return false;
-	   }
-
-	   load_sections( stream );
-	   load_segments( stream );
-
-	   return true;
-   }
 
 //------------------------------------------------------------------------------
-    bool save( const kstring& file_name )
+    bool save( const std::string& file_name )
     {
         std::ofstream f( file_name.c_str(), std::ios::out | std::ios::binary );
 
@@ -276,23 +227,18 @@ class elfio
 //------------------------------------------------------------------------------
     void clean()
     {
-//        delete header;
-        globaldelete(header,sizeof(elf_header));
+        delete header;
         header = 0;
 
-//        std::vector<section*>::const_iterator it;
-        std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>>::const_iterator it;
+        std::vector<section*>::const_iterator it;
         for ( it = sections_.begin(); it != sections_.end(); ++it ) {
-//            delete *it;
-            globaldelete(*it,sizeof(ELFIO::section));
+            delete *it;
         }
         sections_.clear();
 
-//        std::vector<segment*>::const_iterator it1;
-        std::vector<ELFIO::segment*,KernelAllocator<ELFIO::segment*>>::const_iterator it1;
+        std::vector<segment*>::const_iterator it1;
         for ( it1 = segments_.begin(); it1 != segments_.end(); ++it1 ) {
-//            delete *it1;
-			globaldelete(*it1,sizeof(ELFIO::segment));
+            delete *it1;
         }
         segments_.clear();
     }
@@ -377,7 +323,7 @@ class elfio
     }
 
 //------------------------------------------------------------------------------
-    Elf_Half load_sections( std::istream& stream )
+    Elf_Half load_sections( std::ifstream& stream )
     {
         Elf_Half  entry_size = header->get_section_entry_size();
         Elf_Half  num        = header->get_sections_num();
@@ -409,7 +355,7 @@ class elfio
     }
 
 //------------------------------------------------------------------------------
-    bool load_segments( std::istream& stream )
+    bool load_segments( std::ifstream& stream )
     {
         Elf_Half  entry_size = header->get_segment_entry_size();
         Elf_Half  num        = header->get_segments_num();
@@ -591,12 +537,11 @@ class elfio
         }
 
 //------------------------------------------------------------------------------
-        section* operator[]( const kstring& name ) const
+        section* operator[]( const std::string& name ) const
         {
             section* sec = 0;
 
-//          std::vector<section*>::const_iterator it;
-            std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>>::const_iterator it;
+            std::vector<section*>::const_iterator it;
             for ( it = parent->sections_.begin(); it != parent->sections_.end(); ++it ) {
                 if ( (*it)->get_name() == name ) {
                     sec = *it;
@@ -608,7 +553,7 @@ class elfio
         }
 
 //------------------------------------------------------------------------------
-        section* add( const kstring& name )
+        section* add( const std::string& name )
         {
             section* new_section = parent->create_section();
             new_section->set_name( name );
@@ -665,10 +610,8 @@ class elfio
 //------------------------------------------------------------------------------
   private:
     elf_header*           header;
-//    std::vector<section*> sections_;
-    std::vector<ELFIO::section*,KernelAllocator<ELFIO::section*>> sections_;
-//    std::vector<segment*> segments_;
-    std::vector<ELFIO::segment*,KernelAllocator<ELFIO::segment*>> segments_;
+    std::vector<section*> sections_;
+    std::vector<segment*> segments_;
     endianess_convertor   convertor;
 
     Elf_Xword current_file_pos;

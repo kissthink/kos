@@ -1,0 +1,37 @@
+diff -ruN csu-orig/amd64/Makefile csu/amd64/Makefile
+--- csu-orig/amd64/Makefile	2012-12-03 16:36:30.000000000 -0500
++++ csu/amd64/Makefile	2013-07-31 11:59:36.472816040 -0400
+@@ -7,6 +7,8 @@
+ OBJS+=		Scrt1.o gcrt1.o
+ CFLAGS+=	-I${.CURDIR}/../common \
+ 		-I${.CURDIR}/../../libc/include
++CFLAGS+=-I${.CURDIR}/../../../include
++CFLAGS+=-I${.CURDIR}/../../../sys -I${.CURDIR}/../../../sys/sys
+ CFLAGS+=	-fno-omit-frame-pointer
+ 
+ all: ${OBJS}
+@@ -19,21 +21,21 @@
+ 
+ crt1.s: crt1.c
+ 	${CC} ${CFLAGS} -S -o ${.TARGET} ${.CURDIR}/crt1.c
+-	sed -i "" -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
++	sed -i -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
+ 
+ crt1.o: crt1.s
+ 	${CC} ${ACFLAGS} -c -o ${.TARGET} crt1.s
+ 
+ gcrt1.s: crt1.c
+ 	${CC} ${CFLAGS} -DGCRT -S -o ${.TARGET} ${.CURDIR}/crt1.c
+-	sed -i "" -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
++	sed -i -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
+ 
+ gcrt1.o: gcrt1.s
+ 	${CC} ${ACFLAGS} -c -o ${.TARGET} gcrt1.s
+ 
+ Scrt1.s: crt1.c
+ 	${CC} ${CFLAGS} -fPIC -DPIC -S -o ${.TARGET} ${.CURDIR}/crt1.c
+-	sed -i "" -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
++	sed -i -e '/\.note\.ABI-tag/s/progbits/note/' ${.TARGET}
+ 
+ Scrt1.o: Scrt1.s
+ 	${CC} ${ACFLAGS} -c -o ${.TARGET} Scrt1.s

@@ -2,7 +2,7 @@
 
 # see 'config' for installation directories:
 # . grub in $GRUBDIR
-# . cross compiler in $GCCDIR
+# . gcc/binutils in $GCCDIR
 # . gdb, bochs, and qemu in $TOOLSDIR
 # note: use 'make info' and 'make pdf' to build GNU docs
 
@@ -19,10 +19,12 @@ BINUTILS=binutils-2.23.2 # GNU mirror
 BOCHS=bochs-2.6.2        # http://bochs.sourceforge.net/
 GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.6              # GNU mirror
-GLIBC=glibc-2.17         # GNU mirror
 GRUB=grub-2.00           # GNU mirror
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
 QEMU=qemu-1.5.1          # http://www.qemu.org/
+
+# download FreeBSD's src.txz from local mirror, or original URL:
+# http://ftp.freebsd.org/pub/FreeBSD/releases/amd64/9.1-RELEASE/src.txz
 
 mkdir -p $TMPDIR
 
@@ -55,47 +57,104 @@ function install() {
 	$ROOTEXEC -c "make -C $TMPDIR/$1-build install && echo SUCCESS: $1 install"
 }
 
-function build_binutils() {
-	unpack $BINUTILS tar.bz2
+function build_usergcc() {
+	rm -rf $TMPDIR/$GCC && mkdir $TMPDIR/$GCC && cd $TMPDIR/$GCC || error "$TMPDIR/$GCC access"
+	# order often important (gcc last)
+	tar xaf $DLDIR/$BINUTILS.tar.bz2 --strip-components 1 || error "$BINUTILS extract"
+	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
 # for binutils 2.32.2:
 	sed -i -e 's/@colophon/@@colophon/' \
-	       -e 's/doc@cygnus.com/doc@@cygnus.com/' $BINUTILS/bfd/doc/bfd.texinfo
-	prebuild $BINUTILS
-	../$BINUTILS/configure --target=$TARGET --prefix=$UKOSDIR\
-	  || error "$BINUTILS configure"
-	build $BINUTILS
-}
-
-function build_kosgcc() {
-	unpack $GCC tar.bz2
+	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
 # for gcc 4.7.2:
 #	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' $GCC/gcc/configure
 #	sed -i 's/thread_local/thread_localX/' $GCC/gcc/tree.h
 	prebuild $GCC
 	../$GCC/configure --target=$TARGET --prefix=$UKOSDIR\
-		--disable-nls --enable-languages=c --disable-shared\
-		--disable-libssp --disable-libquadmath\
+		--enable-languages=c --enable-lto --enable-shared\
+		--disable-nls --disable-libquadmath --disable-libssp\
 		|| error "$GCC configure"
 	build $GCC
-	# --disable-threads --disable-tls
+}
+# --enable-gold --enable-ld=default --enable-plugin --with-plugin-ld=ld.gold
+
+function build_bsdlibc() {
+	BSDDIR=$TMPDIR/bsd
+	rm -rf $BSDDIR
+
+	BINDIR=$BSDDIR/bin
+	mkdir -p $BINDIR
+	export PATH=$BINDIR:$PATH
+	echo "while read line; do for i in \$line; do echo \$i; done; done|sort|uniq"\
+		> $BINDIR/tsort
+	chmod +x $BINDIR/tsort
+	echo "exec echo \$*" > $BINDIR/lorder
+	chmod +x $BINDIR/lorder
+
+	cd $BSDDIR
+	tar xaf $DLDIR/src.txz
+	cd usr/src/usr.bin/make
+	patch -p1 < $PTDIR/fbsd-make.patch
+	sh $PTDIR/fbsd-make.sed.patch
+	make -f Makefile.dist
+	cp pmake $BINDIR
+	cd $BSDDIR
+	mkdir -p dest/usr/include
+	cd dest/usr/include
+	ln -s ../../../usr/src/include/rpcsvc .
+	cd $BSDDIR/usr/src/include
+	ln -s ../sys/amd64/include machine
+	ln -s ../sys/x86/include x86
+
+	cd $BSDDIR
+	echo "#undef __FreeBSD_version
+#define __FreeBSD_version 901000" > usr/src/include/osreldate.h
+	cp usr/src/lib/msun/src/math.h usr/src/include
+	cp usr/src/lib/msun/amd64/fenv.h usr/src/include
+	cp usr/src/lib/libutil/libutil.h usr/src/include
+	mkdir usr/src/include/altq
+	cp usr/src/sys/contrib/altq/altq/if_altq.h usr/src/include/altq
+	cd usr/src/include/rpcsvc
+	rpcgen -h crypt.x > crypt.h
+	rpcgen -h key_prot.x > key_prot.h
+	patch nis.x < $PTDIR/fbsd-nis.x.patch
+	rpcgen -h nis.x > nis.h
+	rpcgen -h yp.x > yp.h
+	mv key_prot.h ../rpc
+	  	
+	cd $BSDDIR/usr/src/lib/csu
+	patch -p1 < $PTDIR/fbsd-csu.patch
+	cd amd64
+
+	CC=$UKOSDIR/bin/$TARGET-gcc PATH=$UKOSDIR/$TARGET/bin:$PATH \
+	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector
+
+	cd $BSDDIR/usr/src/lib/libc
+	patch -p1 < $PTDIR/fbsd-libc.patch
+	sed -i 's/\$$/\$ /' nls/*.msg
+	sed -i 's/2 RPC/72 RPC/' nls/mn_MN.UTF-8.msg
+	
+	ln -s amd64 unknown
+	ln -s amd64 x86_64	
+
+	# this command finds cc1, but ld does not produce a shared library
+	CC=$UKOSDIR/bin/$TARGET-gcc PATH=$UKOSDIR/$TARGET/bin:$PATH \
+	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector \
+	KOSGCCDIR=$UKOSDIR/lib/gcc/$TARGET/$GCCVER/include
+	rm libc.*
+	# this command does not find cc1, but ld produces shared library
+	PATH=$UKOSDIR/$TARGET/bin:$PATH \
+	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector \
+	KOSGCCDIR=$UKOSDIR/lib/gcc/$TARGET/$GCCVER/include
 }
 
-function build_glibc() {
-	unpack $GLIBC tar.xz
-	prebuild $GLIBC
-	libc_cv_z_relro=yes\
-	../$GLIBC/configure --host=$TARGET --prefix=$UKOSDIR\
-		--enable-hacker-mode --disable-shared\
-		|| error "$GLIBC configure"
-	build $GLIBC -i
-	cd $TMPDIR/$GLIBC-build
-	make -i 2>&1 | fgrep -v "a - " > $TMPDIR/glibc.out
-	return 1
+function install_bsdlibc() {
+	# copy libs to $UKOSDIR/$TARGET/lib
+	# copy header files to $UKOSDIR/$TARGET/include
 }
 
 function build_gcc() {
 	rm -rf $TMPDIR/$GCC && mkdir $TMPDIR/$GCC && cd $TMPDIR/$GCC || error "$TMPDIR/$GCC access"
-	# order important (gcc last): error: 'DEMANGLE_COMPONENT_TRANSACTION_CLONE' undeclared
+	# order often important (gcc last)
 	tar xaf $DLDIR/$BINUTILS.tar.bz2 --strip-components 1 || error "$BINUTILS extract"
 	tar xaf $DLDIR/$NEWLIB.tar.gz --strip-components 1 || error "$NEWLIB extract"
 	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
@@ -111,7 +170,7 @@ function build_gcc() {
 	cd libgloss; autoconf || error "libgloss autoconf" ; cd ..
 	prebuild $GCC
 	../$GCC/configure --target=$TARGET --prefix=$GCCDIR\
-		--disable-threads --disable-tls --disable-nls\
+		--disable-threads --disable-tls --disable-nls --enable-lto\
 		--enable-languages=c,c++ --with-newlib || error "$GCC configure"
 	# compile gcc first pass
 	nice -10 make -j $cpucount all || error "$GCC first pass failed"
@@ -165,18 +224,12 @@ function build_qemu() {
 	build $QEMU
 }
 
-function build_kos_glibc() {
+function build_user() {
 	while [ $# -gt 0 ]; do case "$1" in
 	gcc)
-		build_binutils && install $BINUTILS
-		export PATH=$UKOSDIR/bin:$PATH
-		build_kosgcc && install $GCC;;
-	glibc)
-		export PATH=$UKOSDIR/bin:$PATH
-		build_glibc && install $GLIBC;;
-	allcross)
-		build_kosgcc && install $GCC
-		build_glibc && install $GLIBC;;
+		build_usergcc && install $GCC;;
+	bsdlibc)
+		build_bsdlibc;;
 	*)
 		echo unknown argument: $1;;
 	esac; shift; done
@@ -197,9 +250,9 @@ allcross)
 	build_gcc && install $GCC
 	build_gdb && install $GDB
 	build_grub && install $GRUB;;
-kos)
+user)
 	shift
-	build_kos_glibc $1;;
+	build_user $1;;
 *)
 	echo unknown argument: $1;;
 esac; shift; done

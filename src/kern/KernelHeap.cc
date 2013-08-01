@@ -21,10 +21,17 @@
 #include "kern/Kernel.h"
 #include "kern/KernelHeap.h"
 
-ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }  
+#if 0
+ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }
 ptr_t operator new[](size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }
 void operator delete(ptr_t p) noexcept { ABORT1("delete"); }
-void operator delete[](ptr_t p) noexcept { ABORT1("delete[]"); }
+void operator delete[](ptr_t p) noexcept {Breakpoint2(0); ABORT1("delete[]"); }*/
+#endif
+
+//inline ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.malloc(s); }
+//inline ptr_t operator new[](size_t s) { return (ptr_t)kernelHeap.malloc(s); }
+//inline void operator delete(ptr_t p) noexcept { kernelHeap.free(p); }
+//inline void operator delete[](ptr_t p) noexcept { kernelHeap.free(p); }
 
 void globaldelete(ptr_t addr, size_t size) {
   kernelHeap.release<false>((vaddr)addr, size);

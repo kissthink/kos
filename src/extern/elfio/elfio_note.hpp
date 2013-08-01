@@ -47,7 +47,7 @@ class note_section_accessor
     bool
     get_note( Elf_Word     index,
               Elf_Word&    type,
-              kstring& name,
+              std::string& name,
               void*&       desc,
               Elf_Word&    descSize ) const
     {
@@ -79,7 +79,7 @@ class note_section_accessor
 
 //------------------------------------------------------------------------------
     void add_note( Elf_Word           type,
-                   const kstring& name,
+                   const std::string& name,
                    const void*        desc,
                    Elf_Word           descSize )
     {
@@ -87,7 +87,7 @@ class note_section_accessor
 
         Elf_Word nameLen     = (Elf_Word)name.size() + 1;
         Elf_Word nameLenConv = convertor( nameLen );
-        kstring buffer( reinterpret_cast<char*>( &nameLenConv ), sizeof( nameLenConv ) );
+        std::string buffer( reinterpret_cast<char*>( &nameLenConv ), sizeof( nameLenConv ) );
         Elf_Word descSizeConv = convertor( descSize );
         buffer.append( reinterpret_cast<char*>( &descSizeConv ), sizeof( descSizeConv ) );
         type = convertor( type );

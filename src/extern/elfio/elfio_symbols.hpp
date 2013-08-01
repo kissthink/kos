@@ -52,7 +52,7 @@ class symbol_section_accessor
 //------------------------------------------------------------------------------
     bool
     get_symbol( Elf_Xword      index,
-                kstring&   name,
+                std::string&   name,
                 Elf64_Addr&    value,
                 Elf_Xword&     size,
                 unsigned char& bind,
@@ -76,7 +76,7 @@ class symbol_section_accessor
 
 //------------------------------------------------------------------------------
     bool
-    get_symbol( kstring&   name,
+    get_symbol( std::string&   name,
                 Elf64_Addr&    value,
                 Elf_Xword&     size,
                 unsigned char& bind,
@@ -92,7 +92,7 @@ class symbol_section_accessor
 
             Elf_Word y   = *(Elf_Word*)( hash_section->get_data() +
                                ( 2 + val % nbucket ) * sizeof( Elf_Word ) );
-            kstring   str;
+            std::string   str;
             get_symbol( y, str, value, size, bind, type, section_index, other );
             while ( str != name && STN_UNDEF != y ) {
                 y = *(Elf_Word*)( hash_section->get_data() +
@@ -202,7 +202,7 @@ class symbol_section_accessor
     template< class T >
     bool
     generic_get_symbol( Elf_Xword index,
-                        kstring& name, Elf64_Addr& value,
+                        std::string& name, Elf64_Addr& value,
                         Elf_Xword& size,
                         unsigned char& bind, unsigned char& type,
                         Elf_Half& section_index,

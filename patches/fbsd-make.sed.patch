@@ -1,0 +1,5 @@
+#!/bin/bash
+while fgrep -q __unused *; do
+	sed -i 's/__unused/__Unused/' *
+done
+

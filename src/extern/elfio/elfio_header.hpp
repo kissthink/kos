@@ -31,7 +31,7 @@ class elf_header
 {
   public:
     virtual ~elf_header() {};
-    virtual bool load( std::istream& stream )       = 0;
+    virtual bool load( std::ifstream& stream )       = 0;
     virtual bool save( std::ofstream& stream ) const = 0;
 
     // ELF header functions
@@ -98,7 +98,7 @@ template< class T > class elf_header_impl : public elf_header
     }
 
     bool
-    load( std::istream& stream )
+    load( std::ifstream& stream )
     {
         stream.seekg( 0 );
         stream.read( reinterpret_cast<char*>( &header ), sizeof( header ) );

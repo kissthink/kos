@@ -67,7 +67,6 @@ void mainLoop(ptr_t) {
   }
 
   File* f = kernelFS.find("testprogram2")->second;
-
   //User Address Space
   AddressSpace userAS(AddressSpace::User);
   vaddr startAS = pagesize<2>();
@@ -86,6 +85,7 @@ void mainLoop(ptr_t) {
     KASSERT0(uStack != topaddr);
     // user program address
     vaddr uMain = elfLoader.findMainAddress();
+    DBG::outln(DBG::Basic, "user main address: ", FmtHex(uMain));
     KASSERT0(uMain != topaddr);
     // set user stack
     asm volatile("movq %0, %%rsp"::"g"(uStack + Thread::defaultStack) : "memory");

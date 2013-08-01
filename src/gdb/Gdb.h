@@ -8,7 +8,6 @@
 #include "mach/Processor.h"
 #include "kern/Debug.h"
 #include "world/File.h"
-#include "kern/Kernel.h"    // required by elfio.hpp
 #include "extern/elfio/elfio.hpp"
 
 extern void set_debug_traps(bool);
@@ -149,8 +148,7 @@ private:
   // read virtual address of _Unwind_DebugHook symbol
   static mword findUnwindDebugHookAddr() {
     ELFIO::elfio elfReader;
-    File* kernelElf = kernelFS.find("kernel.sys.debug")->second;
-    KASSERT0(elfReader.load(kernelElf->startptr(), kernelElf->size()));
+    KASSERT0(elfReader.load("kernel.sys.debug"));
     KASSERT1(elfReader.get_class() == ELFCLASS64, elfReader.get_class());
     ELFIO::Elf_Half sec_num = elfReader.sections.size();
     for (int i = 0; i < sec_num; ++i) {
@@ -158,7 +156,7 @@ private:
       if (psec->get_type() == SHT_SYMTAB) {
         const ELFIO::symbol_section_accessor symbols(elfReader, psec);
         for (unsigned int j = 0; j < symbols.get_symbols_num(); ++j) {
-          kstring name;
+          string name;
           ELFIO::Elf64_Addr value;
           ELFIO::Elf_Xword size;
           unsigned char bind;
@@ -166,9 +164,7 @@ private:
           ELFIO::Elf_Half sec_idx;
           unsigned char other;
           symbols.get_symbol(j, name, value, size, bind, type, sec_idx, other);
-          if (name == "_Unwind_DebugHook") {
-            return (mword)value;
-          }
+          if (name == "_Unwind_DebugHook") return (mword)value;
         }
       }
     }

@@ -14,23 +14,31 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#ifndef ELFLoader_h_
-#define ELFLoader_h_
+#ifndef FDHandler_H_
+#define FDHandler_H_
 
-#include "mach/platform.h" //for vaddr
+#include <cstddef>
+#include <cstdint>
 
-//Forward declare AddressSpace and File
-class AddressSpace;
-class File;
+#define MAX_FILE_NUM 1000
 
-class ELFLoader {
-private:
-  bool initialized;
+class FDHandler {
+  enum File_Status { OPEN,CLOSED };
+
+  struct File_Descriptor_Entry {
+    class File;              // Forward Declare Class File
+    File* fInfo;             // Pointer to Kernel File System
+    File_Status fileStatus;  // File Status
+    File_Descriptor_Entry() : fInfo(NULL), fileStatus(File_Status::CLOSED) {}
+  };
+
+  static File_Descriptor_Entry fileDesArr[MAX_FILE_NUM]; // FD array
+
 public:
-  ELFLoader() : initialized(false) { };
-  bool loadAndMapELF(File* elfFile, AddressSpace* addSpace);
-  vaddr findMainAddress();
-  vaddr findEntryAddress();
+  static int openHandle(const char *path, int oflag, int mode);
+  static size_t readHandle(int fd, char* buf, int len);
+  static off_t lseekHandle(int fd, off_t offset, int whence);
+  static int closeHandle(int fd);
 };
 
-#endif /* ELFLoader_h_ */
+#endif /* FDHandler_H_ */

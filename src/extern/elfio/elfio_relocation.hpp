@@ -137,7 +137,7 @@ class relocation_section_accessor
     get_entry( Elf_Xword    index,
                Elf64_Addr&  offset,
                Elf64_Addr&  symbolValue,
-               kstring& symbolName,
+               std::string& symbolName,
                Elf_Word&    type,
                Elf_Sxword&  addend,
                Elf_Sxword&  calcValue ) const
