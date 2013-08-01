@@ -2,6 +2,8 @@
 #define _DynamicTimer_h_
 
 #include "extern/stl/mod_set"
+#include "ipc/BlockingSync.h"
+#include "ipc/CondVar.h"
 #include "ipc/SpinLock.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
@@ -14,6 +16,7 @@ struct TimerEntry {
   void (*func)(ptr_t);
   void* arg;
   mword time;
+  bool running;
 };
 
 struct DynamicTimerCompare {
@@ -24,6 +27,8 @@ struct DynamicTimerCompare {
 
 class DynamicTimer {
   static SpinLock lk;
+  static Mutex mtx;
+  static ConditionVar condVar;
   using TimerSet = set<TimerEntry*,DynamicTimerCompare,KernelAllocator<TimerEntry*>>;
   static TimerSet entries;
   static Thread* thread;
@@ -38,6 +43,9 @@ public:
     entries.insert(entry);
     kernelScheduler.start(*thread);
   }
+  static bool cancel(TimerEntry* entry);
+  static bool cancelSync(TimerEntry* entry);
+  static bool resetEntry(TimerEntry* oldEntry, TimerEntry* newEntry);
   static void run();
   static Thread* getThread() {
     return thread;

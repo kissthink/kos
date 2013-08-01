@@ -19,6 +19,8 @@ DONE
 - tsleep, wakeup, wakeup_one, pause
 - added more functions to KOS scheduler
 - added mtx/sx/rw_sleep
+- added basic DynamicTimer to KOS
+- added basic callout
 
 TODO
 ----
@@ -27,7 +29,7 @@ TODO
 - sx,rw recursive versions
 - FreeBSD mutex supports priority propagation
 - thread
-- event handlers, callout, taskqueue
+- event handlers, taskqueue
 - SYSCTL
 - PCI
 - sample drivers
