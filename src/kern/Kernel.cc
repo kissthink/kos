@@ -34,6 +34,7 @@ map<kstring, File*, less<kstring>, KernelAllocator<kstring>> kernelFS;
 
 static void mainLoop(ptr_t); // forward declaration
 static void task(ptr_t);     // forward declaration
+extern "C" void sysinit_startup();
 
 void apIdleLoop() {
   Machine::initAP2();
@@ -97,6 +98,8 @@ void mainLoop(ptr_t) {
     // activate Kernel Space again
     kernelSpace.activate();
   }
+
+  sysinit_startup();
 
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");

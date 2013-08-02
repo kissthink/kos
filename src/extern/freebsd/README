@@ -21,6 +21,7 @@ DONE
 - added mtx/sx/rw_sleep
 - added basic DynamicTimer to KOS
 - added basic callout
+- added SYSINIT
 
 TODO
 ----
