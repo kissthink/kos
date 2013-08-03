@@ -1,11 +1,13 @@
 #include "sys/param.h"
-//#include "sys/module.h"
-//#include "sys/kernel.h"
+#include "sys/module.h"
+#include "sys/kernel.h"
 #include "sys/systm.h"
 
 #include "sys/conf.h"
 #include "sys/uio.h"
 #include "sys/malloc.h"
+
+#include "kos/Kassert.h"
 
 #define BUFFER_SIZE   256
 
@@ -78,7 +80,6 @@ echo_read(struct cdev *dev, struct uio *uio, int ioflag) {
   return error;
 }
 
-#if 0
 static int
 echo_modevent(module_t mod __unused, int event, void *arg __unused) {
   int error = 0;
@@ -86,7 +87,7 @@ echo_modevent(module_t mod __unused, int event, void *arg __unused) {
   switch (event) {
     case MOD_LOAD:
       echo_message = malloc(sizeof(echo_t), M_TEMP, M_WAITOK);
-      echo_dev = make_dev(&echo_cdevsw, 0, UIO_ROOT, GID_WHEEL, 0600, "echo");
+      echo_dev = make_dev(&echo_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "echo");
       uprintf("Echo driver loaded.\n");
       break;
     case MOD_UNLOAD:
@@ -102,5 +103,11 @@ echo_modevent(module_t mod __unused, int event, void *arg __unused) {
   return error;
 }
 
-DEV_MODULE(echo, echo_modevent, NULL);
-#endif
+//DEV_MODULE(echo, echo_modevent, NULL);
+void malloc_test(void *arg) {
+  int *num = malloc(sizeof(int), 0, M_WAITOK);
+  *num = 777;
+  printf("malloc'ed num: %d\n", *num);
+  free(num, 0);
+}
+SYSINIT(echo, SI_SUB_DRIVERS, SI_ORDER_FIRST, malloc_test, NULL);

@@ -7,6 +7,7 @@ FREEBSD_VM          =           sys/vm
 FREEBSD_LIBIBERTY   =           sys/libiberty
 FREEBSD_DRIVER      =           drivers
 FREEBSD_CHAR_DRIVER =           drivers/sample/char
+FREEBSD_TEST        =           test
 FREEBSD_KOS         =           kos
 FREEBSD_INCLUDE     =           $(SRCDIR)/extern/freebsd/sys
 FREEBSD_KOS_INCLUDE =           include
@@ -16,7 +17,7 @@ FREEBSD_SYS_TYPES_H =           sys/sys/types.h
 #SOURCES=$(foreach sdir,$(FREEBSD_DIRS),$(wildcard $(sdir)/*.c))
 #OBJECTS=$(subst .c,.o,$(notdir $(SOURCES)))
 FREEBSD=$(FREEBSD_KERNEL) $(FREEBSD_KERNEL_LIB) $(FREEBSD_LIBIBERTY) $(FREEBSD_DRIVER) $(FREEBSD_CHAR_DRIVER)\
-				$(FREEBSD_VM)
+				$(FREEBSD_VM) $(FREEBSD_TEST)
 SOURCES=$(wildcard $(addsuffix /*.c,$(FREEBSD)))
 OBJECTS=$(subst .c,.o,$(notdir $(SOURCES)))
 KOS_SOURCES=$(wildcard $(addsuffix /*.cc,$(FREEBSD_KOS)))
@@ -41,5 +42,8 @@ libbsd.a: $(OBJECTS) $(KOS_OBJECTS)
 	$(AR) r $@ $^
 	$(RANLIB) $@
 
+libbsd.o: $(OBJECTS) $(KOS_OBJECTS)
+	$(LD) -r $^ -o $@
+
 clean:
-	rm -f libbsd.a $(OBJECTS) $(KOS_OBJECTS)
+	rm -f libbsd.a libbsd.o $(OBJECTS) $(KOS_OBJECTS)

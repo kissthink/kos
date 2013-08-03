@@ -24,9 +24,11 @@
 .globl   isr_wrapper_\irq_num
 .align   8
 isr_wrapper_\irq_num:
+  call set_interrupt_state
 .endm
 
 .macro ISR_BOTTOM irq_num
+  call reset_interrupt_state
   iretq
 .endm
 

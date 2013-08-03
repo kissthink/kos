@@ -1,8 +1,8 @@
 #include "sys/param.h"
 #include "sys/lock.h"
 #include "sys/systm.h"
-#include "kos/kos_kassert.h"
-#include "kos/kos_sched.h"
+#include "kos/Kassert.h"
+#include "kos/Sched.h"
 
 static int pause_wchan;
 
@@ -26,13 +26,13 @@ int _sleep(void *ident, struct lock_object *lock, int priority,
   // TODO return if kernel already panic'ed
   void* kos_lock = lock ? lock->kos_lock : NULL;
   int lock_type = lock ? lock->kos_lock_type : -1;
-  return kos_sleep(ident, kos_lock, lock_type, priority, timo);
+  return KOS_Sleep(ident, kos_lock, lock_type, priority, timo);
 }
 /**
  * Make all threads sleeping on the specified identifier runnable.
  */
 void wakeup(void *ident) {
-  kos_wakeup(ident);
+  KOS_Wakeup(ident);
 }
 
 /**
@@ -41,7 +41,7 @@ void wakeup(void *ident) {
  * swapped out.
  */
 void wakeup_one(void *ident) {
-  kos_wakeup_one(ident);
+  KOS_Wakeup_One(ident);
 }
 
 /**

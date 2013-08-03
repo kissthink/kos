@@ -1,4 +1,4 @@
-#include "kos/kos_printf.h"
+#include "kos/Printf.h"
 
 // KOS
 #include "kern/OutputSafe.h"
@@ -33,6 +33,6 @@ static void safe_printf(const char* fmt, T value, Args... args) {
 }
 #endif
 
-void putchar(char ch) {
+extern "C" void putchar(char ch) {
   StdOut.out(ch);
 }

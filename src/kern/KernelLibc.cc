@@ -30,6 +30,7 @@ extern "C" void __assert_func( const char* const file, const char* const line,
   StdDbg.outln(file, ':', line, ' ', func, ' ', expr);
 }
 
+#if 0
 extern "C" void* malloc(size_t s) {
   DBG::out(DBG::Libc, "LIBC/malloc: ", FmtHex(s));
   void* p = kernelHeap.malloc(s);
@@ -41,6 +42,7 @@ extern "C" void free(void* p) {
   DBG::outln(DBG::Libc, "LIBC/free: ", FmtHex(p));
   kernelHeap.free(p);
 }
+#endif
 
 /******* dummy functions *******/
 
@@ -48,9 +50,11 @@ extern "C" void* calloc(size_t nmemb, size_t size) {
   ABORT1("calloc"); return 0;
 }
 
+#if 0
 extern "C" void* realloc(void *p, size_t size) {
   ABORT1("realloc"); return 0;
 }
+#endif
 
 extern "C" void* _malloc_r(void* r, size_t s) {
   ABORT1("_malloc_r"); return 0;

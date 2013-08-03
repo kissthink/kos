@@ -28,6 +28,9 @@ class FrameManager;
 class GdbCpu;
 class Thread;
 
+extern "C" void set_interrupt_state(void);
+extern "C" void reset_interrupt_state(void);
+
 class Processor {
   mword          apicID;
   mword          cpuID;
@@ -37,6 +40,7 @@ class Processor {
   volatile mword doNotPreempt;
   volatile mword lockCount;
   GdbCpu*        gdbCpu;
+  volatile mword inInterrupt;
 
   static const unsigned int nullSelector     = 0; // invalid null selector
   static const unsigned int kernCodeSelector = 1; // 1nd descriptor by convention?
@@ -51,9 +55,11 @@ class Processor {
   static constexpr volatile LAPIC* apic() { return (LAPIC*)lapicAddr; }
 
   friend class Machine;
+  friend void set_interrupt_state(void);
+  friend void reset_interrupt_state(void);
 
   Processor() : apicID(0), cpuID(0), currThread(nullptr), idleThread(nullptr),
-    frameManager(nullptr), doNotPreempt(0), lockCount(0), gdbCpu(nullptr) {}
+    frameManager(nullptr), doNotPreempt(0), lockCount(0), gdbCpu(nullptr), inInterrupt(0) {}
   Processor(const Processor&) = delete;            // no copy
   Processor& operator=(const Processor&) = delete; // no assignment
 
@@ -117,6 +123,11 @@ public:
   static GdbCpu* getGdbCpu() {
     GdbCpu* x;
     asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, gdbCpu)));
+    return x;
+  }
+  static bool interrupt() {
+    mword x;
+    asm volatile("movq %%gs:%c1, %0" : "=r"(x) : "i"(offsetof(struct Processor, inInterrupt)));
     return x;
   }
   static bool preempt() {

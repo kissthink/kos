@@ -4,7 +4,7 @@
 #include "sys/stddef.h"
 #include "sys/systm.h"
 #include "machine/stdarg.h"
-#include "kos/kos_printf.h"
+#include "kos/Printf.h"
 
 #define MAXNBUF (sizeof(intmax_t) * NBBY + 1)
 

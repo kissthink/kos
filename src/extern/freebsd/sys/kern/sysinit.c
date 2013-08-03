@@ -1,10 +1,15 @@
 #include "sys/cdefs.h"
 #include "sys/param.h"
 #include "sys/kernel.h"
+#include "sys/systm.h"
 #include "sys/linker_set.h"
-#include "kos/kos_kassert.h"
+#include "kos/Kassert.h"
 
 extern struct linker_set sysinit_set;
+
+void module_register_init(const void *arg) {
+  printf("module_register_init()\n");
+}
 
 /**
  * This ensures that there is at least one entry so that the sysinit_set
@@ -30,6 +35,8 @@ void sysinit_startup() {
     sysinit = SET_BEGIN(sysinit_set);
     sysinit_end = SET_LIMIT(sysinit_set);
   }
+
+  printf("found %ld entries\n", (sysinit_end - sysinit));
 
   /**
    * Perform a bubble sort of the system initialization objects by

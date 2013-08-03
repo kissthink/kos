@@ -1,3 +1,6 @@
+#include "kos/Sched.h"
+
+// KOS
 #include <cstdint>
 #include "ipc/BlockingSync.h"
 #include "ipc/SpinLock.h"
@@ -5,14 +8,14 @@
 #include "kern/Thread.h"
 #include "kern/Scheduler.h"
 
-#include "extern/stl/mod_list"
+#include <list>
 #include <map>
 using namespace std;
 
-extern Scheduler kernScheduler;
+extern Scheduler kernelScheduler;
 
-typedef InPlaceList<Thread*> ThreadList;
-static map<void*, InPlaceList<Thread*>> sleepQueue;
+typedef list<Thread*,KernelAllocator<Thread*>> ThreadList;
+static map<void*,ThreadList,less<void*>,KernelAllocator<pair<void*,ThreadList>>> sleepQueue;
 static SpinLock lk;
 
 static void acquireLock(void* lock, int lockType) {
@@ -64,7 +67,7 @@ static int releaseLock(void* lock, int lockType) {
   return newLockType;
 }
       
-int kos_sleep(void* ident, void* lock, int lockType, int pri, int timeout) {
+extern "C" int KOS_Sleep(void* ident, void* lock, int lockType, int pri, int timeout) {
   lk.acquire();
   KASSERT0(ident);
   int error = 0;
@@ -78,32 +81,36 @@ int kos_sleep(void* ident, void* lock, int lockType, int pri, int timeout) {
     tlist.remove(t);                  // kos_wakeup() can race and remove before this runs; however, still consider it timedout
     lk.release();
   } else {
-    kernScheduler.suspend(lk);
+    kernelScheduler.suspend(lk);
   }
   // acquire lock if not NULL
   acquireLock(lock, newLockType);
   return error;
 }
 
-void kos_wakeup(void* chan) {
+extern "C" void KOS_Wakeup(void* chan) {
   ScopedLock<> lo(lk);
   KASSERT0(chan);
   if (sleepQueue.count(chan) == 0) return;
   ThreadList& tlist = sleepQueue[chan];
   auto it = begin(tlist);
   while (it != end(tlist)) {
-    kernScheduler.start(**it);
+    kernelScheduler.start(**it);
     tlist.erase(it++);
   }
   sleepQueue.erase(chan);
 }
 
-void kos_wakeup_one(void* chan) {
+extern "C" void KOS_Wakeup_One(void* chan) {
   ScopedLock<> lo(lk);
   KASSERT0(chan);
   if (sleepQueue.count(chan) == 0) return;
   ThreadList& tlist = sleepQueue[chan];
-  kernScheduler.start(*tlist.front());
+  kernelScheduler.start(*tlist.front());
   tlist.pop_front();
   if (tlist.empty()) sleepQueue.erase(chan);
+}
+
+extern "C" int KOS_InInterrupt() {
+  return Processor::interrupt() ? 1 : 0;
 }

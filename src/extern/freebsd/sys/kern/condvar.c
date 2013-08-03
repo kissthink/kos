@@ -3,13 +3,13 @@
 #include "sys/lock.h"
 #include "sys/mutex.h"
 #include "sys/condvar.h"
-#include "kos/kos_condVar.h"
-#include "kos/kos_kassert.h"
+#include "kos/CondVar.h"
+#include "kos/Kassert.h"
 
 void cv_init(struct cv *cvp, const char *desc) {
   cvp->cv_description = desc;
   cvp->cv_waiters = 0;
-  kos_cv_init(&cvp->kos_cv);
+  KOS_CV_Init(&cvp->kos_cv);
 }
 
 /**
@@ -20,7 +20,7 @@ void cv_init(struct cv *cvp, const char *desc) {
  * held when cv_signal or cv_broadcast are called.
  */
 void _cv_wait(struct cv *cvp, struct lock_object *lock) {
-  kos_cv_wait(cvp->kos_cv, lock->kos_lock, lock->kos_lock_type, 0);
+  KOS_CV_Wait(cvp->kos_cv, lock->kos_lock, lock->kos_lock_type, 0);
 }
 
 /**
@@ -28,7 +28,7 @@ void _cv_wait(struct cv *cvp, struct lock_object *lock) {
  * not acquiring the mutex after condition variable was signaled.
  */
 void _cv_wait_unlock(struct cv *cvp, struct lock_object *lock) {
-  kos_cv_wait(cvp->kos_cv, lock->kos_lock, lock->kos_lock_type, 1);
+  KOS_CV_Wait(cvp->kos_cv, lock->kos_lock, lock->kos_lock_type, 1);
 }
 
 /**
@@ -39,7 +39,7 @@ void _cv_wait_unlock(struct cv *cvp, struct lock_object *lock) {
  */
 int _cv_wait_sig(struct cv *cvp, struct lock_object *lock) {
   // TODO implement when signal is supported
-  kos_reboot();
+  KOS_Reboot();
   return 0;
 }
 
@@ -50,7 +50,7 @@ int _cv_wait_sig(struct cv *cvp, struct lock_object *lock) {
  */
 int _cv_timedwait(struct cv *cvp, struct lock_object *lock, int timo) {
   // TODO implement when signal is supported
-  kos_reboot();
+  KOS_Reboot();
   return 0;
 }
 
@@ -62,7 +62,7 @@ int _cv_timedwait(struct cv *cvp, struct lock_object *lock, int timo) {
  */
 int _cv_timedwait_sig(struct cv *cvp, struct lock_object *lock, int timo) {
   // TODO implement when signal is supported
-  kos_reboot();
+  KOS_Reboot();
   return 0;
 }
 
@@ -74,7 +74,7 @@ int _cv_timedwait_sig(struct cv *cvp, struct lock_object *lock, int timo) {
  * cv_wait held.
  */
 void cv_signal(struct cv *cvp) {
-  kos_cv_signal(cvp->kos_cv);
+  KOS_CV_Signal(cvp->kos_cv);
 }
 
 /**
@@ -83,7 +83,7 @@ void cv_signal(struct cv *cvp) {
  */
 void cv_broadcastpri(struct cv *cvp, int pri) {
   // TODO respect priority
-  kos_cv_broadcast(cvp->kos_cv);
+  KOS_CV_BroadCast(cvp->kos_cv);
 }
 
 /**
@@ -91,5 +91,5 @@ void cv_broadcastpri(struct cv *cvp, int pri) {
  * in order to be re-used.
  */
 void cv_destroy(struct cv *cvp) {
-  kos_cv_destroy(cvp->kos_cv);
+  KOS_CV_Destroy(cvp->kos_cv);
 }

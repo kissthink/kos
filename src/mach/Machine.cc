@@ -433,6 +433,14 @@ extern "C" void isr_handler_gen_err(mword num, mword errcode) {
 //  Reboot();
 }
 
+extern "C" void set_interrupt_state(void) {
+  asm volatile("movq $1, %%gs:%c0" :: "i"(offsetof(struct Processor, inInterrupt)) : "memory");
+}
+
+extern "C" void reset_interrupt_state(void) {
+  asm volatile("movq $0, %%gs:%c0" :: "i"(offsetof(struct Processor, inInterrupt)) : "memory");
+}
+
 void Machine::setupIDT(unsigned int number, laddr address) {
   KASSERT1(number < maxIDT, number);
   idt[number].Offset00 = (address & 0x000000000000FFFF);

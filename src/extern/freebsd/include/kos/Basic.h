@@ -1,5 +1,5 @@
-#ifndef _KOS_PRINTF_h_
-#define _KOS_PRINTF_h_
+#ifndef _KOS_BASIC_h_
+#define _KOS_BASIC_h_
 
 /**
  * useful macros
@@ -15,8 +15,4 @@
 #define EXTERNC
 #endif
 
-EXTERNC void putchar(char ch);
-
-#undef EXTERNC
-
-#endif /* _KOS_PRINTF_h_ */
+#endif /* _KOS_BASIC_h_ */

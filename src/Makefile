@@ -12,7 +12,7 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
-LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o extern/freebsd/libbsd.a
+LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o extern/freebsd/libbsd.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
@@ -134,7 +134,7 @@ extern/acpica/libacpica.a: extern/acpica/Makefile
 extern/dlmalloc/malloc.o: extern/dlmalloc/Makefile
 	$(MAKE) -C extern/dlmalloc $(notdir $@)
 
-extern/freebsd/libbsd.a: extern/freebsd/Makefile
+extern/freebsd/libbsd.o: extern/freebsd/Makefile
 	$(MAKE) -C extern/freebsd $(notdir $@)
 
 $(USERLIB):

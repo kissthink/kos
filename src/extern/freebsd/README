@@ -22,6 +22,7 @@ DONE
 - added basic DynamicTimer to KOS
 - added basic callout
 - added SYSINIT
+- *****add inInterrupt() to KOS (very easy)*****
 
 TODO
 ----
@@ -34,7 +35,6 @@ TODO
 - SYSCTL
 - PCI
 - sample drivers
-- *****add inInterrupt() to KOS (very easy)*****
 
 About sx lock
 -------------

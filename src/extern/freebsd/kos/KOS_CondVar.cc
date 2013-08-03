@@ -1,12 +1,15 @@
+#include "kos/CondVar.h"
+
+// KOS
 #include <cstdint>
 #include "ipc/CondVar.h"
 
-void kos_cv_init(void** cvp) {
+extern "C" void KOS_CV_Init(void** cvp) {
   *cvp = new ConditionVar();
 }
 
 // mutex can be sleep mutex, sx, or rw lock
-void kos_cv_wait(void* cv, void* mutex, int lockType, int unlock) {
+extern "C" void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
   switch (lockType) {
     case 0: {
@@ -21,17 +24,17 @@ void kos_cv_wait(void* cv, void* mutex, int lockType, int unlock) {
   }
 }
 
-void kos_cv_signal(void* cv) {
+extern "C" void KOS_CV_Signal(void* cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
   cond->signal();
 }
 
-void kos_cv_broadcast(void* cv) {
+extern "C" void KOS_CV_BroadCast(void* cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
   cond->broadcast();
 }
 
-void kos_cv_destroy(void** cv) {
+extern "C" void KOS_CV_Destroy(void** cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(*cv);
   delete cond;
   *cv = 0;

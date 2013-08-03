@@ -1,7 +1,7 @@
 #include "sys/param.h"
 #include "sys/callout.h"
 #include "sys/systm.h"
-#include "kos/kos_dynamicTimer.h"
+#include "kos/DynamicTimer.h"
 
 /**
  * Possible mpsafe values
@@ -17,7 +17,7 @@ void callout_init(struct callout *c, int mpsafe) {
  * safe 1 - callout_drain
  */
 int _callout_stop_safe(struct callout *c, int safe) {
-  return kos_cancel_callout(c->c_func, c->c_arg, c->c_time, safe);
+  return KOS_Cancel_Callout(c->c_func, c->c_arg, c->c_time, safe);
 }
 
 /**
@@ -38,7 +38,7 @@ int _callout_stop_safe(struct callout *c, int safe) {
  */
 int callout_reset_on(struct callout *c, int to_ticks, void (*ftn)(void *),
   void *arg, int cpu) {
-  return kos_reset_callout(c->c_func, c->c_arg, c->c_time, to_ticks, ftn, arg);
+  return KOS_Reset_Callout(c->c_func, c->c_arg, c->c_time, to_ticks, ftn, arg);
 }
 
 int callout_schedule(struct callout *c, int to_ticks) {

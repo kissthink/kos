@@ -1,6 +1,6 @@
 #include "sys/param.h"
 #include "sys/lock.h"
-#include "kos/kos_kassert.h"
+#include "kos/Kassert.h"
 
 struct lock_class *lock_classes[LOCK_CLASS_MAX + 1] = {
   &lock_class_mtx_spin,

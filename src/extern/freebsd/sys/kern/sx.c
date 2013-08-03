@@ -1,8 +1,8 @@
 #include "sys/param.h"
 #include "sys/lock.h"
 #include "sys/sx.h"
-#include "kos/kos_blockingSync.h"
-#include "kos/kos_kassert.h"
+#include "kos/BlockingSync.h"
+#include "kos/Kassert.h"
 
 struct lock_class lock_class_sx = {
   .lc_name = "sx",
@@ -36,7 +36,7 @@ void sx_init_flags(struct sx *sx, const char *description, int opts) {
   sx->sx_lock = SX_LOCK_UNLOCKED;
 
   lock_init(&sx->lock_object, &lock_class_sx, description, NULL, flags);
-  kos_rw_mutex_init(&sx->kos_lock, opts & SX_RECURSE);
+  KOS_RwMutex_Init(&sx->kos_lock, opts & SX_RECURSE);
   sx->lock_object.kos_lock = sx->kos_lock;
   sx->lock_object.kos_lock_type = 1;
 }
@@ -45,7 +45,7 @@ void sx_init_flags(struct sx *sx, const char *description, int opts) {
 int _sx_slock(struct sx *sx, int opts, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_slock() of destroyed sx");
-  kos_rw_mutex_read_acquire(sx->kos_lock);
+  KOS_RwMutex_RLock(sx->kos_lock);
   return 0;
 }
 
@@ -53,32 +53,32 @@ int _sx_slock(struct sx *sx, int opts, const char *file, int line) {
 int _sx_xlock(struct sx *sx, int opts, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_xlock() of destroyed sx");
-  kos_rw_mutex_write_acquire(sx->kos_lock);
+  KOS_RwMutex_WLock(sx->kos_lock);
   return 0;
 }
 
 int _sx_try_slock(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_try_slock() of destroyed sx");
-  return kos_rw_mutex_read_try_acquire(sx->kos_lock);
+  return KOS_RwMutex_RTryLock(sx->kos_lock);
 }
 
 int _sx_try_xlock(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_try_xlock() of destroyed sx");
-  return kos_rw_mutex_write_try_acquire(sx->kos_lock);
+  return KOS_RwMutex_WTryLock(sx->kos_lock);
 }
 
 void _sx_sunlock(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_sunlock() of destroyed sx");
-  kos_rw_mutex_read_release(sx->kos_lock);
+  KOS_RwMutex_RUnLock(sx->kos_lock);
 }
 
 void _sx_xunlock(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_xunlock() of destroyed sx");
-  kos_rw_mutex_write_release(sx->kos_lock);
+  KOS_RwMutex_WUnLock(sx->kos_lock);
 }
 
 /**
@@ -89,7 +89,7 @@ void _sx_xunlock(struct sx *sx, const char *file, int line) {
 int _sx_try_upgrade(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_try_upgrade() of destroyed sx");
-  return kos_rw_mutex_upgrade(sx->kos_lock);
+  return KOS_RwMutex_TryUpgrade(sx->kos_lock);
 }
 
 /**
@@ -98,7 +98,7 @@ int _sx_try_upgrade(struct sx *sx, const char *file, int line) {
 void _sx_downgrade(struct sx *sx, const char *file, int line) {
   // TODO return if kernel already panic'ed
   BSD_KASSERTSTR((sx->sx_lock != SX_LOCK_DESTROYED), "sx_downgrade() of destroyed sx");
-  kos_rw_mutex_downgrade(sx->kos_lock);
+  KOS_RwMutex_Downgrade(sx->kos_lock);
 }
 
 void sx_destroy(struct sx *sx) {

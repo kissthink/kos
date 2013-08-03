@@ -1,4 +1,4 @@
-#include "kos/kos_frameManager.h"
+#include "kos/FrameManager.h"
 #include "sys/malloc.h"
 
 // TODO do not ignore flags, alignment, boundary
@@ -12,11 +12,11 @@ contigmalloc(
 	unsigned long alignment,
 	unsigned long boundary) {
 	void *ret;
-  ret = kos_alloc_contig(size, low, high, alignment, boundary);
+  ret = KOS_Alloc_Contig(size, low, high, alignment, boundary);
 	return ret;
 }
 
 void
 contigfree(void *addr, unsigned long size, struct malloc_type *type) {
-  kos_free_contig(addr, size);
+  KOS_Free_Contig(addr, size);
 }

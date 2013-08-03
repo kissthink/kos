@@ -1,8 +1,8 @@
 #include "sys/param.h"
 #include "sys/lock.h"
 #include "sys/mutex.h"
-#include "kos/kos_blockingSync.h"
-#include "kos/kos_kassert.h"
+#include "kos/BlockingSync.h"
+#include "kos/Kassert.h"
 
 #if 0
 static void assert_mtx(struct lock_object *lock, int what);
@@ -81,7 +81,7 @@ void mtx_init(struct mtx *m, const char *name, const char *type, int opts) {
   if (opts & MTX_RECURSE) flags |= LO_RECURSABLE;
 
   lock_init(&m->lock_object, class, name, type, flags);     // init for FreeBSD data
-  kos_lock_init(&m->kos_lock, opts & MTX_SPIN, opts & MTX_RECURSE);
+  KOS_Lock_Init(&m->kos_lock, opts & MTX_SPIN, opts & MTX_RECURSE);
   m->lock_object.kos_lock = m->kos_lock;
   if (opts & MTX_SPIN) m->lock_object.kos_lock_type = 3;
   else m->lock_object.kos_lock_type = 0;
@@ -92,8 +92,8 @@ void _mtx_lock_flags(struct mtx *m, int opts, const char *file, int line) {
   BSD_KASSERTSTR((m->mtx_lock != MTX_DESTROYED), "mtx_lock() of destroyed mutex");
   BSD_KASSERTSTR((LOCK_CLASS(&m->lock_object) == &lock_class_mtx_sleep),
       "mtx_lock() of spin mutex");
-  if (m->lock_object.lo_flags & LO_RECURSABLE) kos_rmutex_acquire(m->kos_lock);
-  else kos_mutex_acquire(m->kos_lock);
+  if (m->lock_object.lo_flags & LO_RECURSABLE) KOS_RMutex_Lock(m->kos_lock);
+  else KOS_Mutex_Lock(m->kos_lock);
 }
 
 void _mtx_unlock_flags(struct mtx *m, int opts, const char *file, int line) {
@@ -101,8 +101,8 @@ void _mtx_unlock_flags(struct mtx *m, int opts, const char *file, int line) {
   BSD_KASSERTSTR((m->mtx_lock != MTX_DESTROYED), "mtx_unlock() of destroyed mutex");
   BSD_KASSERTSTR((LOCK_CLASS(&m->lock_object) == &lock_class_mtx_sleep),
       "mtx_unlock() of spin mutex");
-  if (m->lock_object.lo_flags & LO_RECURSABLE) kos_rmutex_release(m->kos_lock);
-  else kos_mutex_release(m->kos_lock);
+  if (m->lock_object.lo_flags & LO_RECURSABLE) KOS_RMutex_UnLock(m->kos_lock);
+  else KOS_Mutex_UnLock(m->kos_lock);
 }
 
 void _mtx_lock_spin_flags(struct mtx *m, int opts, const char *file, int line) {
@@ -111,8 +111,8 @@ void _mtx_lock_spin_flags(struct mtx *m, int opts, const char *file, int line) {
   BSD_KASSERTSTR((LOCK_CLASS(&m->lock_object) == &lock_class_mtx_spin),
       "mtx_lock_spin() of sleep mutex");
   // XXX KOS does not handle acquiring spinlock recursively on non-recursive spinlock (i.e. deadlock)
-  if (m->lock_object.lo_flags & LO_RECURSABLE) kos_rspinlock_acquire(m->kos_lock);
-  else kos_spinlock_acquire(m->kos_lock);
+  if (m->lock_object.lo_flags & LO_RECURSABLE) KOS_RSpinLock_Lock(m->kos_lock);
+  else KOS_SpinLock_Lock(m->kos_lock);
 }
 
 void _mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file, int line) {
@@ -120,8 +120,8 @@ void _mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file, int line)
   BSD_KASSERTSTR((m->mtx_lock != MTX_DESTROYED), "mtx_unlock_spin() of destroyed mutex");
   BSD_KASSERTSTR((LOCK_CLASS(&m->lock_object) == &lock_class_mtx_spin),
       "mtx_unlock_spin() of sleep mutex");
-  if (m->lock_object.lo_flags & LO_RECURSABLE) kos_rspinlock_release(m->kos_lock);
-  else kos_spinlock_release(m->kos_lock);
+  if (m->lock_object.lo_flags & LO_RECURSABLE) KOS_RSpinLock_UnLock(m->kos_lock);
+  else KOS_SpinLock_UnLock(m->kos_lock);
 }
 
 int _mtx_trylock(struct mtx *m, int opts, const char *file, int line) {
@@ -129,8 +129,8 @@ int _mtx_trylock(struct mtx *m, int opts, const char *file, int line) {
   BSD_KASSERTSTR((m->mtx_lock != MTX_DESTROYED), "mtx_trylock() of destroyed mutex");
   BSD_KASSERTSTR((LOCK_CLASS(&m->lock_object) == &lock_class_mtx_sleep),
       "mtx_trylock() of spin mutex");
-  if (m->lock_object.lo_flags & LO_RECURSABLE) return kos_rmutex_try_acquire(m->kos_lock);
-  return kos_mutex_try_acquire(m->kos_lock);
+  if (m->lock_object.lo_flags & LO_RECURSABLE) return KOS_RMutex_TryLock(m->kos_lock);
+  return KOS_Mutex_TryLock(m->kos_lock);
 }
 
 /**

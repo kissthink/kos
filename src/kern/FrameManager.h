@@ -39,8 +39,8 @@ class FrameManager {
   friend class AddressSpace;
   friend class PageManager;
 
-  friend void* kos_alloc_contig(unsigned long, vaddr, vaddr, unsigned long, unsigned long);
-  friend void kos_free_contig(void*, unsigned long);
+  friend void* KOS_Alloc_Contig(unsigned long, vaddr, vaddr, unsigned long, unsigned long);
+  friend void KOS_Free_Contig(void*, unsigned long);
 
   FileCache fc;
 
