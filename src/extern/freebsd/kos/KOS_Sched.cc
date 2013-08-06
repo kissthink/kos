@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "ipc/BlockingSync.h"
 #include "ipc/SpinLock.h"
+#include "ipc/ReadWriteLock.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
 #include "kern/Scheduler.h"
@@ -67,7 +68,7 @@ static int releaseLock(void* lock, int lockType) {
   return newLockType;
 }
       
-extern "C" int KOS_Sleep(void* ident, void* lock, int lockType, int pri, int timeout) {
+int KOS_Sleep(void* ident, void* lock, int lockType, int pri, int timeout) {
   lk.acquire();
   KASSERT0(ident);
   int error = 0;
@@ -88,7 +89,7 @@ extern "C" int KOS_Sleep(void* ident, void* lock, int lockType, int pri, int tim
   return error;
 }
 
-extern "C" void KOS_Wakeup(void* chan) {
+void KOS_Wakeup(void* chan) {
   ScopedLock<> lo(lk);
   KASSERT0(chan);
   if (sleepQueue.count(chan) == 0) return;
@@ -101,7 +102,7 @@ extern "C" void KOS_Wakeup(void* chan) {
   sleepQueue.erase(chan);
 }
 
-extern "C" void KOS_Wakeup_One(void* chan) {
+void KOS_Wakeup_One(void* chan) {
   ScopedLock<> lo(lk);
   KASSERT0(chan);
   if (sleepQueue.count(chan) == 0) return;
@@ -111,6 +112,6 @@ extern "C" void KOS_Wakeup_One(void* chan) {
   if (tlist.empty()) sleepQueue.erase(chan);
 }
 
-extern "C" int KOS_InInterrupt() {
+int KOS_InInterrupt() {
   return Processor::interrupt() ? 1 : 0;
 }

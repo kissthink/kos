@@ -3,38 +3,39 @@
 // KOS
 #include <cstdint>
 #include "ipc/CondVar.h"
+#include "ipc/ReadWriteLock.h"
 
-extern "C" void KOS_CV_Init(void** cvp) {
+void KOS_CV_Init(void** cvp) {
   *cvp = new ConditionVar();
 }
 
 // mutex can be sleep mutex, sx, or rw lock
-extern "C" void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
+void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
   switch (lockType) {
     case 0: {
       Mutex* mtx = static_cast<Mutex*>(mutex);
-      cond->wait(mtx, unlock ? false : true);
+      cond->wait(mtx, unlock ? true : false);
     } break;
     case 1: {
       RwMutex* mtx = static_cast<RwMutex*>(mutex);
-      cond->wait(mtx, unlock ? false : true);
+      cond->wait(mtx, unlock ? true : false);
     } break;
     default: ABORT1("invalid lock type");
   }
 }
 
-extern "C" void KOS_CV_Signal(void* cv) {
+void KOS_CV_Signal(void* cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
-  cond->signal();
+  cond->signal();  // FIXME
 }
 
-extern "C" void KOS_CV_BroadCast(void* cv) {
+void KOS_CV_BroadCast(void* cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(cv);
-  cond->broadcast();
+  cond->broadcast(); // FIXME
 }
 
-extern "C" void KOS_CV_Destroy(void** cv) {
+void KOS_CV_Destroy(void** cv) {
   ConditionVar* cond = static_cast<ConditionVar*>(*cv);
   delete cond;
   *cv = 0;

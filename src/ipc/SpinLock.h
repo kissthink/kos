@@ -31,7 +31,7 @@ class SpinLock {
     __atomic_clear(&locked, __ATOMIC_SEQ_CST);
   }
   bool tryAcquireInternal() volatile {
-    return __atomic_test_and_set(&locked, __ATOMIC_SEQ_CST);
+    return !__atomic_test_and_set(&locked, __ATOMIC_SEQ_CST);
   }
 public:
   SpinLock() : locked(false) {}

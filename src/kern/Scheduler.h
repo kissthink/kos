@@ -61,6 +61,7 @@ public:
   int sleep(Thread& t);
   int sleep(Thread& t, volatile SpinLock& rl);
   void yield();
+  void yield(Thread& t);
 };
 
 #endif /* _Scheduler_h_ */

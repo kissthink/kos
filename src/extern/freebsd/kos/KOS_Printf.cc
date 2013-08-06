@@ -33,6 +33,6 @@ static void safe_printf(const char* fmt, T value, Args... args) {
 }
 #endif
 
-extern "C" void putchar(char ch) {
+void putchar(char ch) {
   StdOut.out(ch);
 }

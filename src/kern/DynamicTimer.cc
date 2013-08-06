@@ -58,7 +58,6 @@ void DynamicTimer::run() {
     lk.release();
     curEntry->func(curEntry->arg);
     lk.acquire();
-    mtx.acquire();
     entries.erase(curEntry);
     condVar.signal();
   }

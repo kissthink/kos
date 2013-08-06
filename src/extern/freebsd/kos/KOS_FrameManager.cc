@@ -6,7 +6,7 @@
 #include "mach/Processor.h"
 
 // FrameManager in KOS is a single instance retrievable through Processor class
-extern "C" void* KOS_Alloc_Contig(unsigned long size, vaddr low, vaddr high, unsigned long alignment,
+void* KOS_Alloc_Contig(unsigned long size, vaddr low, vaddr high, unsigned long alignment,
                        unsigned long boundary) {
   FrameManager* fm = Processor::getFrameManager();
 
@@ -16,7 +16,7 @@ extern "C" void* KOS_Alloc_Contig(unsigned long size, vaddr low, vaddr high, uns
   return (void *)addr;
 }
 
-extern "C" void KOS_Free_Contig(void* addr, unsigned long size) {
+void KOS_Free_Contig(void* addr, unsigned long size) {
   FrameManager* fm = Processor::getFrameManager();
   fm->release((laddr)addr, size);
 }

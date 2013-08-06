@@ -26,6 +26,7 @@
 #include "world/ELFLoader.h"
 
 #include "mach/asm_functions.h"
+#include "test/LockTest.h"
 
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;
@@ -100,6 +101,7 @@ void mainLoop(ptr_t) {
   }
 
   sysinit_startup();
+  RunTests();
 
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");

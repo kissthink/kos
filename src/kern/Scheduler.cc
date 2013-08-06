@@ -46,7 +46,7 @@ void Scheduler::schedule() {
   }
   Processor::setCurrThread(nextThread);
 
-  KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
+  //KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
   DBG::out(DBG::Scheduler, "CPU ", Processor::getApicID(), " switch: ");
   if (prevThread->getName()) DBG::out(DBG::Scheduler, prevThread->getName());
   else DBG::out(DBG::Scheduler, prevThread);
@@ -95,5 +95,14 @@ void Scheduler::yield() {
   if likely(Processor::getCurrThread() != Processor::getIdleThread()) {
     ready(*Processor::getCurrThread());
   }
+  schedule();
+}
+
+void Scheduler::yield(Thread& t) {
+  ScopedLock<> lo(lk);
+  if likely(Processor::getCurrThread() != Processor::getIdleThread()) {
+    ready(*Processor::getCurrThread());
+  }
+  readyQueue[t.getPrio()].push_front(&t);
   schedule();
 }

@@ -83,7 +83,7 @@ echo_read(struct cdev *dev, struct uio *uio, int ioflag) {
 static int
 echo_modevent(module_t mod __unused, int event, void *arg __unused) {
   int error = 0;
-
+#if 0
   switch (event) {
     case MOD_LOAD:
       echo_message = malloc(sizeof(echo_t), M_TEMP, M_WAITOK);
@@ -99,7 +99,7 @@ echo_modevent(module_t mod __unused, int event, void *arg __unused) {
       error = EOPNOTSUPP;
       break;
   }
-
+#endif
   return error;
 }
 
