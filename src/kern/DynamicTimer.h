@@ -17,6 +17,8 @@ struct TimerEntry {
   void* arg;
   mword time;
   bool running;
+  TimerEntry(void (*func)(ptr_t), void* arg, mword time)
+  : func(func), arg(arg), time(Machine::now()+time), running(false) {}
 };
 
 struct DynamicTimerCompare {

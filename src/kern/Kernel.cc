@@ -26,7 +26,7 @@
 #include "world/ELFLoader.h"
 
 #include "mach/asm_functions.h"
-#include "test/LockTest.h"
+#include "test/Tests.h"
 
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;

@@ -210,11 +210,3 @@ void RwMutexTest() {
   KASSERT1(counter == 5000, counter);
   DBG::outln(DBG::Basic, "RwMutexTest success");
 }
-
-void RunTests() {
-  MutexTest();
-  RecursiveMutexTest();
-  SemaphoreTest();
-  ConditionVarTest();
-  RwMutexTest();
-}
