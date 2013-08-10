@@ -8,5 +8,6 @@ void RunTests() {
   SemaphoreTest();
   ConditionVarTest();
   RwMutexTest();
+  DelayTest();
   TimerTest();
 }

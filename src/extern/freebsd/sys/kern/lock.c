@@ -22,7 +22,7 @@ void lock_init(struct lock_object *lock, struct lock_class *class, const char *n
       break;
     }
   }
-  BSD_KASSERTSTR(i < LOCK_CLASS_MAX, "unkown lock class");
+  BSD_KASSERTSTR((i < LOCK_CLASS_MAX), "unkown lock class");
 
   // initialize lock object
   lock->lo_name = name;
@@ -30,6 +30,6 @@ void lock_init(struct lock_object *lock, struct lock_class *class, const char *n
 }
 
 void lock_destroy(struct lock_object *lock) {
-  BSD_KASSERTSTR(lock_initalized(lock), "lock is not initialized");
+  BSD_KASSERTSTR((lock_initalized(lock)), "lock is not initialized");
   lock->lo_flags &= ~LO_INITIALIZED;
 }

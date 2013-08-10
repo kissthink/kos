@@ -3,6 +3,7 @@
 #include "kern/DynamicTimer.h"
 #include "kern/Debug.h"
 #include "ipc/BlockingSync.h"
+#include "mach/Delay.h"
 #include <atomic>
 
 static atomic<int> numTestsDone;
@@ -35,4 +36,28 @@ void TimerTest() {
   }
   while (numTestsDone < 20) Pause();
   DBG::outln(DBG::Basic, "TimerTest success");
+}
+
+void DelayTest() {
+  DBG::outln(DBG::Basic, "running DelayTest...");
+  DBG::outln(DBG::Basic, "delay for 100ns");
+  mword start = Machine::now();
+  Delay::ndelay(100);
+  mword end = Machine::now();
+  DBG::outln(DBG::Basic, "100ns took ", end-start, "cycles");
+  DBG::outln(DBG::Basic, "done.");
+  DBG::outln(DBG::Basic, "delay for 100us");
+  start = Machine::now();
+  Delay::udelay(100);
+  end = Machine::now();
+  DBG::outln(DBG::Basic, "100us took ", end-start, "cycles");
+  DBG::outln(DBG::Basic, "done.");
+  for (int i = 0; i < 5; i++) {
+    DBG::outln(DBG::Basic, "delay for 1000us");
+    start = Machine::now();
+    Delay::udelay(1000);
+    end = Machine::now();
+    DBG::outln(DBG::Basic, "1000us took ", end-start, "cycles");
+    DBG::outln(DBG::Basic, "done.");
+  }
 }

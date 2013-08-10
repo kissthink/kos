@@ -141,3 +141,13 @@ void mtx_destroy(struct mtx *m) {
   m->mtx_lock = MTX_DESTROYED;
   lock_destroy(&m->lock_object);
 }
+
+/*
+ * General init routine used by the MTX_SYSINIT() macro.
+ */
+void
+mtx_sysinit(void *arg) {
+  struct mtx_args *margs = arg;
+
+  mtx_init(margs->ma_mtx, margs->ma_desc, NULL, margs->ma_opts);
+}

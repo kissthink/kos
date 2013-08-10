@@ -39,7 +39,11 @@ protected:
   Thread* resume() {
     Thread* t = threadQueue.front();
     threadQueue.pop_front();
+#ifdef MUTEX_NO_BATONPASS
+    kernelScheduler.start(*t);
+#else
     kernelScheduler.yield(*t);    // yield control to thread t
+#endif
     return t;
   }
   bool waiting() {
@@ -74,6 +78,38 @@ public:
   }
 };
 
+#ifdef MUTEX_NO_BATONPASS
+class Mutex : public BlockingSync {
+protected:
+  Thread* owner;
+public:
+  Mutex() : owner(nullptr) {}
+  void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Mutex)); }
+  void acquire() {
+    ScopedLock<> lo(lk);
+    if (owner) suspend();
+    else owner = Processor::getCurrThread();
+  }
+  bool tryAcquire() {
+    ScopedLock<> lo(lk);
+    if (owner) return false;
+    owner = Processor::getCurrThread();
+    return true;
+  }
+  void release() {
+    ScopedLock<> lo(lk);
+    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
+    if likely(waiting()) {
+      owner = resume();
+    } else {
+      owner = nullptr;
+    }
+  }
+  bool locked() {
+    return owner != nullptr;
+  }
+};
+#else
 class Mutex : public BlockingSync {
 protected:
   Thread* owner;
@@ -105,11 +141,12 @@ public:
     return owner != nullptr;
   }
 };
+#endif
 
 class RecursiveMutex : public BlockingSync {
 protected:
   Thread* owner;
-  uint32_t recurse;
+  mword recurse;
 public:
   RecursiveMutex() : owner(nullptr), recurse(0) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(RecursiveMutex)); }
@@ -127,9 +164,22 @@ public:
     return true;
   }
   void release() {
+#ifdef MUTEX_NO_BATONPASS
+    ScopedLock<> lo(lk);
+#else
     lk.acquire();
+#endif
     KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
     recurse -= 1;
+#ifdef MUTEX_NO_BATONPASS
+    if (recurse == 0) {
+      if likely(waiting()) {
+        owner = resume();
+      } else {
+        owner = nullptr;
+      }
+    }
+#else
     if (recurse > 0) {
       lk.release();
     } else {
@@ -140,6 +190,7 @@ public:
         lk.release();
       }
     }
+#endif
   }
 };
 

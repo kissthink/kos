@@ -14,6 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
+#include "mach/Calibrate.h"
 #include "mach/Machine.h"
 #include "mach/PageManager.h"
 #include "mach/PCI.h"
@@ -278,6 +279,9 @@ void Machine::initBSP2() {
 
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();
+
+  // calibrate timer (find out CPU cycles per tick)
+  Calibrate::init();
 
   // send test IPI to self
   tipiReceived = false;

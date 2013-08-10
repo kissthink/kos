@@ -8,6 +8,13 @@
 
 #define MAXNBUF (sizeof(intmax_t) * NBBY + 1)
 
+struct snprintf_arg {
+  char *str;
+  size_t remain;
+};
+
+static void snprintf_func(int ch, void *arg);
+
 // TODO implement real uprintf
 int uprintf(const char *fmt, ...) {
   va_list ap;
@@ -394,3 +401,44 @@ number:
 	}
 }
 
+/*
+ * Scaled down version of vsnprintf(3).
+ */
+int
+vsnprintf(char *str, size_t size, const char *format, va_list ap) {
+  struct snprintf_arg info;
+  int retval;
+
+  info.str = str;
+  info.remain = size;
+  retval = kvprintf(format, snprintf_func, &info, 10, ap);
+  if (info.remain >= 1)
+    *info.str++ = '\0';
+  return retval;
+}
+
+/*
+ * Kernel version which takes radix argument vsnprintf(3).
+ */
+int
+vsnrprintf(char *str, size_t size, int radix, const char *format, va_list ap) {
+  struct snprintf_arg info;
+  int retval;
+
+  info.str = str;
+  info.remain = size;
+  retval = kvprintf(format, snprintf_func, &info, radix, ap);
+  if (info.remain >= 1)
+    *info.str++ = '\0';
+  return retval;
+}
+
+static void
+snprintf_func(int ch, void *arg) {
+  struct snprintf_arg *const info = arg;
+
+  if (info->remain >= 2) {
+    *info->str++ = ch;
+    info->remain--;
+  }
+}
