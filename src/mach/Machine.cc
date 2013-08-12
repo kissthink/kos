@@ -31,6 +31,8 @@
 #include "kern/Kernel.h"
 #include "kern/Multiboot.h"
 #include "kern/Thread.h"
+#include "int/Interrupt.h"
+#include "int/ISource.h"
 
 #include <atomic>
 #include <list>
@@ -426,8 +428,18 @@ extern "C" void isr_handler_0xff() {
 }
 
 extern "C" void isr_handler_gen(mword num) {
+  ISource* s = Interrupt::lookupSource(num);
+  DBG::outln(DBG::Basic, "source:", FmtHex(s));
+  if (!s) {
+    StdErr.outln("\nNULL SOURCE: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
+    Processor::sendEOI();
+  } else {
+    Interrupt::runHandlers(s);
+  }
+#if 0
   StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
   Processor::sendEOI();
+#endif
 //  Reboot();
 }
 
@@ -445,14 +457,16 @@ extern "C" void reset_interrupt_state(void) {
   asm volatile("movq $0, %%gs:%c0" :: "i"(offsetof(struct Processor, inInterrupt)) : "memory");
 }
 
-void Machine::setupIDT(unsigned int number, laddr address) {
+void Machine::setupIDT(unsigned int number, laddr address, int type, int dpl, int ist) {
   KASSERT1(number < maxIDT, number);
   idt[number].Offset00 = (address & 0x000000000000FFFF);
   idt[number].Offset16 = (address & 0x00000000FFFF0000) >> 16;
   idt[number].Offset32 = (address & 0xFFFFFFFF00000000) >> 32;
   idt[number].SegmentSelector = Processor::kernCodeSelector * sizeof(SegmentDescriptor);
-  idt[number].Type = 0x0E; // 64-bit interrupt gate (trap does not disable interrupts)
+  idt[number].Type = type; // 0x0E 64-bit interrupt gate (trap does not disable interrupts)
   idt[number].P = 1;
+  idt[number].DPL = dpl;
+  idt[number].IST = ist;
 }
 
 void Machine::setupAllIDTs() {

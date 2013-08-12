@@ -5,9 +5,13 @@
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
 
-void IEvent::addHandler(IHandler* h) {
+bool IEvent::addHandler(IHandler* h) {
   ScopedLock<> lo(lk);
-  handlers.insert(h);
+  if (h->isExclusive() && !handlers.empty()) {
+    if ((*handlers.begin())->isExclusive()) return false;
+  }
+  auto ret = handlers.insert(h);
+  return ret.second;
 }
 
 void IEvent::removeHandler(IHandler* h) {
@@ -20,6 +24,7 @@ void IEvent::createIThread(const char* name) {
   if (!ithread) {
     Thread* t = Thread::create(kernelSpace, name);
     ithread = new IThread(t, this);
+    DBG::outln(DBG::Basic, "created ithread:", FmtHex(ithread));
   }
 }
 

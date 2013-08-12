@@ -2,14 +2,16 @@
 #include "LockTest.h"
 #include "TimerTest.h"
 #include "SleepQueueTest.h"
+#include "InterruptTest.h"
 
 void RunTests() {
-  MutexTest();
-  RecursiveMutexTest();
-  SemaphoreTest();
-  ConditionVarTest();
-  RwMutexTest();
-  DelayTest();
+//  MutexTest();
+//  RecursiveMutexTest();
+//  SemaphoreTest();
+//  ConditionVarTest();
+//  RwMutexTest();
+//  DelayTest();
 //  TimerTest();
-  SleepQueueTest();
+//  SleepQueueTest();
+  InterruptTest();
 }
