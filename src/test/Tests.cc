@@ -1,6 +1,7 @@
 #include "Tests.h"
 #include "LockTest.h"
 #include "TimerTest.h"
+#include "SleepQueueTest.h"
 
 void RunTests() {
   MutexTest();
@@ -9,5 +10,6 @@ void RunTests() {
   ConditionVarTest();
   RwMutexTest();
   DelayTest();
-  TimerTest();
+//  TimerTest();
+  SleepQueueTest();
 }

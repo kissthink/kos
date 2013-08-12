@@ -1,6 +1,7 @@
 #include "int/IEvent.h"
 #include "int/IHandler.h"
 #include "int/IThread.h"
+#include "ipc/SleepQueue.h"
 #include "kern/Thread.h"
 
 void IThread::executeHandlers() {
@@ -10,7 +11,7 @@ void IThread::executeHandlers() {
     IHandler* h = *it;
     if (h->pendingRemoval) {      // set to be removed
       event->removeHandler(h);
-//      h->broadcast();             // wake up all threads waiting for the handler to be removed
+      SleepQueue::wakeup(h);      // wake up all threads waiting for the handler to be removed
       continue;
     }
     if (!h->handler) continue;    // only run handlers in ithread

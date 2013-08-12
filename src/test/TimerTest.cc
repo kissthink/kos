@@ -31,10 +31,10 @@ static void test1(ptr_t arg) {
 void TimerTest() {
   DBG::outln(DBG::Basic, "running TimerTest...");
   numTestsDone = counter = 0;
-  for (int i = 0; i < 20; i++) {
+  for (int i = 0; i < 10; i++) {
     Thread::create(test1, new mword(i*500+1), kernelSpace, "t");
   }
-  while (numTestsDone < 20) Pause();
+  while (numTestsDone < 10) Pause();
   DBG::outln(DBG::Basic, "TimerTest success");
 }
 
@@ -53,11 +53,11 @@ void DelayTest() {
   DBG::outln(DBG::Basic, "100us took ", end-start, "cycles");
   DBG::outln(DBG::Basic, "done.");
   for (int i = 0; i < 5; i++) {
-    DBG::outln(DBG::Basic, "delay for 1000us");
+    DBG::outln(DBG::Basic, "delay for 2000us");
     start = Machine::now();
-    Delay::udelay(1000);
+    Delay::udelay(2000);
     end = Machine::now();
-    DBG::outln(DBG::Basic, "1000us took ", end-start, "cycles");
+    DBG::outln(DBG::Basic, "2000us took ", end-start, "cycles");
     DBG::outln(DBG::Basic, "done.");
   }
 }
