@@ -4,9 +4,12 @@
 // KOS
 #include <cstdint>
 #include "kern/KernelHeap.h"
+#include "mach/platform.h"
 
 #include <map>
 using namespace std;
+
+extern mword getUpTime();
 
 extern KernelHeap kernelHeap;
 // tracks allocated memory (realloc)
@@ -30,4 +33,8 @@ unsigned long KOS_GetMemorySize(void *addr) {
     return memorySizeMap[addr];
   }
   return 0;
+}
+
+int KOS_GetUpTime() {
+  return getUpTime();
 }

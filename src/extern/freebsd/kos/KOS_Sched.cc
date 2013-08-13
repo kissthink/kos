@@ -113,5 +113,6 @@ void KOS_Wakeup_One(void* chan) {
 }
 
 int KOS_InInterrupt() {
-  return Processor::interrupt() ? 1 : 0;
+//  return Processor::interrupt() ? 1 : 0;
+  return 0;
 }

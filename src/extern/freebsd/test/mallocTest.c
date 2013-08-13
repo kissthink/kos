@@ -41,6 +41,7 @@ void mallocTest4() {
   str = realloc(str, sizeof(char) * 20, 0, M_WAITOK);
   BSD_KASSERT0(strncmp(str, "realloc", 8) == 0);
   str = realloc(str, sizeof(char) * 3, 0, M_WAITOK);
+  printf("string: %s\n", str);
   BSD_KASSERT0(strncmp(str, "realloc", 8) == 0);
   free(str, 0);
 }
