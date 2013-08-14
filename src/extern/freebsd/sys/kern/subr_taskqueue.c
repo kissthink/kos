@@ -47,11 +47,11 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_taskqueue.c 225570 2011-09-15 08
 
 #ifndef SUKWON
 #include "kos/Thread.h"
-#undef thread_lock
-#undef thread_unlock
+//#undef thread_lock
+//#undef thread_unlock
 
-#define thread_lock(tdp)    KOS_ThreadLock((tdp))
-#define thread_unlock(tdp)  KOS_ThreadUnLock((tdp))
+//#define thread_lock(tdp)    KOS_ThreadLock((tdp))
+//#define thread_unlock(tdp)  KOS_ThreadUnLock((tdp))
 #endif
 
 #ifdef SUKWON
@@ -334,6 +334,7 @@ taskqueue_run(struct taskqueue *queue)
 {
 
 	TQ_LOCK(queue);
+  printf("running taskqueue %p\n", (void *)queue);
 	taskqueue_run_locked(queue);
 	TQ_UNLOCK(queue);
 }

@@ -3,6 +3,6 @@
 
 #include "kos/Basic.h"
 
-EXTERNC void putchar(char ch);
+EXTERNC void KOS_PutChar(char ch);
 
 #endif /* _KOS_PRINTF_h_ */

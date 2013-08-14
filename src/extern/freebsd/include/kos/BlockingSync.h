@@ -30,4 +30,10 @@ EXTERNC int   KOS_RwMutex_WTryLock(void* kos_lock);
 EXTERNC int   KOS_RwMutex_TryUpgrade(void* kos_lock);
 EXTERNC void  KOS_RwMutex_Downgrade(void* kos_lock);
 
+// new APIs
+EXTERNC void KOS_MutexInit(void *mtx, int flags);
+EXTERNC void KOS_MutexLock(void *mtx, int opts, const char *file, int line);
+EXTERNC void KOS_MutexUnLock(void *mtx, int opts, const char *file, int line);
+EXTERNC int KOS_MutexTryLock(void *mtx, int opts, const char *file, int line);
+
 #endif /* _KOS_BLOCKINGSYNC_h_ */

@@ -33,6 +33,6 @@ static void safe_printf(const char* fmt, T value, Args... args) {
 }
 #endif
 
-void putchar(char ch) {
+void KOS_PutChar(char ch) {
   StdOut.out(ch);
 }
