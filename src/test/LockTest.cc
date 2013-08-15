@@ -164,23 +164,25 @@ RwMutex rwmtx;
 atomic<int> readAcquireCount, readReleaseCount;
 atomic<int> writeAcquireCount, writeReleaseCount;
 
-static void rwmutex_readers(ptr_t) {
+static void rwmutex_readers(ptr_t lock) {
+  RwMutex* mtx = static_cast<RwMutex*>(lock);
   for (int i = 0; i < 1000; i++) {
-    rwmtx.readAcquire();
+    mtx->readAcquire();
     readAcquireCount += 1;
-    rwmtx.readRelease();
+    mtx->readRelease();
     readReleaseCount += 1;
     for (int i = 0; i < 10000; i++) {}
   }
   numThreadsDone += 1;
   DBG::outln(DBG::Basic, "thread ", Processor::getCurrThread()->getName(), " done");
 }
-static void rwmutex_writers(ptr_t) {
+static void rwmutex_writers(ptr_t lock) {
+  RwMutex* mtx = static_cast<RwMutex*>(lock);
   for (int i = 0; i < 1000; i++) {
-    rwmtx.writeAcquire();
+    mtx->writeAcquire();
     writeAcquireCount += 1;
     counter += 1;
-    rwmtx.writeRelease();
+    mtx->writeRelease();
     writeReleaseCount += 1;
   }
   numThreadsDone += 1;
@@ -190,17 +192,17 @@ static void rwmutex_writers(ptr_t) {
 void RwMutexTest() {
   DBG::outln(DBG::Basic, "running RwMutexTest...");
   numThreadsDone = counter = 0;
-  Thread::create(rwmutex_readers, nullptr, kernelSpace, "r1");
-  Thread::create(rwmutex_readers, nullptr, kernelSpace, "r2");
-  Thread::create(rwmutex_readers, nullptr, kernelSpace, "r3");
-  Thread::create(rwmutex_readers, nullptr, kernelSpace, "r4");
-  Thread::create(rwmutex_readers, nullptr, kernelSpace, "r5");
+  Thread::create(rwmutex_readers, &rwmtx, kernelSpace, "r1");
+  Thread::create(rwmutex_readers, &rwmtx, kernelSpace, "r2");
+  Thread::create(rwmutex_readers, &rwmtx, kernelSpace, "r3");
+  Thread::create(rwmutex_readers, &rwmtx, kernelSpace, "r4");
+  Thread::create(rwmutex_readers, &rwmtx, kernelSpace, "r5");
 
-  Thread::create(rwmutex_writers, nullptr, kernelSpace, "w1");
-  Thread::create(rwmutex_writers, nullptr, kernelSpace, "w2");
-  Thread::create(rwmutex_writers, nullptr, kernelSpace, "w3");
-  Thread::create(rwmutex_writers, nullptr, kernelSpace, "w4");
-  Thread::create(rwmutex_writers, nullptr, kernelSpace, "w5");
+  Thread::create(rwmutex_writers, &rwmtx, kernelSpace, "w1");
+  Thread::create(rwmutex_writers, &rwmtx, kernelSpace, "w2");
+  Thread::create(rwmutex_writers, &rwmtx, kernelSpace, "w3");
+  Thread::create(rwmutex_writers, &rwmtx, kernelSpace, "w4");
+  Thread::create(rwmutex_writers, &rwmtx, kernelSpace, "w5");
 
   while (numThreadsDone != 10) Pause();
   KASSERT1(readAcquireCount == readReleaseCount, "read acquire/release counts differ");
@@ -210,3 +212,31 @@ void RwMutexTest() {
   KASSERT1(counter == 5000, counter);
   DBG::outln(DBG::Basic, "RwMutexTest success");
 }
+
+RecursiveRwMutex rrwmtx;
+
+void RecursiveRwMutexTest() {
+  DBG::outln(DBG::Basic, "running RecursiveRwMutexTest...");
+  numThreadsDone = counter = 0;
+  readAcquireCount = readReleaseCount = writeAcquireCount = writeReleaseCount = 0;
+  Thread::create(rwmutex_readers, &rrwmtx, kernelSpace, "r1");
+  Thread::create(rwmutex_readers, &rrwmtx, kernelSpace, "r2");
+  Thread::create(rwmutex_readers, &rrwmtx, kernelSpace, "r3");
+  Thread::create(rwmutex_readers, &rrwmtx, kernelSpace, "r4");
+  Thread::create(rwmutex_readers, &rrwmtx, kernelSpace, "r5");
+
+  Thread::create(rwmutex_writers, &rrwmtx, kernelSpace, "w1");
+  Thread::create(rwmutex_writers, &rrwmtx, kernelSpace, "w2");
+  Thread::create(rwmutex_writers, &rrwmtx, kernelSpace, "w3");
+  Thread::create(rwmutex_writers, &rrwmtx, kernelSpace, "w4");
+  Thread::create(rwmutex_writers, &rrwmtx, kernelSpace, "w5");
+
+  while (numThreadsDone != 10) Pause();
+  KASSERT1(readAcquireCount == readReleaseCount, "read acquire/release counts differ");
+  KASSERT1(readAcquireCount == 5000, "wrong read acquire/release value");
+  KASSERT1(writeAcquireCount == writeReleaseCount, "write acquire/release counts differ");
+  KASSERT1(writeAcquireCount == 5000, "wrong write acquire/release value");
+  KASSERT1(counter == 5000, counter);
+  DBG::outln(DBG::Basic, "RecursiveRwMutexTest success");
+}
+

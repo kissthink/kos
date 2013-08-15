@@ -6,5 +6,6 @@ void RecursiveMutexTest();
 void SemaphoreTest();
 void CVTest();
 void RwMutexTest();
+void RecursiveRwMutexTest();
 
 #endif /* _LockTest_h_ */

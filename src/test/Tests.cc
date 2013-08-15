@@ -10,6 +10,7 @@ void RunTests() {
   SemaphoreTest();
   CVTest();
   RwMutexTest();
+  RecursiveRwMutexTest();
   DelayTest();
   TimerTest();
   SleepQueueTest();
