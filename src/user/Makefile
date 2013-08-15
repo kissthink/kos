@@ -16,7 +16,7 @@ all: $(EXE) exec/motd
 $(OBJ): %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(EXE): exec/%: %.o
+$(EXE): exec/%: %.o ../ulib/libKOS.a
 	mkdir -p exec
 	$(CXX) $(LDFLAGS) $< -o $@
 #	strip $@
