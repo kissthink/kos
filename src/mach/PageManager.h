@@ -223,6 +223,12 @@ protected:
     return ret;
   }
 
+  static inline void clone(laddr pt, vaddr vpt, vaddr vptorig) {
+    memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
+    PageEntry* pe = (PageEntry*)vpt;
+    pe[pml4entry].c = mword(pt) | Kernel | PageTable;
+  }
+
   static inline void installAddressSpace(laddr pml4);
 
 public:
@@ -253,7 +259,7 @@ template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
 }
 
 inline void PageManager::installAddressSpace(laddr pml4) {
-  CPU::writeCR3(pml4); // flush what's necessary?
+  CPU::writeCR3(pml4);
 //  CPU::invTLB(ptp<1>());
 }
 
