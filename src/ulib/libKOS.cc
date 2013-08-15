@@ -46,7 +46,8 @@ extern "C" int close(int fd) {
 }
 
 extern "C" void _exit(int) {
-  for(;;) {}
+  asm volatile("movq %0, %%rdi"::"i"(3) : "rdi", "memory");
+  asm volatile("syscall" ::: "memory");
 }
 
 #if !defined(__clang__)

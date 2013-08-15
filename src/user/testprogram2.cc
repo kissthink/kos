@@ -19,7 +19,5 @@ int main() {
 	asm volatile("syscall" ::: "memory");
   asm volatile("movq %0, %%rdi"::"i"(2) : "rdi", "memory");
 	asm volatile("syscall" ::: "memory");
-  asm volatile("movq %0, %%rdi"::"i"(3) : "rdi", "memory");
-	asm volatile("syscall" ::: "memory");
   return 0;
 };
