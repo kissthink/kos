@@ -2,16 +2,16 @@
 
 // KOS
 #include <cstdint>
-#include "ipc/CondVar.h"
+#include "ipc/CV.h"
 #include "ipc/ReadWriteLock.h"
 
 void KOS_CV_Init(void** cvp) {
-  *cvp = new ConditionVar();
+  *cvp = new CV();
 }
 
 // mutex can be sleep mutex, sx, or rw lock
 void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
-  ConditionVar* cond = static_cast<ConditionVar*>(cv);
+  CV* cond = static_cast<CV*>(cv);
   switch (lockType) {
     case 0: {
       Mutex* mtx = static_cast<Mutex*>(mutex);
@@ -26,17 +26,17 @@ void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
 }
 
 void KOS_CV_Signal(void* cv) {
-  ConditionVar* cond = static_cast<ConditionVar*>(cv);
+  CV* cond = static_cast<CV*>(cv);
   cond->signal();  // FIXME
 }
 
 void KOS_CV_BroadCast(void* cv) {
-  ConditionVar* cond = static_cast<ConditionVar*>(cv);
+  CV* cond = static_cast<CV*>(cv);
   cond->broadcast(); // FIXME
 }
 
 void KOS_CV_Destroy(void** cv) {
-  ConditionVar* cond = static_cast<ConditionVar*>(*cv);
+  CV* cond = static_cast<CV*>(*cv);
   delete cond;
   *cv = 0;
 }

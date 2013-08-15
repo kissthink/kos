@@ -1,14 +1,14 @@
-#ifndef _CondVar_h_
-#define _CondVar_h_ 1
+#ifndef _CV_h_
+#define _CV_h_ 1
 
 #include "ipc/BlockingSync.h"
 
 class RwMutex;
-class ConditionVar {  // reference: http://research.microsoft.com/pubs/64242/implementingcvs.pdf
+class CV {  // reference: http://research.microsoft.com/pubs/64242/implementingcvs.pdf
   Semaphore s,x,h;
   mword waiters;
 public:
-  ConditionVar() : s(0), x(1), h(0), waiters(0) {}
+  CV() : s(0), x(1), h(0), waiters(0) {}
   void wait(Mutex& m, bool unlock = false) {
     KASSERT1(m.isLocked(), "cannot wait on an unlocked mutex");
     x.P();
@@ -36,4 +36,4 @@ public:
     x.V();
   }
 };
-#endif /* _CondVar_h_ */
+#endif /* _CV_h_ */

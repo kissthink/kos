@@ -1,8 +1,8 @@
 #include <cstdint>
-#include "ipc/CondVar.h"
+#include "ipc/CV.h"
 #include "ipc/ReadWriteLock.h"
 
-void ConditionVar::wait(RwMutex& m, bool unlock) {
+void CV::wait(RwMutex& m, bool unlock) {
   KASSERT1(m.isLocked(), "cannot wait on an unlocked rw mutex");
   x.P();
   waiters += 1;

@@ -1,14 +1,14 @@
 #include "kern/Debug.h"
 #include "kern/Kernel.h"
 #include "ipc/BlockingSync.h"
-#include "ipc/CondVar.h"
+#include "ipc/CV.h"
 #include "ipc/ReadWriteLock.h"
 #include "mach/Processor.h"
 #include "test/LockTest.h"
 #include "util/Output.h"
 #include <atomic>
 
-ConditionVar cond;
+CV cond;
 Mutex mtx;
 atomic<int> acquireCount;
 atomic<int> releaseCount;
@@ -126,7 +126,7 @@ static void waiter(ptr_t) {
   threadsStarted += 1;
   mtx.acquire();
   while (counter < 100000)
-    cond.wait(&mtx);
+    cond.wait(mtx);
   KASSERT1(counter == 100000, counter);
   mtx.release();
   numThreadsDone += 1;
@@ -144,7 +144,7 @@ static void signaller(ptr_t) {
 #endif
 }
 
-void ConditionVarTest() {
+void CVTest() {
   DBG::outln(DBG::Basic, "running CVTest...");
   threadsStarted = numThreadsDone = 0;
   for (int i = 0; i < 200; i++) {

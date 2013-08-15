@@ -2,7 +2,7 @@
 #define _ReadWriteLock_h_ 1
 
 #include "ipc/BlockingSync.h"
-#include "ipc/CondVar.h"
+#include "ipc/CV.h"
 
 #include <atomic>
 
@@ -11,7 +11,7 @@ class RwMutex {
   std::atomic<bool> writer;
   std::atomic<bool> locked;
   Mutex mtx;
-  ConditionVar cond;
+  CV cond;
 public:
   RwMutex() : readers(0), writer(false) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(RwMutex)); }

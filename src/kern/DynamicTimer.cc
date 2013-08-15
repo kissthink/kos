@@ -11,7 +11,7 @@ static void timerLoop(ptr_t) {
 
 SpinLock DynamicTimer::lk;
 Mutex DynamicTimer::mtx;
-ConditionVar DynamicTimer::condVar;
+CV DynamicTimer::condVar;
 set<TimerEntry*,DynamicTimerCompare,KernelAllocator<TimerEntry*>>  DynamicTimer::entries;
 Thread* DynamicTimer::thread;
 
@@ -34,7 +34,7 @@ bool DynamicTimer::cancelSync(TimerEntry* entry) {
   if ((*it)->running) {
     mtx.acquire();
     while (entries.find(entry) != entries.end())  // wait till it completes
-      condVar.wait(&mtx);
+      condVar.wait(mtx);
     mtx.release();
     return false;
   }

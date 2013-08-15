@@ -3,7 +3,7 @@
 
 #include "extern/stl/mod_set"
 #include "ipc/BlockingSync.h"
-#include "ipc/CondVar.h"
+#include "ipc/CV.h"
 #include "ipc/SpinLock.h"
 #include "kern/Kernel.h"
 #include "kern/Thread.h"
@@ -30,7 +30,7 @@ struct DynamicTimerCompare {
 class DynamicTimer {
   static SpinLock lk;
   static Mutex mtx;
-  static ConditionVar condVar;
+  static CV condVar;
   using TimerSet = set<TimerEntry*,DynamicTimerCompare,KernelAllocator<TimerEntry*>>;
   static TimerSet entries;
   static Thread* thread;

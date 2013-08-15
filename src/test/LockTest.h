@@ -4,7 +4,7 @@
 void MutexTest();
 void RecursiveMutexTest();
 void SemaphoreTest();
-void ConditionVarTest();
+void CVTest();
 void RwMutexTest();
 
 #endif /* _LockTest_h_ */

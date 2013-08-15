@@ -5,13 +5,13 @@
 #include "InterruptTest.h"
 
 void RunTests() {
-//  MutexTest();
-//  RecursiveMutexTest();
-//  SemaphoreTest();
-//  ConditionVarTest();
-//  RwMutexTest();
-//  DelayTest();
-//  TimerTest();
-//  SleepQueueTest();
+  MutexTest();
+  RecursiveMutexTest();
+  SemaphoreTest();
+  CVTest();
+  RwMutexTest();
+  DelayTest();
+  TimerTest();
+  SleepQueueTest();
   InterruptTest();
 }
