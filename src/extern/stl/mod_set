@@ -6,7 +6,7 @@ using namespace std;
 #include "mod_stl_tree.h"  
 #include "mod_stl_set.h"
 #include "mod_stl_multiset.h"
-#include "inplace_allocator.h"
+#include "mod_allocator.h"
 
 template <typename _Key, size_t shift, typename _Compare = std::less<_Key>>
 using InPlaceSet = modstd::set<_Key,_Compare,InPlaceAllocator<_Key,shift>>;

@@ -26,15 +26,15 @@
 
 template<typename Buffer>
 class ProdConsQueue {
-  volatile SpinLock lk;
+  SpinLock lock;
   size_t unclaimedElements; // baton passing to guarantee FIFO access
   Buffer elementQueue;
   InPlaceList<Thread*> waitQueue;
 
   void suspend() {
     waitQueue.push_back(Processor::getCurrThread());
-    kernelScheduler.suspend(lk);
-    lk.acquire();
+    kernelScheduler.suspend(lock);
+    lock.acquire();
   }
 
   bool resume() {
@@ -51,7 +51,7 @@ public:
   explicit ProdConsQueue(size_t N = 0) : unclaimedElements(0), elementQueue(N) {}
 
   void append(const Element& elem) {                 // blocking append
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if likely(unclaimedElements == elementQueue.max_size()) suspend();
     else if unlikely(!resume()) unclaimedElements += 1;
     else KASSERT1(elementQueue.empty(), elementQueue.size());
@@ -59,7 +59,7 @@ public:
   }
 
   bool tryAppend(const Element& elem) {              // non-blocking append
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if likely(unclaimedElements == elementQueue.max_size()) return false;
     else if unlikely(!resume()) unclaimedElements += 1;
     else KASSERT1(elementQueue.empty(), elementQueue.size());
@@ -68,7 +68,7 @@ public:
   }
 
   Element remove() {                                 // blocking remove
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if unlikely(unclaimedElements == 0) suspend();
     else if unlikely(!resume()) unclaimedElements -= 1;
     else KASSERT1(elementQueue.full(), elementQueue.size());

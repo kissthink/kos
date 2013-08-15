@@ -89,15 +89,6 @@ static RTC rtc;
 
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
-#if 1
-  StdErr.out(" PIT test, 3 secs...");
-  for (int i = 0; i < 3; i++) {
-    Processor::getCurrThread()->sleep(1000);
-    StdErr.out(' ', i+1);
-  }
-  StdErr.outln(" done.");
-#endif
-  StdErr.out(' ');
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
 #if KEYBOARD_RAW
@@ -314,7 +305,8 @@ void Machine::initBSP2() {
   }
 
   // create simple keyboard-to-screen thread
-  Thread::create(keybLoop, nullptr, kernelSpace, "keyb")->setPrio(1);
+  Thread* t = Thread::create(kernelSpace, "keyb")->setPriority(1);
+  kernelScheduler.run(*t, keybLoop, nullptr);
 }
 
 void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
@@ -333,17 +325,15 @@ mword Machine::now() {
 
 inline void Machine::rtcInterrupt(mword counter) {
   if (counter % cpuCount == bspIndex) {
-    if (Processor::preempt()) {
-      Processor::enableInterrupts(); // new thread on way out won't enable
-      kernelScheduler.yield();
-    }
+    if (Processor::preempt()) kernelScheduler.preempt();
   } else {
     processorTable[counter % cpuCount].sendWakeUpIPI();
   }
 }
 
-extern "C" void handleSysCall() {
-	StdDbg.outln("NOTE: system call");
+extern "C" void syscall_handler(mword x) {
+	DBG::outln(DBG::Process, "system call: ", x);
+	if (x == 3) kernelScheduler.kill();
 }
 
 extern "C" void isr_handler_0x08() { // double fault
@@ -395,14 +385,13 @@ extern "C" void isr_handler_0x2c() { // mouse interrupt
 
 extern "C" void isr_handler_0x40() {
   Processor::sendEOI();              // EOI *before* switching stacks
-  if (Processor::preempt()) {
-    Processor::enableInterrupts();   // new thread on way out won't enable
-    kernelScheduler.yield();
-  }
+  KASSERT0(!Processor::interruptsEnabled());
+  if (Processor::preempt()) kernelScheduler.preempt();
 }
 
 extern "C" void isr_handler_0x41() {
-  StdErr.out(" TIPI", (Processor::interruptsEnabled() ? 'e' : 'd'));
+  KASSERT0(!Processor::interruptsEnabled());
+  StdErr.out(" TIPI");
   tipiReceived = true;
   Processor::sendEOI();
 }

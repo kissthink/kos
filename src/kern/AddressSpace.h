@@ -47,7 +47,7 @@ private:
   const AddressSpace& operator=(const AddressSpace&) = delete; // no assignment
 
   template<size_t N, bool alloc, bool virt>
-  vaddr mapPagesInternal( size_t size, Type t, vaddr lma, vaddr vma ) {
+  vaddr mapPagesInternal( size_t size, Type type, vaddr lma, vaddr vma ) {
     static_assert( N < pagelevels, "page level template violation" );
     KASSERT1( aligned(vma, pagesize<N>()), vma );
     KASSERT1( aligned(size, pagesize<N>()), size );
@@ -63,8 +63,8 @@ private:
     for (; size > 0; size -= pagesize<N>()) {
       if (alloc) lma = Processor::getFrameManager()->alloc(pagesize<N>());
       KASSERT1(lma != topaddr, size);
-      PageManager::map<N>(vma, lma, owner, t, *Processor::getFrameManager());
-      DBG::outln(DBG::VM, "AS/map ", FmtHex(lma), " -> ", FmtHex(vma));
+      PageManager::map<N>(vma, lma, owner, type, *Processor::getFrameManager());
+      DBG::outln(DBG::VM, "AS/map ", FmtHex(lma), " -> ", FmtHex(vma), " flags: ", PageManager::FmtFlags(owner|type));
       vma += pagesize<N>();
       if (!alloc) lma += pagesize<N>();
     }
@@ -101,6 +101,8 @@ public:
   }
 
   void setPagetable(laddr pt) { pagetable = pt; }
+
+  laddr getPagetable() { return pagetable; }
 
   void clonePagetable(AddressSpace& as) {
     pagetable = Processor::getFrameManager()->alloc(pagetablesize());

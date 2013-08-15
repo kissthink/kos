@@ -27,14 +27,14 @@
 class BlockingSync {
   InPlaceList<Thread*> threadQueue;
 protected:
-  SpinLock lk;
+  SpinLock lock;
   ~BlockingSync() {
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     while (!threadQueue.empty()) resume();
   }
   void suspend() {
     threadQueue.push_back(Processor::getCurrThread());
-    kernelScheduler.suspend(lk);
+    kernelScheduler.suspend(lock);
   }
   Thread* resume() {
     Thread* t = threadQueue.front();
@@ -53,23 +53,23 @@ public:
   Semaphore(mword c = 0) : counter(c) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Semaphore)); }
   void P() {
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if likely(counter < 1) suspend();
     else counter -= 1;
   }
   bool tryP() {
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if likely(counter < 1) return false;
     counter -= 1;
     return true;
   }
   void V() {
-    lk.acquire();
+    lock.acquire();
     if likely(waiting()) {
       resume(); // pass closed lock to thread waiting on V()
     } else {
       counter += 1;
-      lk.release();
+      lock.release();
     }
   }
 };
@@ -81,18 +81,18 @@ public:
   Mutex() : owner(nullptr) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Mutex)); }
   void acquire() {
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     if (owner) suspend();
     else owner = Processor::getCurrThread();
   }
   void release() {
-    lk.acquire();
+    lock.acquire();
     KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
     if likely(waiting()) {
       owner = resume();
     } else {
       owner = nullptr;
-      lk.release();
+      lock.release();
     }
   }
 };

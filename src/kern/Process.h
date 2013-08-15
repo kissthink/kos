@@ -1,5 +1,5 @@
 /******************************************************************************
-    Copyright 2013 Behrooz Shafia
+    Copyright 2013 Martin Karsten
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,23 +14,19 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
-#ifndef ELFLoader_h_
-#define ELFLoader_h_
+#ifndef _Process_h_
+#define _Process_h_ 1
 
-#include "mach/platform.h" //for vaddr
+#include "kern/AddressSpace.h"
 
-//Forward declare AddressSpace and File
-class AddressSpace;
-class File;
-
-class ELFLoader {
-private:
-  bool initialized;
+class Process {
+  AddressSpace as;
+  Thread* thread;
 public:
-  ELFLoader() : initialized(false) { };
-  bool loadAndMapELF(File* elfFile, AddressSpace* addSpace);
-  vaddr findMainAddress();
-  vaddr findEntryAddress();
+  Process() : as(AddressSpace::User) {
+    as.setMemoryRange(userBase, topuser - userBase);
+  }
+  void execElfFile(const kstring& fileName);
 };
 
-#endif /* ELFLoader_h_ */
+#endif /* _Process_h_ */

@@ -17,49 +17,55 @@
 #ifndef _Scheduler_h_
 #define _Scheduler_h_ 1
 
+#include "mach/stack.h"
+#include "kern/Thread.h"
+#include "ipc/SpinLock.h"
 #include "extern/stl/mod_list"
 #include "extern/stl/mod_set"
-#include "ipc/SpinLock.h"
 
 class Thread;
 
 extern "C" void isr_handler_0x20();
 
-struct TimeoutCompare {
-  inline bool operator()( const Thread* t1, const Thread* t2 );
-};
-
 class Scheduler {
-  friend class Thread;            // lk
   friend void isr_handler_0x20(); // timerEvent
-  volatile SpinLock lk;
-  InPlaceList<Thread*> readyQueue[2];
-  InPlaceMultiset<Thread*,0,TimeoutCompare> timerQueue;
-  void ready(Thread& t);
-  void schedule();
-  void yieldInternal();
-  void timerEvent(mword ticks);
+
+  SpinLock lock;
+  bool enableInterrupts;
+  // shared embedded linkage -> thread can only be on one queue at a time
+  EmbeddedList<Thread*> readyQueue[2];
+  EmbeddedList<Thread*> destroyList;
+  EmbeddedMultiset<Thread*,Thread::TimeoutCompare> timerQueue;
+  SpinLock timerLock;
 
   Scheduler(const Scheduler&) = delete;                  // no copy
   const Scheduler& operator=(const Scheduler&) = delete; // no assignment
 
+  void ready(Thread& t) { readyQueue[t.priority].push_back(&t); }
+  void schedule(bool ei = false);
+  void timerEvent(mword ticks);
+
 public:
-  Scheduler() = default;
+  Scheduler() : enableInterrupts(false) {}
+  void kill();
+  void preempt();
+  void sleep(mword t);
+  void suspend(SpinLock& rl);
+  void suspend();
   void start(Thread& t) {
-    ScopedLock<> lo(lk);
+    ScopedLock<> sl(lock);
     ready(t);
   }
-  void suspend(volatile SpinLock& rl) {
-    ScopedLock<> lo(lk);
-    rl.release();
-    schedule();
+  void run(Thread& t, function_t func, ptr_t data) {
+    t.stackPointer = stackInitIndirect(t.stackPointer, func, data, (void*)invoke);
+    start(t);
   }
-  void suspend() {
-    ScopedLock<> lo(lk);
-    schedule();
+  void runUser(Thread& t, function_t func, ptr_t data) {
+    t.stackPointer = stackInitIndirect(t.stackPointer, func, data, (void*)invokeUser);
+    start(t);
   }
-  void sleep(Thread& t);
-  void yield();
+  static void invoke(function_t func, ptr_t data);
+  static void invokeUser(function_t func, ptr_t data);
 };
 
 #endif /* _Scheduler_h_ */

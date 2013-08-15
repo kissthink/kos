@@ -43,9 +43,9 @@ class segment
     ELFIO_GET_SET_ACCESS_DECL( Elf64_Addr, physical_address );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Xword,  file_size        );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Xword,  memory_size      );
+    ELFIO_GET_ACCESS_DECL    ( Elf64_Off,  file_offset      );
 
     virtual const char* get_data() const = 0;
-    virtual Elf64_Off get_data_offset() const = 0;
 
     virtual Elf_Half add_section_index( Elf_Half index, Elf_Xword addr_align ) = 0;
     virtual Elf_Half get_sections_num()                                  const = 0;
@@ -87,6 +87,7 @@ class segment_impl : public segment
     ELFIO_GET_SET_ACCESS( Elf64_Addr, physical_address, ph.p_paddr  );
     ELFIO_GET_SET_ACCESS( Elf_Xword,  file_size,        ph.p_filesz );
     ELFIO_GET_SET_ACCESS( Elf_Xword,  memory_size,      ph.p_memsz  );
+    ELFIO_GET_ACCESS    ( Elf64_Off,  file_offset,      ph.p_offset );
 
 //------------------------------------------------------------------------------
     Elf_Half
@@ -100,13 +101,6 @@ class segment_impl : public segment
     get_data() const
     {
         return data;
-    }
-
-//------------------------------------------------------------------------------
-    Elf64_Off
-    get_data_offset() const
-    {
-        return ph.p_offset;
     }
 
 //------------------------------------------------------------------------------

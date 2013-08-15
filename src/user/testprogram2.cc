@@ -15,7 +15,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 int main() {
-	asm volatile("SYSCALL" ::: "memory");
-	asm volatile("SYSCALL" ::: "memory");
+  asm volatile("movq %0, %%rdi"::"i"(1) : "rdi", "memory");
+	asm volatile("syscall" ::: "memory");
+  asm volatile("movq %0, %%rdi"::"i"(2) : "rdi", "memory");
+	asm volatile("syscall" ::: "memory");
+  asm volatile("movq %0, %%rdi"::"i"(3) : "rdi", "memory");
+	asm volatile("syscall" ::: "memory");
   return 0;
 };

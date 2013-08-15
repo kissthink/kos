@@ -32,6 +32,7 @@ static const char* options[] = {
   "memacpi",
   "paging",
   "pci",
+  "process",
   "scheduler",
   "vm",
   "warning",

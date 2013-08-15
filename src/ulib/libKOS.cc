@@ -45,6 +45,10 @@ extern "C" int close(int fd) {
   return -1;
 }
 
+extern "C" void _exit(int) {
+  for(;;) {}
+}
+
 #if !defined(__clang__)
 extern "C" int fstat(int fd, struct stat *buf) {
   buf->st_mode = S_IFCHR;

@@ -62,6 +62,12 @@ public:
     Data      = RW() | XD()
   };
 
+  struct FmtFlags {
+    uint64_t t;
+    FmtFlags(uint64_t t) : t(t) {}
+  };
+  friend inline ostream& operator<<(ostream &os, const PageManager::FmtFlags& f);
+
 private:
   static const uint64_t pageMask = P() | G() | US() | RW() | XD();
 
@@ -246,6 +252,21 @@ template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);
   KASSERT1(pe->P, FmtHex(vma));
   return ADDR(pe->c) + offset<1>(vma);
+}
+
+inline ostream& operator<<(ostream &os, const PageManager::FmtFlags& f) {
+  if (f.t & PageManager::P()) os << " P";
+  if (f.t & PageManager::RW()) os << " RW";
+  if (f.t & PageManager::US()) os << " US";
+  if (f.t & PageManager::PWT()) os << " PWT";
+  if (f.t & PageManager::PCD()) os << " PCD";
+  if (f.t & PageManager::A()) os << " A";
+  if (f.t & PageManager::D()) os << " D";
+  if (f.t & PageManager::PS()) os << " PS";
+  if (f.t & PageManager::G()) os << " G";
+  if (f.t & PageManager::ADDR()) os << " ADDR";
+  if (f.t & PageManager::XD()) os << " XD";
+  return os;
 }
 
 #endif /* _PageManager_h_ */

@@ -1,5 +1,5 @@
-#ifndef _mod_allocator_h_
-#define _mod_allocator_h_
+#ifndef _inplace_allocator_h_
+#define _inplace_allocator_h_
 
 template<typename T,size_t shift> class InPlaceAllocator : public std::allocator<T> {
 public:
@@ -31,4 +31,4 @@ public:
   void deallocate(T*, size_t) {}
 };
 
-#endif /* _mod_allocator_h_ */
+#endif /* _inplace_allocator_h_ */

@@ -8,7 +8,7 @@
  * Non-blocking semaphore used by gdb code.
  */
 class NonBlockSemaphore {
-  SpinLock lk;
+  SpinLock lock;
   atomic<int> counter;
 public:
   NonBlockSemaphore(int counter = 0): counter(counter) {}
@@ -17,10 +17,10 @@ public:
   static constexpr size_t size() {
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(NonBlockSemaphore);
   }
-  void P() volatile {
+  void P() {
     for(;;) {
       Pause();
-      ScopedLock<> so(lk);
+      ScopedLock<> sl(lock);
       if (counter <= 0) {
         continue;
       } else {
@@ -30,13 +30,13 @@ public:
     }
   }
 
-  void V() volatile {
-    ScopedLock<> so(lk);
+  void V() {
+    ScopedLock<> sl(lock);
     counter += 1;
   }
 
   void resetCounter(int newCounter) {
-    ScopedLock<> so(lk);
+    ScopedLock<> sl(lock);
     counter = newCounter;
   }
 };

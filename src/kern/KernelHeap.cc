@@ -25,13 +25,12 @@
 ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }
 ptr_t operator new[](size_t s) { return (ptr_t)kernelHeap.alloc<false>(s); }
 void operator delete(ptr_t p) noexcept { ABORT1("delete"); }
-void operator delete[](ptr_t p) noexcept {Breakpoint2(0); ABORT1("delete[]"); }*/
+void operator delete[](ptr_t p) noexcept { ABORT1("delete[]"); }
 #endif
 
-//inline ptr_t operator new(size_t s) { return (ptr_t)kernelHeap.malloc(s); }
-//inline ptr_t operator new[](size_t s) { return (ptr_t)kernelHeap.malloc(s); }
-//inline void operator delete(ptr_t p) noexcept { kernelHeap.free(p); }
-//inline void operator delete[](ptr_t p) noexcept { kernelHeap.free(p); }
+ptr_t globalalloc(size_t size) {
+  return (ptr_t)kernelHeap.alloc<false>(size);
+}
 
 void globaldelete(ptr_t addr, size_t size) {
   kernelHeap.release<false>((vaddr)addr, size);
@@ -87,7 +86,7 @@ void KernelHeap::releaseInternal(vaddr p, size_t size) {
 void KernelHeap::init(vaddr start, vaddr end) {
   KASSERTN( end - start >= DEFAULT_GRANULARITY, FmtHex(start), '-', FmtHex(end) );
   kmspace = create_mspace_with_base( (ptr_t)start, end - start, 0 );
-  initFull = false;
+  init2done = false;
 }
 
 // memory is marked as available
@@ -97,7 +96,7 @@ void KernelHeap::addMemory(vaddr start, vaddr end) {
 
 ptr_t KernelHeap::malloc(size_t s) {
   ptr_t ret = mspace_malloc(kmspace, s);
-  if likely(initFull) {
+  if likely(init2done) {
     if (!availableMemory.check(DEFAULT_GRANULARITY)) expand(DEFAULT_GRANULARITY);
   }
   return ret;

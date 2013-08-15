@@ -4,7 +4,7 @@
 #include <list>
 using namespace std;
 #include "mod_stl_list.h"
-#include "inplace_allocator.h"
+#include "mod_allocator.h"
 
 template <typename T>
 using InPlaceList = modstd::list<T,InPlaceAllocator<T,0>>;

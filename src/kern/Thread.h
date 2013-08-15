@@ -18,43 +18,43 @@
 #define _Thread_h_ 1
 
 #include "extern/stl/mod_set"
-#include "mach/platform.h"
-#include "mach/stack.h"
+#include "util/basics.h"
 
 class AddressSpace;
+class Scheduler;
 
 class Thread : public mod_set_elem<Thread*> {
 public:
   static const size_t defaultStack = 2 * pagesize<1>();
+  struct TimeoutCompare {
+    inline bool operator()( const Thread* t1, const Thread* t2 ) {
+      return t1->timeout < t2->timeout;
+    }
+  };
 private:
-  friend struct TimeoutCompare; // timeout 
-  friend class Scheduler; // stackPointer
-  AddressSpace* addressSpace;
-  vaddr stackPointer;
-  size_t stackSize;
-  mword timeout;
-  int prio;
+  friend class Scheduler; // stackPointer, timeout, priority
   const char* name;
+  AddressSpace* addressSpace;
+  size_t stackSize;
+  vaddr stackPointer;
+  mword timeout;
+  int priority;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
-    : addressSpace(&as), stackPointer(sp), stackSize(s), timeout(0), prio(0), name(n) {}
-  ~Thread() { /* join */ }
-  static void invoke( function_t func, ptr_t data );
+    : name(n), addressSpace(&as), stackSize(s), stackPointer(sp),
+      timeout(0), priority(0) {}
+  ~Thread() = delete;
+
+  void destroy();
 
 public:
-  Thread* setPrio(int p) { prio = p; return this; }
-  int getPrio() const { return prio; }
+  Thread* setPriority(int p) { priority = p; return this; }
   const char* getName() const { return name; }
-  AddressSpace& getAddressSpace() const { return *addressSpace; }
+  AddressSpace* getAddressSpace() const { return addressSpace; }
 
   static Thread* create(AddressSpace& as, size_t stackSize = defaultStack);
   static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack);
-  static Thread* create(function_t func, ptr_t data, AddressSpace& as, size_t stackSize = defaultStack);
-  static Thread* create(function_t func, ptr_t data, AddressSpace& as, const char *n, size_t stackSize = defaultStack);
-  static void destroy(Thread* t);
-  void run(function_t func, ptr_t data);
   void runDirect(funcvoid_t func);
-  void sleep(mword t);
 } __packed;
 
 #endif /* _Thread_h_ */

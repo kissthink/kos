@@ -26,6 +26,9 @@ extern "C" void stackStart(mword next);
 // use next pointer to make switch work, even if curr == next
 extern "C" void stackSwitch(mword* curr, mword* next);
 
+// like 'stackSwitch', but also set CR3 to install new address space
+extern "C" void stackSwitchAS(mword* curr, mword* next, mword nextCR3);
+
 // initialize stack for simple invocation of 'func'
 extern "C" mword stackInitSimple(mword stack, funcvoid_t func);
 

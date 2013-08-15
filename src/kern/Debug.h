@@ -36,6 +36,7 @@ public:
     MemAcpi,
     Paging,
     PCI,
+    Process,
     Scheduler,
     VM,
     Warning,

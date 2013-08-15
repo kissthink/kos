@@ -17,19 +17,11 @@
 #include "mach/Processor.h"
 #include "mach/stack.h"
 #include "kern/Debug.h"
+#include "kern/Kernel.h"
 #include "kern/Scheduler.h"
-#include "kern/Thread.h"
-
-inline bool TimeoutCompare::operator()( const Thread* t1, const Thread* t2 ) {
-  return t1->timeout < t2->timeout;
-}
-
-void Scheduler::ready(Thread& t) {
-  readyQueue[t.getPrio()].push_back(&t);
-}
 
 // extremely simple 2-class prio scheduling!
-void Scheduler::schedule() {
+void Scheduler::schedule(bool ei) {
   Thread* nextThread;
   Thread* prevThread = Processor::getCurrThread();
   if unlikely(!readyQueue[1].empty()) {
@@ -41,6 +33,8 @@ void Scheduler::schedule() {
   } else {
     nextThread = Processor::getIdleThread();
   }
+
+  if (prevThread == nextThread) return;
   Processor::setCurrThread(nextThread);
 
   KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
@@ -51,33 +45,80 @@ void Scheduler::schedule() {
   if (nextThread->getName()) DBG::outln(DBG::Scheduler, nextThread->getName());
   else DBG::outln(DBG::Scheduler, nextThread);
 
-  // this needs to happen in kernel memory?
-  stackSwitch(&prevThread->stackPointer, &nextThread->stackPointer);
-  // AS switch, if necessary...
+  enableInterrupts = ei;
+
+  if ( nextThread->getAddressSpace() != &kernelSpace
+    && nextThread->getAddressSpace() != prevThread->getAddressSpace() ) {
+    stackSwitchAS(&prevThread->stackPointer, &nextThread->stackPointer, nextThread->getAddressSpace()->getPagetable());
+  } else {
+    stackSwitch(&prevThread->stackPointer, &nextThread->stackPointer);
+  }
+
+  while (!destroyList.empty()) {
+    Thread* t = destroyList.front();
+    destroyList.pop_front();
+    t->destroy();
+  }
 }
 
 void Scheduler::timerEvent(mword ticks) {
-  if likely(timerQueue.empty()) return;
-  ScopedLock<> lo(lk);
+  ScopedLock<> sl(timerLock);
   for (;;) {
-    InPlaceSet<Thread*,0,TimeoutCompare>::iterator i = timerQueue.begin();
+    EmbeddedMultiset<Thread*,Thread::TimeoutCompare>::iterator i = timerQueue.begin();
   if (i == timerQueue.end() || ticks < (*i)->timeout) break;
     Thread* t = *i;
     timerQueue.erase(i);
-    ready(*t);
+    timerLock.release();
+    start(*t);
+    timerLock.acquire();
   }
 }
 
-void Scheduler::sleep(Thread& t) {
-  ScopedLock<> lo(lk); 
-  timerQueue.insert(&t);
-  schedule();
+// TODO: clean up AS/Process when last thread is gone...
+void Scheduler::kill() {
+  ScopedLock<> sl(lock);
+  destroyList.push_back(Processor::getCurrThread());
+  schedule();                                    // does not return
 }
 
-void Scheduler::yield() {
-  ScopedLock<> lo(lk);
+void Scheduler::preempt() {
+  ScopedLock<> sl(lock);
   if likely(Processor::getCurrThread() != Processor::getIdleThread()) {
     ready(*Processor::getCurrThread());
   }
+  schedule(true);
+}
+
+void Scheduler::sleep(mword t) {
+  timerLock.acquire();
+  Processor::getCurrThread()->timeout = t;
+  timerQueue.insert(Processor::getCurrThread());
+  suspend(timerLock);
+}
+
+void Scheduler::suspend() {
+  lock.acquire();
   schedule();
+  lock.release(enableInterrupts);
+}
+
+void Scheduler::suspend(SpinLock& rl) {
+  lock.acquire();
+  rl.release();
+  schedule();
+  lock.release(enableInterrupts);
+}
+
+void Scheduler::invoke(function_t func, ptr_t data) {
+  KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
+  kernelScheduler.lock.release(kernelScheduler.enableInterrupts);
+  func(data);
+  kernelScheduler.kill();                        // does not return
+}
+
+void Scheduler::invokeUser(function_t func, ptr_t data) {
+  KASSERT1(Processor::getLockCount() == 1, Processor::getLockCount());
+  kernelScheduler.lock.release(kernelScheduler.enableInterrupts);
+  asm volatile("movq %0, %%rcx"::"g"(func) : "rcx", "memory");
+  asm volatile("sysretq" ::: "memory");          // does not return
 }

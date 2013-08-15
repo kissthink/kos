@@ -19,30 +19,30 @@
 #include "kern/AddressSpace.h"
 #include "kern/Kernel.h"
 #include "kern/OutputSafe.h"
+#include "kern/Process.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 #include "world/File.h"
-#include "world/ELFLoader.h"
-
-#include "mach/asm_functions.h"
 
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;
 Scheduler kernelScheduler;
 map<kstring, File*, less<kstring>, KernelAllocator<kstring>> kernelFS;
 
-static void mainLoop(ptr_t); // forward declaration
-static void task(ptr_t);     // forward declaration
+static void mainLoop(ptr_t);  // forward declaration
+static void timertest(ptr_t); // forward declaration
+static void task(ptr_t);      // forward declaration
 
-void apIdleLoop() {
+static void apIdleLoop() {
   Machine::initAP2();
   for (;;) Halt();
 }
 
-void bspIdleLoop() {
+static void bspIdleLoop() {
   Machine::initBSP2();
   StdOut.outln("Welcome to KOS!");
-  Thread::create(mainLoop, nullptr, kernelSpace, "BSP");
+  Thread* t = Thread::create(kernelSpace, "0");
+  kernelScheduler.run(*t, mainLoop, nullptr);
   for (;;) Pause();
 }
 
@@ -57,7 +57,7 @@ extern "C" void kmain(mword magic, mword addr) {
   }
 }
 
-void mainLoop(ptr_t) {
+static void mainLoop(ptr_t) {
   File* f1 = kernelFS.find("motd")->second;
   for (;;) {
     char c;
@@ -66,63 +66,45 @@ void mainLoop(ptr_t) {
     StdDbg.out(c);
   }
 
-  File* f = kernelFS.find("testprogram2")->second;
-  //User Address Space
-  AddressSpace userAS(AddressSpace::User);
-  vaddr startAS = pagesize<2>();
-  vaddr lengthAS = topuser - startAS;
-  userAS.setMemoryRange(startAS, lengthAS);
-
-  //ELF Loader
-  ELFLoader elfLoader;
-  if (elfLoader.loadAndMapELF(f, &userAS)) {
-    //  clone and Activate Address Space
-    userAS.clonePagetable(kernelSpace);
-    userAS.activate();
-
-    // allocate user stack
-    vaddr uStack = userAS.allocPages<1>(Thread::defaultStack, AddressSpace::Data);
-    KASSERT0(uStack != topaddr);
-    // user program address
-    vaddr uMain = elfLoader.findMainAddress();
-    DBG::outln(DBG::Basic, "user main address: ", FmtHex(uMain));
-    KASSERT0(uMain != topaddr);
-    // set user stack
-    asm volatile("movq %0, %%rsp"::"g"(uStack + Thread::defaultStack) : "memory");
-    // start address of user Program in RCX, so sysret loads RIP with RCX
-    asm volatile("movq %0, %%rcx"::"g"(uMain) : "memory");
-//    asm volatile("sysretq" ::: "memory");
-
-    // activate Kernel Space again
-    kernelSpace.activate();
-  }
+  Process p;
+  p.execElfFile("testprogram2");
 
   // TODO: create processes and leave BSP thread waiting for events
-  Thread::create(task, nullptr, kernelSpace, "A");
-  Thread::create(task, nullptr, kernelSpace, "B");
-  Thread::create(task, nullptr, kernelSpace, "C");
-  Thread::create(task, nullptr, kernelSpace, "D");
-  Thread::create(task, nullptr, kernelSpace, "E");
-  Thread::create(task, nullptr, kernelSpace, "F");
-  Thread::create(task, nullptr, kernelSpace, "G");
-  Thread::create(task, nullptr, kernelSpace, "H");
-  Thread::create(task, nullptr, kernelSpace, "I");
-  Thread::create(task, nullptr, kernelSpace, "J");
-  Thread::create(task, nullptr, kernelSpace, "K");
-  Thread::create(task, nullptr, kernelSpace, "L");
-  Thread::create(task, nullptr, kernelSpace, "M");
-  Thread::create(task, nullptr, kernelSpace, "N");
-  Thread::create(task, nullptr, kernelSpace, "O");
-  Thread::create(task, nullptr, kernelSpace, "P");
-  Thread::create(task, nullptr, kernelSpace, "Q");
-  Thread::create(task, nullptr, kernelSpace, "R");
-  Thread::create(task, nullptr, kernelSpace, "S");
-  Thread::create(task, nullptr, kernelSpace, "T");
-  Thread::create(task, nullptr, kernelSpace, "U");
-  Thread::create(task, nullptr, kernelSpace, "V");
-  Thread::create(task, nullptr, kernelSpace, "W");
-  Thread::create(task, nullptr, kernelSpace, "X");
+  kernelScheduler.run( *Thread::create(kernelSpace, "TT"), timertest, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "A"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "B"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "C"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "D"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "E"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "F"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "G"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "H"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "I"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "J"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "K"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "L"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "M"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "N"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "O"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "P"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "Q"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "R"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "S"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "T"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "U"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "V"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "W"), task, nullptr);
+  kernelScheduler.run( *Thread::create(kernelSpace, "X"), task, nullptr);
   task(nullptr);
+}
+
+void timertest(ptr_t) {
+  StdErr.out(" PIT test, 3 secs...");
+  for (int i = 0; i < 3; i++) {
+    kernelScheduler.sleep(Machine::now() + 1000);
+    StdErr.out(' ', i+1);
+  }
+  StdErr.outln(" done.");
 }
 
 void task(ptr_t) {

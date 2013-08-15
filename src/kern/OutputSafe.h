@@ -27,7 +27,7 @@
 
 class KernelOutput {
   ostream os;
-  SpinLock lk;
+  SpinLock lock;
 
   template<typename T>
   void print( const T& msg ) {
@@ -45,17 +45,15 @@ public:
 
   template<typename... Args>
   void out( const Args&... a ) {
-    lk.acquire();
+    ScopedLock<> sl(lock);
     print(a...);
-    lk.release();
   }
 
   template<typename... Args>
   void outln( const Args&... a ) {
-    lk.acquire();
+    ScopedLock<> sl(lock);
     print(a...);
     print(kendl);
-    lk.release();
   }
 };
 

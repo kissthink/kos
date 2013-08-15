@@ -40,116 +40,29 @@ function unpack() {
 	tar xaf $DLDIR/$1.$2 || error "$1 extract"
 }
 
-function prebuild() {
+function applypatch() {
 	dir=$TMPDIR/$1
 	[ -f $PTDIR/$1.patch ] && {
 		patch -d $dir -p1 < $PTDIR/$1.patch || error "$1 patch"
 	}
-	rm -rf $dir-build && mkdir $dir-build && cd $dir-build || error "$dir-build access"
+	[ -x $PTDIR/$1.sh ] && {
+		$PTDIR/$1.sh $dir || error "$1 shell patch"
+	}
+}
+
+function prebuild() {
+	dir=$TMPDIR/$1-build
+	rm -rf $dir && mkdir $dir && cd $dir || error "$dir access"
 }
 
 function build() {
 	cd $TMPDIR/$1-build
-	nice -10 make -j $cpucount $2 all || error "$1 build failed"
+	nice -10 make -j $cpucount all || error "$1 build failed"
 }
 
 function install() {
+	echo -n "Installing $1 - "
 	$ROOTEXEC -c "make -C $TMPDIR/$1-build install && echo SUCCESS: $1 install"
-}
-
-function build_usergcc() {
-	rm -rf $TMPDIR/$GCC && mkdir $TMPDIR/$GCC && cd $TMPDIR/$GCC || error "$TMPDIR/$GCC access"
-	# order often important (gcc last)
-	tar xaf $DLDIR/$BINUTILS.tar.bz2 --strip-components 1 || error "$BINUTILS extract"
-	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
-# for binutils 2.32.2:
-	sed -i -e 's/@colophon/@@colophon/' \
-	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
-# for gcc 4.7.2:
-#	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' $GCC/gcc/configure
-#	sed -i 's/thread_local/thread_localX/' $GCC/gcc/tree.h
-	prebuild $GCC
-	../$GCC/configure --target=$TARGET --prefix=$UKOSDIR\
-		--enable-languages=c --enable-lto --enable-shared\
-		--disable-nls --disable-libquadmath --disable-libssp\
-		|| error "$GCC configure"
-	build $GCC
-}
-# --enable-gold --enable-ld=default --enable-plugin --with-plugin-ld=ld.gold
-
-function build_bsdlibc() {
-	BSDDIR=$TMPDIR/bsd
-	rm -rf $BSDDIR
-
-	BINDIR=$BSDDIR/bin
-	mkdir -p $BINDIR
-	export PATH=$BINDIR:$PATH
-	echo "while read line; do for i in \$line; do echo \$i; done; done|sort|uniq"\
-		> $BINDIR/tsort
-	chmod +x $BINDIR/tsort
-	echo "exec echo \$*" > $BINDIR/lorder
-	chmod +x $BINDIR/lorder
-
-	cd $BSDDIR
-	tar xaf $DLDIR/src.txz
-	cd usr/src/usr.bin/make
-	patch -p1 < $PTDIR/fbsd-make.patch
-	sh $PTDIR/fbsd-make.sed.patch
-	make -f Makefile.dist
-	cp pmake $BINDIR
-	cd $BSDDIR
-	mkdir -p dest/usr/include
-	cd dest/usr/include
-	ln -s ../../../usr/src/include/rpcsvc .
-	cd $BSDDIR/usr/src/include
-	ln -s ../sys/amd64/include machine
-	ln -s ../sys/x86/include x86
-
-	cd $BSDDIR
-	echo "#undef __FreeBSD_version
-#define __FreeBSD_version 901000" > usr/src/include/osreldate.h
-	cp usr/src/lib/msun/src/math.h usr/src/include
-	cp usr/src/lib/msun/amd64/fenv.h usr/src/include
-	cp usr/src/lib/libutil/libutil.h usr/src/include
-	mkdir usr/src/include/altq
-	cp usr/src/sys/contrib/altq/altq/if_altq.h usr/src/include/altq
-	cd usr/src/include/rpcsvc
-	rpcgen -h crypt.x > crypt.h
-	rpcgen -h key_prot.x > key_prot.h
-	patch nis.x < $PTDIR/fbsd-nis.x.patch
-	rpcgen -h nis.x > nis.h
-	rpcgen -h yp.x > yp.h
-	mv key_prot.h ../rpc
-	  	
-	cd $BSDDIR/usr/src/lib/csu
-	patch -p1 < $PTDIR/fbsd-csu.patch
-	cd amd64
-
-	CC=$UKOSDIR/bin/$TARGET-gcc PATH=$UKOSDIR/$TARGET/bin:$PATH \
-	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector
-
-	cd $BSDDIR/usr/src/lib/libc
-	patch -p1 < $PTDIR/fbsd-libc.patch
-	sed -i 's/\$$/\$ /' nls/*.msg
-	sed -i 's/2 RPC/72 RPC/' nls/mn_MN.UTF-8.msg
-	
-	ln -s amd64 unknown
-	ln -s amd64 x86_64	
-
-	# this command finds cc1, but ld does not produce a shared library
-	CC=$UKOSDIR/bin/$TARGET-gcc PATH=$UKOSDIR/$TARGET/bin:$PATH \
-	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector \
-	KOSGCCDIR=$UKOSDIR/lib/gcc/$TARGET/$GCCVER/include
-	rm libc.*
-	# this command does not find cc1, but ld produces shared library
-	PATH=$UKOSDIR/$TARGET/bin:$PATH \
-	pmake DESTDIR=$BSDDIR/dest SSP_CFLAGS=-fno-stack-protector \
-	KOSGCCDIR=$UKOSDIR/lib/gcc/$TARGET/$GCCVER/include
-}
-
-function install_bsdlibc() {
-	# copy libs to $UKOSDIR/$TARGET/lib
-	# copy header files to $UKOSDIR/$TARGET/include
 }
 
 function build_gcc() {
@@ -158,22 +71,15 @@ function build_gcc() {
 	tar xaf $DLDIR/$BINUTILS.tar.bz2 --strip-components 1 || error "$BINUTILS extract"
 	tar xaf $DLDIR/$NEWLIB.tar.gz --strip-components 1 || error "$NEWLIB extract"
 	tar xaf $DLDIR/$GCC.tar.bz2 --strip-components 1 || error "$GCC extract"
-# for binutils 2.32.2:
-	sed -i -e 's/@colophon/@@colophon/' \
-	       -e 's/doc@cygnus.com/doc@@cygnus.com/' bfd/doc/bfd.texinfo
-# for gcc 4.7.2:
-#	sed -i 's/BUILD_INFO=info/BUILD_INFO=/' gcc/configure
-#	sed -i 's/thread_local/thread_localX/' gcc/tree.h
-	cp $PTDIR/crt0.S libgloss/libnosys || error "crt0.S copy"
-	sed -i 's/OUTPUTS = /OUTPUTS = crt0.o /' libgloss/libnosys/Makefile.in
-	echo 'newlib_cflags="${newlib_cflags} -DMALLOC_PROVIDED"' >> newlib/configure.host
-	cd libgloss; autoconf || error "libgloss autoconf" ; cd ..
+	sh $PTDIR/$BINUTILS.sh $TMPDIR/$GCC || error "$BINUTILS shell path"
+	sh $PTDIR/$NEWLIB.sh $TMPDIR/$GCC || error "$NEWLIB shell path"
+	applypatch $GCC
 	prebuild $GCC
 	../$GCC/configure --target=$TARGET --prefix=$GCCDIR\
-		--disable-threads --disable-tls --disable-nls --enable-lto\
-		--enable-languages=c,c++ --with-newlib || error "$GCC configure"
+		--enable-languages=c,c++ --enable-lto --disable-nls --disable-tls\
+		--with-newlib || error "$GCC configure"
 	# compile gcc first pass
-	nice -10 make -j $cpucount all || error "$GCC first pass failed"
+	build $GCC
 	cd $TMPDIR/$GCC-build/$TARGET
 	# recompile newlib with -mcmodel=kernel
 	sed -i 's/CFLAGS = -g -O2/CFLAGS = -g -O2 -mcmodel=kernel/' newlib/Makefile
@@ -184,12 +90,13 @@ function build_gcc() {
 	sed -i 's/CXXFLAGS = -g -O2/CXXFLAGS = -g -O2 -mcmodel=kernel/' libstdc++-v3/Makefile
 	make -C libstdc++-v3 clean
 	nice -10 make -C libstdc++-v3 -j $cpucount all || error "libstdc++-v3 recompile failed"
-	# recompile gcc with new libraries
+	# recompile gcc with new library settings
 	build $GCC
 }
 
 function build_gdb() {
 	unpack $GDB tar.bz2
+	applypatch $GDB
 	prebuild $GDB
 	../$GDB/configure --target=$TARGET --prefix=$TOOLSDIR || error "$GDB configure"
 	build $GDB
@@ -197,6 +104,7 @@ function build_gdb() {
 
 function build_grub() {
 	unpack $GRUB tar.xz
+	applypatch $GRUB
 	prebuild $GRUB
 	../$GRUB/configure --target=$TARGET --prefix=$GRUBDIR --disable-werror\
 	--disable-device-mapper || error "$GRUB configure"
@@ -205,6 +113,7 @@ function build_grub() {
 
 function build_bochs() {
 	unpack $BOCHS tar.gz
+	applypatch $BOCHS
 	prebuild $BOCHS
 	../$BOCHS/configure --enable-smp --enable-cpu-level=6 --enable-x86-64\
 		--enable-all-optimizations --enable-pci --enable-vmx --enable-debugger\
@@ -218,21 +127,11 @@ function build_bochs() {
 
 function build_qemu() {
 	unpack $QEMU tar.bz2
+	applypatch $QEMU
 	prebuild $QEMU
 	../$QEMU/configure --target-list=x86_64-softmmu --prefix=$TOOLSDIR\
 	--python=/usr/bin/python2 --enable-sdl || error "$QEMU configure"
 	build $QEMU
-}
-
-function build_user() {
-	while [ $# -gt 0 ]; do case "$1" in
-	gcc)
-		build_usergcc && install $GCC;;
-	bsdlibc)
-		build_bsdlibc;;
-	*)
-		echo unknown argument: $1;;
-	esac; shift; done
 }
 
 while [ $# -gt 0 ]; do case "$1" in
@@ -250,9 +149,6 @@ allcross)
 	build_gcc && install $GCC
 	build_gdb && install $GDB
 	build_grub && install $GRUB;;
-user)
-	shift
-	build_user $1;;
 *)
 	echo unknown argument: $1;;
 esac; shift; done

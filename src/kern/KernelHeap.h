@@ -34,7 +34,7 @@ class KernelHeap {
   BuddyMap<min,max,BuddySet> availableMemory;
   SpinLock lock;
   void* kmspace;
-  bool initFull;
+  bool init2done;
 
   vaddr allocInternal(size_t size);
   void releaseInternal(vaddr p, size_t size);
@@ -47,7 +47,7 @@ class KernelHeap {
 public:
   KernelHeap() {} // don't do anything, since constructor is called *after* init
   void init(vaddr start, vaddr end);
-  void init2() { initFull = true; }
+  void init2() { init2done = true; }
   void addMemory(vaddr start, vaddr end);
   template<bool aligned=true>
   vaddr alloc(size_t size) {

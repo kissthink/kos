@@ -21,15 +21,15 @@
 #include "kern/globals.h"
 
 class SpinLock {
-  bool locked;
-  void acquireInternal() volatile {
+  volatile bool locked;
+  void acquireInternal() {
     while (__atomic_test_and_set(&locked, __ATOMIC_SEQ_CST))
       while (locked) Pause();
   }
-  void releaseInternal() volatile {
+  void releaseInternal() {
     __atomic_clear(&locked, __ATOMIC_SEQ_CST);
   }
-  bool tryAcquireInternal() volatile {
+  bool tryAcquireInternal() {
     return __atomic_test_and_set(&locked, __ATOMIC_SEQ_CST);
   }
 public:
@@ -39,15 +39,16 @@ public:
   static constexpr size_t size() {
     return sizeof(SpinLock) < sizeof(vaddr) ? sizeof(vaddr) : sizeof(SpinLock);
   }
-  void acquire() volatile {
+  void acquire() {
     Processor::incLockCount();
     acquireInternal();
   }
-  void release() volatile {
+  void release(bool enableInterrupts = false) {
     releaseInternal();
+    if (enableInterrupts) Processor::enableInterrupts();
     Processor::decLockCount();
   }
-  bool tryAcquire() volatile {
+  bool tryAcquire() {
     Processor::incLockCount();
     bool success = tryAcquireInternal();
     if (!success) Processor::decLockCount();
@@ -57,16 +58,16 @@ public:
 
 class NoLock {
 public:
-  void acquire() volatile {}
-  void release() volatile {}
-  bool tryAcquire() volatile { return true; }
+  void acquire() {}
+  void release() {}
+  bool tryAcquire() { return true; }
 };
 
 template <typename Lock = SpinLock>
 class ScopedLock {
-  volatile Lock& lk;
+  Lock& lk;
 public:
-  ScopedLock(volatile Lock& lk) : lk(lk) { lk.acquire(); }
+  ScopedLock(Lock& lk) : lk(lk) { lk.acquire(); }
   ~ScopedLock() { lk.release(); }
 };
 

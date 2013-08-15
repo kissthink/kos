@@ -20,6 +20,7 @@
 #include "util/basics.h"
 
 // implemented in KernelHeap.cc
+extern ptr_t globalalloc(size_t);
 extern void globaldelete(ptr_t, size_t);
 
 #endif /* _globals_h_ */

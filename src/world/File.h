@@ -32,7 +32,7 @@ class File {
 
 public:
   File(vaddr s, size_t l) : length(l), offset(0) {
-    start = new char[align_up(l, BlockSize)];
+    start = (bufptr_t)globalalloc(align_up(l, BlockSize));
     KASSERT0(vaddr(start) != topaddr);
     KASSERT0(start != nullptr);
     memcpy(start, bufptr_t(s), l);
@@ -58,7 +58,6 @@ public:
 
   bufptr_t startptr() { return start; }
   size_t size() { return length; }
-
 };
 
 #endif /* _File_h_ */

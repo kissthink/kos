@@ -31,7 +31,7 @@ void Processor::checkCapabilities(bool print) {
   if (CPUID::hasARAT())         if (print) DBG::out(DBG::Basic, " ARAT");
   if (CPUID::hasTSC_Deadline()) if (print) DBG::out(DBG::Basic, " TSC");
   if (CPUID::hasX2APIC())       if (print) DBG::out(DBG::Basic, " X2A");
-  if (print) DBG::out(DBG::Basic, kendl);
+                                if (print) DBG::out(DBG::Basic, kendl);
 }
 
 void Processor::configure() {
@@ -40,11 +40,12 @@ void Processor::configure() {
   CPU::writeCR4(CPU::readCR4() | CPU::PGE());    // enable  G paging bit
 
   MSR::enableSYSCALL();                          // enable syscall/sysret
-  MSR::write(MSR::SYSCALL_CSTAR, 0x0);           // set up registers
-  MSR::write(MSR::SYSCALL_SFMASK, 0x0);
+  // top  16 bits: userCodeSelector * 8 + 3 (CPL); assume DataSelector is next
+  // next 16 bits: kernCodeSelector * 8 + 0 (CPL); assume DataSelector is next
+  MSR::write(MSR::SYSCALL_STAR, 0x001B000800000000);
   MSR::write(MSR::SYSCALL_LSTAR, mword(syscallHandler));
-  //uint64_t star = ((((uint64_t)Machine::userCodeSelector|0x3) - 16)<<48)|((uint64_t)Machine::userCodeSelector<<32);
-  MSR::write(MSR::SYSCALL_STAR, 0x0008000800000000);
+  MSR::write(MSR::SYSCALL_CSTAR, 0x0);
+  MSR::write(MSR::SYSCALL_SFMASK, 0x0);
 }
 
 void Processor::init(FrameManager& fm, AddressSpace& as,

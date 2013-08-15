@@ -111,7 +111,6 @@ extern "C" int kill(pid_t pid, int sig) {
 }
 
 extern "C" void* sbrk(intptr_t increment) {
-  Breakpoint(0);
   ABORT1("sbrk"); return nullptr;
 }
 

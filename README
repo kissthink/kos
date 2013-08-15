@@ -88,10 +88,10 @@ Please send feedback to mkarsten@uwaterloo.ca.
 
 Contributors (in alphabetical order)
 ============
-- Sukown Oh (GDB support, Linux drivers)
+- Sukown Oh (GDB support, drivers)
 - Behrooz Shafiee (keyboard, pit, elf, syscall/sysret)
 - Alex Szlavik (bootstrap code)
-- Cameron White (clang support)
+- Cameron White (clang support, not in release currently)
 
 
 TODO: explain 3rd-party packages, licensing...
@@ -99,14 +99,3 @@ TODO: explain 3rd-party packages, licensing...
 - elfio
 - multiboot
 - dlmalloc
-- linux
-
-
-Linux drivers
-=============
-1. Download linux-3.9.4.tar.xz from kernel.org
-2. Extract under src/extern directory
-3. run ./clean_tree.sh included in root directory of KOS
-4. apply patches in patches/linux/ directory (patch -p1 <
-patches/linux/<patchname>)
-5. make drivers or make all 

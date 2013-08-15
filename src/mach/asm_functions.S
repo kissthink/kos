@@ -65,6 +65,6 @@ loadTR:
 .globl   syscallHandler
 syscallHandler:
 	pushq %rcx
-	call handleSysCall
+	call syscall_handler
 	popq %rcx
 	sysretq
