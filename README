@@ -70,10 +70,10 @@ Running KOS
 ===========
 
 When executing KOS, the system should show a number of messages and then get
-into a split-screen mode, where the first 20 lines are showing output from 7
-threads running on 2 cores and the bottom 5 lines show keycodes when keys
-are pressed and released.  Running KOS in qemu creates several log files
-that can be used to diagnose problems:
+into a split-screen mode, where the first 20 lines are showing output from
+several threads running on several cores and the bottom 5 lines show
+keycodes when keys are pressed and released.  Running KOS in qemu creates
+several log files that can be used to diagnose problems:
 
 /tmp/KOS.serial
 /tmp/KOS.dbg
@@ -88,7 +88,7 @@ Please send feedback to mkarsten@uwaterloo.ca.
 
 Contributors (in alphabetical order)
 ============
-- Sukown Oh (GDB support, drivers)
+- Sukown Oh (gdb server, drivers)
 - Behrooz Shafiee (keyboard, pit, elf, syscall/sysret)
 - Alex Szlavik (bootstrap code)
 - Cameron White (clang support, not in release currently)
@@ -96,6 +96,7 @@ Contributors (in alphabetical order)
 
 TODO: explain 3rd-party packages, licensing...
 - acpica
+- dlmalloc
 - elfio
 - multiboot
-- dlmalloc
+- stl
