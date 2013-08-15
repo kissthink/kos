@@ -189,7 +189,7 @@ int
 rw_wowned(struct rwlock *rw)
 {
 
-	return (rw_wowner(rw) == curthread);
+  return KOS_RWLockOwned(rw);
 }
 
 void

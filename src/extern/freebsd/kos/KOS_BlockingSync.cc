@@ -243,7 +243,7 @@ struct RecursiveSpinLockWrapper : public LockWrapper {
 ////////////////
 
 static SpinLock lockMapLock;
-map<ptr_t,LockWrapper*,less<ptr_t>,KernelAllocator<pair<ptr_t,LockWrapper*>>> lockMap; 
+static map<ptr_t,LockWrapper*,less<ptr_t>,KernelAllocator<pair<ptr_t,LockWrapper*>>> lockMap; 
 
 // mutex/recursive mutex
 void KOS_MutexLock(ptr_t mtx, int opts, const char* file, int line) {

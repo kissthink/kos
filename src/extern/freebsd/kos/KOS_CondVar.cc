@@ -15,11 +15,11 @@ void KOS_CV_Wait(void* cv, void* mutex, int lockType, int unlock) {
   switch (lockType) {
     case 0: {
       Mutex* mtx = static_cast<Mutex*>(mutex);
-      cond->wait(mtx, unlock ? true : false);
+      cond->wait(*mtx, unlock ? true : false);
     } break;
     case 1: {
       RwMutex* mtx = static_cast<RwMutex*>(mutex);
-      cond->wait(mtx, unlock ? true : false);
+      cond->wait(*mtx, unlock ? true : false);
     } break;
     default: ABORT1("invalid lock type");
   }

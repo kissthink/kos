@@ -16,8 +16,9 @@ protected:
   Mutex mtx;
   CV readerQueue;
   CV writerQueue;
+  Thread* owner;
 public:
-  RwMutex() : readers(0), writer(false), locked(false), readWaiters(0), writeWaiters(0) {}
+  RwMutex() : readers(0), writer(false), locked(false), readWaiters(0), writeWaiters(0), owner(nullptr) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(RwMutex)); }
   virtual void readAcquire() {
     mtx.acquire();
@@ -50,6 +51,7 @@ public:
     }
     writer = true;
     locked = true;
+    owner = Processor::getCurrThread();
     mtx.release();
   }
   virtual void writeRelease() {
@@ -58,6 +60,7 @@ public:
     KASSERT1(!readers, "releasing read lock");
     writer = false;
     locked = false;
+    owner = nullptr;
     if (readWaiters) {
       readerQueue.broadcast();  // give readers first try
     } else if (writeWaiters) {
@@ -81,6 +84,7 @@ public:
     if (!locked) {
       writer = true;
       locked = true;
+      owner = Processor::getCurrThread();
       mtx.release();
       return true;
     }
@@ -92,6 +96,7 @@ public:
     if (readers == 1) {
       readers = 0;
       writer = true;
+      owner = Processor::getCurrThread();
       mtx.release();
       return true;
     }
@@ -112,13 +117,15 @@ public:
   virtual bool isLocked() {
     return locked;
   }
+  virtual bool writeOwned() {
+    return owner == Processor::getCurrThread();
+  }
 };
 
 class RecursiveRwMutex : public RwMutex {
   mword recurse;
-  Thread* owner;
 public:
-  RecursiveRwMutex() : RwMutex(), recurse(0), owner(nullptr) {}
+  RecursiveRwMutex() : RwMutex(), recurse(0) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr,sizeof(RecursiveRwMutex)); }
   void writeAcquire() {
     mtx.acquire();
