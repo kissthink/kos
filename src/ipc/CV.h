@@ -19,7 +19,7 @@ public:
     h.V();
     if (!unlock) m.acquire();
   }
-  void wait(RwMutex& m, bool unlock = false);
+  void wait(RwMutex& m, bool unlock = false); // not inlined because of cross-dependency with RwMutex
   void signal() {
     x.P();
     if (waiters) {

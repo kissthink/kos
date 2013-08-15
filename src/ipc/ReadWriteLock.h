@@ -10,15 +10,20 @@ class RwMutex {
   std::atomic<mword> readers;
   std::atomic<bool> writer;
   std::atomic<bool> locked;
+  mword readWaiters;
+  mword writeWaiters;
   Mutex mtx;
-  CV cond;
+  CV readerQueue;
+  CV writerQueue;
 public:
   RwMutex() : readers(0), writer(false) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(RwMutex)); }
   void readAcquire() {
     mtx.acquire();
     while (writer) {
-      cond.wait(mtx);
+      readWaiters += 1;
+      readerQueue.wait(mtx);
+      readWaiters -= 1;
     }
     readers += 1;
     locked = true;
@@ -31,14 +36,16 @@ public:
     readers -= 1;
     if (readers == 0) {
       locked = false;
-      cond.broadcast(); // wakeup all blocked readers/writers
+      writerQueue.signal(); // readers shouldn't need to be woken up
     }
     mtx.release();
   }
   void writeAcquire() {
     mtx.acquire();
     while (locked) {
-      cond.wait(mtx);
+      writeWaiters += 1;
+      writerQueue.wait(mtx);
+      writeWaiters -= 1;
     }
     writer = true;
     locked = true;
@@ -50,7 +57,11 @@ public:
     KASSERT1(!readers, "releasing read lock");
     writer = false;
     locked = false;
-    cond.broadcast(); // wakeup all blocked readers/writers
+    if (readWaiters) {
+      readerQueue.broadcast();  // give readers first try
+    } else if (writeWaiters) {
+      writerQueue.signal();
+    }
     mtx.release();
   }
   bool tryReadAcquire() {
@@ -91,7 +102,7 @@ public:
     KASSERT1(writer, "downgrading non-writelock");
     readers = 1;
     writer = false;
-    cond.broadcast(); // wakeup all blocked readers (but it's okay to wake up writers, too)
+    readerQueue.broadcast(); // other blocked readers may run, too.
     mtx.release();
   }
   bool isExclusive() {
