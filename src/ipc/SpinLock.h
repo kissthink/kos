@@ -83,6 +83,9 @@ class RecursiveSpinLock {
   void releaseInternal() volatile {
     __atomic_clear(&locked, __ATOMIC_SEQ_CST);
   }
+  bool tryAcquireInternal() volatile {
+    return !__atomic_test_and_set(&locked, __ATOMIC_SEQ_CST);
+  }
 public:
   RecursiveSpinLock() : owner(nullptr), recurse(0), locked(false) {}
   ptr_t operator new(size_t) { return ::operator new(size()); }
@@ -110,6 +113,25 @@ public:
     releaseInternal();
     owner = nullptr;
     Processor::decLockCount();
+  }
+  bool tryAcquire() volatile {
+    ScopedLock<> lo(lk);
+    if (owner) {
+      if (owner != Processor::getCurrThread())  // another thread is holding the lock
+        return false;
+      else {
+        recurse += 1;   // I was holding the lock
+        return true;
+      }
+    }
+    Processor::incLockCount();
+    bool acquired = tryAcquireInternal();
+    if (acquired) {
+      owner = Processor::getCurrThread(); // update owner info
+      return true;
+    }
+    Processor::decLockCount();  // failed to acquire
+    return false;
   }
 };
 

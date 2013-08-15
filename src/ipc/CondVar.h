@@ -9,17 +9,17 @@ class ConditionVar {  // reference: http://research.microsoft.com/pubs/64242/imp
   mword waiters;
 public:
   ConditionVar() : s(0), x(1), h(0), waiters(0) {}
-  void wait(Mutex* m, bool unlock = false) {
-    KASSERT1(m->locked(), "cannot wait on an unlocked mutex");
+  void wait(Mutex& m, bool unlock = false) {
+    KASSERT1(m.isLocked(), "cannot wait on an unlocked mutex");
     x.P();
     waiters += 1;
     x.V();
-    m->release();
+    m.release();
     s.P();
     h.V();
-    if (!unlock) m->acquire();
+    if (!unlock) m.acquire();
   }
-  void wait(RwMutex* m, bool unlock = false);
+  void wait(RwMutex& m, bool unlock = false);
   void signal() {
     x.P();
     if (waiters) {

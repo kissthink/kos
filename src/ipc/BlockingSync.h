@@ -105,7 +105,7 @@ public:
       owner = nullptr;
     }
   }
-  bool locked() {
+  bool isLocked() {
     return owner != nullptr;
   }
 };
@@ -137,7 +137,7 @@ public:
       lk.release();
     }
   }
-  bool locked() {
+  bool isLocked() {
     return owner != nullptr;
   }
 };
