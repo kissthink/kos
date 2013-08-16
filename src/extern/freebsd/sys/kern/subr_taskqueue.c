@@ -32,9 +32,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_taskqueue.c 225570 2011-09-15 08
 #include <sys/bus.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
-#ifdef SUKWON
-#include <sys/kthread.h>
-#endif
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -45,20 +42,10 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_taskqueue.c 225570 2011-09-15 08
 #include <sys/unistd.h>
 #include <machine/stdarg.h>
 
-#ifndef SUKWON
+#include "kos/Kassert.h"
 #include "kos/Thread.h"
-//#undef thread_lock
-//#undef thread_unlock
 
-//#define thread_lock(tdp)    KOS_ThreadLock((tdp))
-//#define thread_unlock(tdp)  KOS_ThreadUnLock((tdp))
-#endif
-
-#ifdef SUKWON
 static MALLOC_DEFINE(M_TASKQUEUE, "taskqueue", "Task Queues");
-#else
-#define M_TASKQUEUE 0
-#endif
 static void	*taskqueue_giant_ih;
 static void	*taskqueue_ih;
 
@@ -73,7 +60,7 @@ struct taskqueue {
 	void			*tq_context;
 	TAILQ_HEAD(, taskqueue_busy) tq_active;
 	struct mtx		tq_mutex;
-	struct thread		**tq_threads;
+	void		**tq_threads;
 	int			tq_tcount;
 	int			tq_spin;
 	int			tq_flags;
@@ -156,7 +143,7 @@ taskqueue_create(const char *name, int mflags,
  * Signal a taskqueue thread to terminate.
  */
 static void
-taskqueue_terminate(struct thread **pp, struct taskqueue *tq)
+taskqueue_terminate(void **pp, struct taskqueue *tq)
 {
 
 	while (tq->tq_tcount > 0 || tq->tq_callouts > 0) {
@@ -368,7 +355,7 @@ taskqueue_cancel_locked(struct taskqueue *queue, struct task *task,
 int
 taskqueue_cancel(struct taskqueue *queue, struct task *task, u_int *pendp)
 {
-	u_int pending;
+	u_int pending __attribute__((unused));
 	int error;
 
 	TQ_LOCK(queue);
@@ -449,7 +436,7 @@ taskqueue_start_threads(struct taskqueue **tqp, int count, int pri,
 	va_list ap;
 	void *td;
 	struct taskqueue *tq;
-	int i, error;
+	int i;
 	char ktname[MAXCOMLEN + 1];
 
 	if (count <= 0)
@@ -461,54 +448,28 @@ taskqueue_start_threads(struct taskqueue **tqp, int count, int pri,
 	vsnprintf(ktname, sizeof(ktname), name, ap);
 	va_end(ap);
 
-#ifdef SUKWON
-	tq->tq_threads = malloc(sizeof(struct thread *) * count, M_TASKQUEUE,
-	    M_NOWAIT | M_ZERO);
-#else
   tq->tq_threads = KOS_ThreadsMalloc(count);
-#endif
 	if (tq->tq_threads == NULL) {
 		printf("%s: no memory for %s threads\n", __func__, ktname);
 		return (ENOMEM);
 	}
 
 	for (i = 0; i < count; i++) {
-		if (count == 1)
-#ifdef SUKWON
-			error = kthread_add(taskqueue_thread_loop, tqp, NULL,
-			    &tq->tq_threads[i], RFSTOPPED, 0, "%s", ktname);
-#else
-      tq->tq_threads[i] = KOS_ThreadCreate(taskqueue_thread_loop, tqp, RFSTOPPED, "%s", ktname);
-#endif
-		else
-#ifdef SUKWON
-			error = kthread_add(taskqueue_thread_loop, tqp, NULL,
-			    &tq->tq_threads[i], RFSTOPPED, 0,
-			    "%s_%d", ktname, i);
-#else
-      tq->tq_threads[i] = KOS_ThreadCreate(taskqueue_thread_loop, tqp, RFSTOPPED, "%s_%d", ktname, i);
-#endif
-#ifdef SUKWON
-		if (error) {
-			/* should be ok to continue, taskqueue_free will dtrt */
-			printf("%s: kthread_add(%s): error %d", __func__,
-			    ktname, error);
-			tq->tq_threads[i] = NULL;		/* paranoid */
-		} else
-#endif
-			tq->tq_tcount++;
+		if (count == 1) {
+      tq->tq_threads[i] = KOS_ThreadCreate(taskqueue_thread_loop,
+          tqp, RFSTOPPED, "%s", ktname);
+		} else {
+      tq->tq_threads[i] = KOS_ThreadCreate(taskqueue_thread_loop,
+          tqp, RFSTOPPED, "%s_%d", ktname, i);
+    }
+    tq->tq_tcount++;
 	}
 	for (i = 0; i < count; i++) {
 		if (tq->tq_threads[i] == NULL)
 			continue;
 		td = tq->tq_threads[i];
 		thread_lock(td);
-#ifdef SUKWON
-		sched_prio(td, pri);
-		sched_add(td, SRQ_BORING);
-#else
     KOS_ScheduleLocked(td, 0);
-#endif
 		thread_unlock(td);
 	}
 
@@ -540,9 +501,6 @@ taskqueue_thread_loop(void *arg)
 	tq->tq_tcount--;
 	wakeup_one(tq->tq_threads);
 	TQ_UNLOCK(tq);
-#ifdef SUKWON
-	kthread_exit();
-#endif
 }
 
 void
@@ -600,22 +558,10 @@ TASKQUEUE_FAST_DEFINE(fast, taskqueue_fast_enqueue, NULL,
 	swi_add(NULL, "Fast task queue", taskqueue_fast_run, NULL,
 	SWI_TQ_FAST, INTR_MPSAFE, &taskqueue_fast_ih));
 
+// used in sys/cddl/compat/opensolaris/kern/opensolaris_taskq.c only
 int
 taskqueue_member(struct taskqueue *queue, struct thread *td)
 {
-	int i, j, ret = 0;
-
-	TQ_LOCK(queue);
-	for (i = 0, j = 0; ; i++) {
-		if (queue->tq_threads[i] == NULL)
-			continue;
-		if (queue->tq_threads[i] == td) {
-			ret = 1;
-			break;
-		}
-		if (++j >= queue->tq_tcount)
-			break;
-	}
-	TQ_UNLOCK(queue);
-	return (ret);
+  BSD_KASSERTSTR((false), "unimplemented taskqueue_member()");
+  return 0;
 }

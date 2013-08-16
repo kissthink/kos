@@ -130,7 +130,7 @@ _sleep(void *ident, struct lock_object *lock, int priority,
 	 * sleep queue first.  We have to do this to handle recursive
 	 * sleeps.
 	 */
-	if (TD_ON_SLEEPQ(td))
+	if (KOS_OnSleepQueue(td))
 		sleepq_remove(td, KOS_SleepQueueGetChannel(td));
 
 	if (ident == &pause_wchan)
