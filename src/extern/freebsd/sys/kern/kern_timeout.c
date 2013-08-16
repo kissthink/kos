@@ -50,7 +50,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_timeout.c 235221 2012-05-10 10:1
 #include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/sleepqueue.h>
-#include "kos/SleepQueue.h"
 #include "kos/Thread.h"
 #include "kos/Timer.h"
 
@@ -173,12 +172,6 @@ kern_timeout_callwheel_alloc(caddr_t v)
 		;
 	callwheelmask = callwheelsize - 1;
 
-#if 0
-	cc->cc_callout = (struct callout *)v;
-	v = (caddr_t)(cc->cc_callout + ncallout);
-	cc->cc_callwheel = (struct callout_tailq *)v;
-	v = (caddr_t)(cc->cc_callwheel + callwheelsize);
-#endif
   // try allocating with malloc later during KOS startup
   cc->cc_callout = malloc(sizeof(struct callout) * ncallout, M_TEMP, M_WAITOK);
   cc->cc_callwheel = malloc(sizeof(struct callout_tailq) * callwheelsize, M_TEMP, M_WAITOK);
@@ -391,9 +384,11 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc, int *mpcalls,
 	} else {
 		(*mpcalls)++;
 	}
-	THREAD_NO_SLEEPING();
+//	THREAD_NO_SLEEPING();
+  critical_enter(); // don't know if this simulates okay
 	c_func(c_arg);
-	THREAD_SLEEPING_OK();
+//	THREAD_SLEEPING_OK();
+  critical_exit();
 	if ((c_flags & CALLOUT_RETURNUNLOCKED) == 0)
 		class->lc_unlock(c_lock);
 skip:
@@ -424,7 +419,7 @@ skip:
 			cc_cme_cleanup(cc);
 		cc->cc_waiting = 0;
 		CC_UNLOCK(cc);
-    KOS_SleepQueueWakeup(&cc->cc_waiting);
+    wakeup(&cc->cc_waiting);
 		CC_LOCK(cc);
 	} else if (cc_cme_migrating(cc)) {
 		panic("migration should not happen");

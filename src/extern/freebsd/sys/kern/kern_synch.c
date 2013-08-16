@@ -174,11 +174,13 @@ _sleep(void *ident, struct lock_object *lock, int priority,
 	if (timo && catch) {
       BSD_KASSERTSTR((false), "unimplemented sleepq_timedwait_sig");
 //		rval = sleepq_timedwait_sig(ident, pri);
+      rval = 0;
 	} else if (timo) {
 		rval = sleepq_timedwait(ident, pri);
 	} else if (catch) {
       BSD_KASSERTSTR((false), "unimplemented sleepq_wait_sig");
 //		rval = sleepq_wait_sig(ident, pri);
+      rval = 0;
 	} else {
 		sleepq_wait(ident, pri);
 		rval = 0;
