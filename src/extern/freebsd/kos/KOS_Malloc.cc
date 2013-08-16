@@ -34,7 +34,3 @@ unsigned long KOS_GetMemorySize(void *addr) {
   }
   return 0;
 }
-
-int KOS_GetUpTime() {
-  return getUpTime();
-}

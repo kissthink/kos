@@ -111,12 +111,8 @@ void	_mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file,
 #if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 void	_mtx_assert(struct mtx *m, int what, const char *file, int line);
 #endif
-#ifdef SUKWON
-void	_thread_lock_flags(struct thread *, int, const char *, int);
-#else
 void	_thread_lock_flags(void *, int, const char *, int);
 void _thread_unlock(void *, const char *, int);
-#endif
 
 #define	mtx_trylock_flags_(m, opts, file, line)				\
 	_mtx_trylock((m), (opts), (file), (line))
@@ -127,13 +123,8 @@ void _thread_unlock(void *, const char *, int);
     _thread_lock_flags((tdp), 0, __FILE__, __LINE__)
 #define	thread_lock_flags(tdp, opt)					\
     _thread_lock_flags((tdp), (opt), __FILE__, __LINE__)
-#ifdef SUKWON
-#define	thread_unlock(tdp)						\
-       mtx_unlock_spin((tdp)->td_lock)
-#else
 #define thread_unlock(tdp)            \
     _thread_unlock((tdp), (__FILE__), (__LINE__))
-#endif
 
 #define	mtx_recurse	lock_object.lo_data
 
@@ -339,7 +330,6 @@ extern struct mtx_pool *mtxpool_sleep;
 #define GIANT_REQUIRED
 #endif	/* INVARIANTS */
 
-#ifdef SUKWON
 #define	mtx_lock_flags(m, opts)						\
 	mtx_lock_flags_((m), (opts), LOCK_FILE, LOCK_LINE)
 #define	mtx_unlock_flags(m, opts)					\
@@ -350,18 +340,6 @@ extern struct mtx_pool *mtxpool_sleep;
 	mtx_unlock_spin_flags_((m), (opts), LOCK_FILE, LOCK_LINE)
 #define mtx_trylock_flags(m, opts)					\
 	mtx_trylock_flags_((m), (opts), LOCK_FILE, LOCK_LINE)
-#else
-#define	mtx_lock_flags(m, opts)						\
-	mtx_lock_flags_((m), (opts), __FILE__, __LINE__)
-#define	mtx_unlock_flags(m, opts)					\
-	mtx_unlock_flags_((m), (opts), __FILE__, __LINE__)
-#define	mtx_lock_spin_flags(m, opts)					\
-	mtx_lock_spin_flags_((m), (opts), __FILE__, __LINE__)
-#define	mtx_unlock_spin_flags(m, opts)					\
-	mtx_unlock_spin_flags_((m), (opts), __FILE__, __LINE__)
-#define mtx_trylock_flags(m, opts)					\
-	mtx_trylock_flags_((m), (opts), __FILE__, __LINE__)
-#endif
 #define	mtx_assert(m, what)						\
 	mtx_assert_((m), (what), __FILE__, __LINE__)
 

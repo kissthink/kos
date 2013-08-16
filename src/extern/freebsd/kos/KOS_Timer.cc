@@ -12,6 +12,10 @@ int KOS_Ticks() {
   return Machine::now();  // PIT tick
 }
 
+int KOS_GetUpTime() {
+  return KOS_Ticks() / 1000;
+}
+
 static SpinLock volTickLock;
 static map<ptr_t,int,less<ptr_t>,KernelAllocator<pair<ptr_t,int>>> volTickMap;
 

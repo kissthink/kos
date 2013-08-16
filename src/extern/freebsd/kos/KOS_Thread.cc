@@ -39,7 +39,15 @@ void KOS_ThreadLock(void* thread, const char* file, int line) {
     td->savedInterrupt = Processor::disableInterrupts();
   td->lock_count += 1;
 #endif
-  td->lk.acquire();
+  bool acquired = false;
+  td->savedInterrupt = Processor::disableInterrupts();
+  while ((acquired = td->lk.tryAcquire()) == false) {
+    int i = 0;
+    if (td->savedInterrupt) Processor::enableInterrupts(); // give interrupts a chance while we spin
+    while (i++ < 10000000)
+      Pause();
+    td->savedInterrupt = Processor::disableInterrupts();
+  }
   DBG::outln(DBG::Basic, "acquired threadlock:", FmtHex(thread), " @ ", file, ':', line, " td_count:", td->lock_count);
 }
 
@@ -48,6 +56,7 @@ void KOS_ThreadUnLock(void* thread, const char* file, int line) {
   ThreadData* td = (ThreadData *) thread;
   THREAD_DATA_ASSERT(td);
   td->lk.release();
+  if (td->savedInterrupt) Processor::enableInterrupts();
 #if 0
   td->lock_count -= 1;
   if (td->lock_count == 0) {

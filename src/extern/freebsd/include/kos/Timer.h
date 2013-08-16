@@ -4,6 +4,7 @@
 #include "kos/Basic.h"
 
 EXTERNC int KOS_Ticks();
+EXTERNC int KOS_GetUpTime();
 EXTERNC void KOS_UpdateVolTick(void *td);
 EXTERNC int KOS_GetVolTick(void *td);
 

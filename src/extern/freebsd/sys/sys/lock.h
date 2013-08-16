@@ -135,8 +135,8 @@ struct lock_class {
 #define	LOCK_FILE	__FILE__
 #define	LOCK_LINE	__LINE__
 #else
-#define	LOCK_FILE	NULL
-#define	LOCK_LINE	0
+#define	LOCK_FILE	__FILE__  //NULL
+#define	LOCK_LINE	__LINE__  //0
 #endif
 
 /*

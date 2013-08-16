@@ -114,7 +114,10 @@ enum VM_GUEST { VM_GUEST_NO = 0, VM_GUEST_VM, VM_GUEST_XEN };
  * Otherwise, the kernel will deadlock since the scheduler isn't
  * going to run the thread that holds any lock we need.
  */
+#if 0
 #define	SCHEDULER_STOPPED() __predict_false(curthread->td_stopsched)
+#endif
+#define SCHEDULER_STOPPED() 0
 
 /*
  * XXX the hints declarations are even more misplaced than most declarations

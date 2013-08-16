@@ -66,15 +66,21 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_sleepqueue.c 236344 2012-05-30 2
 #include <sys/systm.h>
 #include <sys/lock.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/sbuf.h>
-#include <sys/sched.h>
 #include <sys/signalvar.h>
 #include <sys/sleepqueue.h>
+
 #include "kos/Kassert.h"
 #include "kos/Thread.h"
 #include "kos/SleepQueue.h"
+#include "kos/Callout.h"
+
+struct timeout_data { // for callout arg
+  void *td;
+  void *wchan;
+};
 
 /*
  * Prototypes for non-exported routines.
@@ -148,12 +154,12 @@ sleepq_add(void *wchan, struct lock_object *lock, const char *wmesg, int flags,
 	sq = sleepq_lookup(wchan);
   
   if (sq == NULL) {
-    sq = KOS_SleepQueueCreateLocked(wchan, wmesg);
+    sq = KOS_SleepQueueCreateLocked(wchan);
   }
 
   td = KOS_CurThread();
   thread_lock(td);
-  KOS_SleepQueueBlockThreadLocked(td, sq); // add me as blocked on sleepqueue
+  KOS_SleepQueueBlockThreadLocked(td, sq, wmesg); // add me as blocked on sleepqueue
 	thread_unlock(td);
 }
 
@@ -164,8 +170,21 @@ sleepq_add(void *wchan, struct lock_object *lock, const char *wmesg, int flags,
 void
 sleepq_set_timeout(void *wchan, int timo)
 {
+  void *td;
   KOS_SleepQueueLockAssert();
-  KOS_SleepQueueResetTimeout(wchan, timo);
+  BSD_KASSERTSTR((wchan != NULL), "null wchan");
+
+  td = KOS_CurThread();
+  if (KOS_GetPerThreadCallout(td) == NULL) {
+    struct callout* co = malloc(sizeof(struct callout), M_TEMP, M_WAITOK);
+    callout_init(co, CALLOUT_MPSAFE);
+    KOS_SetPerThreadCallout(td, co);
+  }
+  struct timeout_data *tdata = malloc(sizeof(struct timeout_data), M_TEMP, M_WAITOK);
+  tdata->td = td;
+  tdata->wchan = wchan;
+  callout_reset_curcpu(KOS_GetPerThreadCallout(td), timo, sleepq_timeout, tdata);
+//  KOS_SleepQueueResetTimeout(wchan, timo);
 }
 
 /*
@@ -182,6 +201,27 @@ sleepq_sleepcnt(void *wchan, int queue)
 	if (sq == NULL)
 		return (0);
   return KOS_SleepQueueBlockedThreadCount(sq);
+}
+
+/*
+ * Check to see if we timed out.
+ */
+static int
+sleepq_check_timeout(void)
+{
+  void *td = KOS_CurThread();
+  // THREAD_LOCK_ASSERT(td, MA_OWNED)
+
+  if (KOS_SleepQueueGetFlags(td) & TDF_TIMEOUT) {
+    KOS_SleepQueueResetFlags(td, TDF_TIMEOUT);
+    return EWOULDBLOCK;
+  }
+
+  if (callout_stop(KOS_GetPerThreadCallout(td)) == 0) {
+    KOS_SleepQueueSetFlags(td, TDF_TIMEOUT);
+    KOS_Suspend(td);
+  }
+  return 0;
 }
 
 /*
@@ -222,7 +262,8 @@ sleepq_timedwait(void *wchan, int pri)
 	td = KOS_CurThread();
 	thread_lock(td);
   KOS_SleepQueueWait(wchan, td);
-  rval = KOS_SleepQueueCheckTimeout(wchan);
+//  rval = KOS_SleepQueueCheckTimeout(wchan);
+  rval = sleepq_check_timeout();
 	thread_unlock(td);
 
 	return (rval);
@@ -282,7 +323,6 @@ sleepq_broadcast(void *wchan, int flags, int pri, int queue)
   return 0;
 }
 
-#if 0
 /*
  * Time sleeping threads out.  When the timeout expires, the thread is
  * removed from the sleep queue and made runnable if it is still asleep.
@@ -290,35 +330,24 @@ sleepq_broadcast(void *wchan, int flags, int pri, int queue)
 static void
 sleepq_timeout(void *arg)
 {
-	struct sleepqueue_chain *sc;
-	struct sleepqueue *sq;
-	struct thread *td;
+	void *td;
 	void *wchan;
-	int wakeup_swapper;
+  struct timeout_data *tdata = (struct timeout_data *)arg;
 
-	td = arg;
-	wakeup_swapper = 0;
-	CTR3(KTR_PROC, "sleepq_timeout: thread %p (pid %ld, %s)",
-	    (void *)td, (long)td->td_proc->p_pid, (void *)td->td_name);
+  td = tdata->td;
+  wchan = tdata->wchan;
 
 	/*
 	 * First, see if the thread is asleep and get the wait channel if
 	 * it is.
 	 */
 	thread_lock(td);
-	if (TD_IS_SLEEPING(td) && TD_ON_SLEEPQ(td)) {
-		wchan = td->td_wchan;
-		sc = SC_LOOKUP(wchan);
-		THREAD_LOCKPTR_ASSERT(td, &sc->sc_lock);
-		sq = sleepq_lookup(wchan);
-		MPASS(sq != NULL);
-		td->td_flags |= TDF_TIMEOUT;
-		wakeup_swapper = sleepq_resume_thread(sq, td, 0);
-		thread_unlock(td);
-		if (wakeup_swapper)
-			kick_proc0();
-		return;
-	}
+  if (KOS_SleepQueueIsSleeping(td) && KOS_OnSleepQueue(td)) {
+    KOS_SleepQueueSetFlags(td, TDF_TIMEOUT);
+    KOS_SleepQueueWakeupThread(td, wchan);
+    thread_unlock(td);
+    return;
+  }
 
 	/*
 	 * If the thread is on the SLEEPQ but isn't sleeping yet, it
@@ -326,11 +355,11 @@ sleepq_timeout(void *arg)
 	 * one of the sleepq_*wait*() routines or it can be in
 	 * sleepq_catch_signals().
 	 */
-	if (TD_ON_SLEEPQ(td)) {
-		td->td_flags |= TDF_TIMEOUT;
-		thread_unlock(td);
-		return;
-	}
+  if (KOS_OnSleepQueue(td)) {
+    KOS_SleepQueueSetFlags(td, TDF_TIMEOUT);
+    thread_unlock(td);
+    return;
+  }
 
 	/*
 	 * Now check for the edge cases.  First, if TDF_TIMEOUT is set,
@@ -341,18 +370,15 @@ sleepq_timeout(void *arg)
 	 * to let it know that the timeout has already run and doesn't
 	 * need to be canceled.
 	 */
-	if (td->td_flags & TDF_TIMEOUT) {
-		MPASS(TD_IS_SLEEPING(td));
-		td->td_flags &= ~TDF_TIMEOUT;
-		TD_CLR_SLEEPING(td);
-		wakeup_swapper = setrunnable(td);
-	} else
-		td->td_flags |= TDF_TIMOFAIL;
+  if (KOS_SleepQueueGetFlags(td) & TDF_TIMEOUT) {
+    KOS_SleepQueueResetFlags(td, TDF_TIMEOUT);
+    KOS_SleepQueueSetSleeping(td, 0);
+    KOS_ScheduleLocked(td, 0);
+  } else {
+    KOS_SleepQueueSetFlags(td, TDF_TIMOFAIL);
+  }
 	thread_unlock(td);
-	if (wakeup_swapper)
-		kick_proc0();
 }
-#endif
 
 /*
  * Resumes a specific thread from the sleep queue associated with a specific

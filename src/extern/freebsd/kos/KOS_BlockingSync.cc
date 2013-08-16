@@ -264,8 +264,7 @@ void KOS_MutexLock(ptr_t mtx, int opts, const char* file, int line) {
         "recursed on non-recursive mutex @ ", file, ':', line); 
 
   bool debug = !(opts & LOP_QUIET);
-  if (debug)
-    DBG::outln(DBG::Lock, "KOS_MutexLock:", FmtHex(lw), " @ ", file, ':', line);
+  if (debug) DBG::outln(DBG::Lock, "KOS_MutexLock:", FmtHex(lw), " @ ", file, ':', line);
   lw->acquire(debug);  // acquire lock!
 }
 
@@ -277,8 +276,7 @@ void KOS_MutexUnLock(ptr_t mtx, int opts, const char* file, int line) {
   lockMapLock.release();
 
   bool debug = !(opts & LOP_QUIET);
-  if (debug)
-    DBG::outln(DBG::Lock, "KOS_MutexUnLock:", FmtHex(lw), " @ ", file, ':', line);
+  if (debug) DBG::outln(DBG::Lock, "KOS_MutexUnLock:", FmtHex(lw), " @ ", file, ':', line);
   lw->release(debug);  // release lock!
 }
 

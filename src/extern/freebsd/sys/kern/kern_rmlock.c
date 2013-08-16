@@ -47,15 +47,13 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_rmlock.c 235404 2012-05-13 17:01
 #define RMPF_ONQUEUE	1
 #define RMPF_SIGNAL	2
 
+// TODO: Please Fix, this implementation is not complete
+
 /*
  * To support usage of rmlock in CVs and msleep yet another list for the
  * priority tracker would be needed.  Using this lock for cv and msleep also
  * does not seem very useful
  */
-
-static __inline void compiler_memory_barrier(void) {
-	__asm __volatile("":::"memory");
-}
 
 static void	assert_rm(struct lock_object *lock, int what);
 static void	lock_rm(struct lock_object *lock, int how);

@@ -14,13 +14,8 @@ using namespace std;
 struct SleepQueue {
   ptr_t wchan;
   list<ThreadData*,KernelAllocator<ThreadData*>> blocked;
-  const char* wmesg;
-  bool timeout_checked;
-  bool timedout;
-  mword timeout;
 
-  SleepQueue(ptr_t wchan, const char* wmesg) : wchan(wchan), wmesg(wmesg),
-      timeout_checked(false), timedout(false), timeout(0) {}
+  SleepQueue(ptr_t wchan) : wchan(wchan) {}
 };
 
 static RecursiveSpinLock sqLock;  // global lock for sleep queue
@@ -58,27 +53,20 @@ int KOS_OnSleepQueue(ptr_t td) {
   return (threadData->wchan) ? 1 : 0;
 }
 
-ptr_t KOS_SleepQueueCreateLocked(ptr_t wchan, const char* wmesg) {
+ptr_t KOS_SleepQueueCreateLocked(ptr_t wchan) {
   KOS_SleepQueueLockAssert();
   KASSERTN(sqMap.count(wchan) == 0, "sleepqueue for wchan:", FmtHex(wchan), " exists.");
-  sqMap[wchan] = new SleepQueue(wchan, wmesg);
+  sqMap[wchan] = new SleepQueue(wchan);
   return sqMap[wchan];
 }
 
-void KOS_SleepQueueBlockThreadLocked(ptr_t td, ptr_t sq) {
+void KOS_SleepQueueBlockThreadLocked(ptr_t td, ptr_t sq, const char* wmesg) {
   KOS_SleepQueueLockAssert();
   SleepQueue* sleepq = (SleepQueue *)sq;
   KASSERT1(sqMap[sleepq->wchan] == sleepq, "sleepqueue conflict");
   ((ThreadData *)td)->wchan = sleepq->wchan;
+  ((ThreadData *)td)->wmesg = wmesg;
   sleepq->blocked.push_back((ThreadData *)td);
-}
-
-void KOS_SleepQueueResetTimeout(ptr_t wchan, int timeout) {
-  // TODO: use callout
-  KASSERT1(timeout >= 0, timeout);
-  if (timeout == 0) {
-    timeout = 1;
-  }
 }
 
 unsigned int KOS_SleepQueueBlockedThreadCount(ptr_t sq) {
@@ -103,28 +91,8 @@ void KOS_SleepQueueWait(ptr_t wchan, ptr_t td) {
   ThreadData* threadData = (ThreadData *)td;
   KASSERT1(threadData->thread == Processor::getCurrThread(),
       "cannot sleep as some other thread");
-  sleepq->timeout_checked = false;
+  ((ThreadData *)td)->sleeping = true;
   kernelScheduler.suspend(sqLock);
-  sqLock.acquire();
-  if (sleepq->timeout >= Machine::now() && !sleepq->timeout_checked) {
-    sleepq->timedout = true;
-  }
-  if (sleepq->timeout_checked) {
-    sleepq->timeout_checked = false;
-    sleepq->timedout = false;
-    sleepq->timeout = 0;
-  }
-  sqLock.release();
-}
-
-int KOS_SleepQueueCheckTimeout(ptr_t wchan) {
-  ScopedLock<RecursiveSpinLock> lo(sqLock);
-  KASSERTN(sqMap.count(wchan), "sleepqueue for wchan:", FmtHex(wchan), " does not exists.");
-  SleepQueue* sleepq = (SleepQueue *)sqMap[wchan];
-  int timedout = sleepq->timedout;
-  sleepq->timeout_checked = true;
-  sleepq->timedout = false;
-  return timedout ? 1 : 0;
 }
 
 void KOS_SleepQueueWakeupOne(ptr_t sq) {
@@ -133,7 +101,8 @@ void KOS_SleepQueueWakeupOne(ptr_t sq) {
   KASSERT1(sqMap[sleepq->wchan] == sleepq, "sleepqueue conflict");
   KASSERT1(!sleepq->blocked.empty(), "no threads are blocked");
   ThreadData* td = (ThreadData *)sleepq->blocked.front();
-  td->wchan = nullptr;
+  td->wchan = nullptr;  // for KOS_OnSleepQueue
+  td->sleeping = false;
   sleepq->blocked.pop_front();
   kernelScheduler.start(*td->thread);
 }
@@ -145,7 +114,8 @@ void KOS_SleepQueueWakeup(ptr_t sq) {
   KASSERT1(!sleepq->blocked.empty(), "no threads are blocked");
   while (!sleepq->blocked.empty()) {
     ThreadData* td = (ThreadData *)sleepq->blocked.front();
-    td->wchan = nullptr;
+    td->wchan = nullptr;  // for KOS_OnSleepQueue
+    td->sleeping = false;
     sleepq->blocked.pop_front();
     kernelScheduler.start(*td->thread);
   }
@@ -157,10 +127,42 @@ void KOS_SleepQueueWakeupThread(ptr_t td, ptr_t wchan) {
   SleepQueue* sleepq = (SleepQueue *) sqMap[wchan];
   for (ThreadData* threadData : sleepq->blocked) {
     if (threadData == td) {
-      threadData->wchan = nullptr;
+      threadData->wchan = nullptr;  // for KOS_OnSleepQueue
+      threadData->sleeping = false;
       sleepq->blocked.remove(threadData);
       kernelScheduler.start(*threadData->thread);
       break;
     }
   }
+}
+
+int KOS_SleepQueueGetFlags(ptr_t td) {
+  ThreadData* threadData = (ThreadData *)td;
+  ScopedLock<> lo(threadData->lk);
+  return threadData->flags;
+}
+
+void KOS_SleepQueueSetFlags(ptr_t td, int val) {
+  ThreadData* threadData = (ThreadData *)td;
+  ScopedLock<> lo(threadData->lk);
+  threadData->flags |= val;
+}
+
+void KOS_SleepQueueResetFlags(ptr_t td, int val) {
+  ThreadData* threadData = (ThreadData *)td;
+  ScopedLock<> lo(threadData->lk);
+  threadData->flags &= ~val;
+}
+
+void KOS_SleepQueueSetSleeping(ptr_t td, int val) {
+  ThreadData* threadData = (ThreadData *)td;
+  ScopedLock<> lo(threadData->lk);
+  if (val) threadData->sleeping = true;
+  else threadData->sleeping = false;
+}
+
+int KOS_SleepQueueIsSleeping(ptr_t td) {
+  ThreadData* threadData = (ThreadData *)td;
+  ScopedLock<> lo(threadData->lk);
+  return threadData->sleeping ? 1 : 0;
 }

@@ -65,32 +65,6 @@ struct lock_class lock_class_rw = {
 	.lc_unlock = unlock_rw,
 };
 
-/*
- * Return a pointer to the owning thread if the lock is write-locked or
- * NULL if the lock is unlocked or read-locked.
- */
-#define	rw_wowner(rw)							\
-	((rw)->rw_lock & RW_LOCK_READ ? NULL :				\
-	    (struct thread *)RW_OWNER((rw)->rw_lock))
-
-/*
- * Returns if a write owner is recursed.  Write ownership is not assured
- * here and should be previously checked.
- */
-#define	rw_recursed(rw)		((rw)->rw_recurse != 0)
-
-/*
- * Return true if curthread helds the lock.
- */
-#define	rw_wlocked(rw)		(rw_wowner((rw)) == curthread)
-
-/*
- * Return a pointer to the owning thread for this lock who should receive
- * any priority lent by threads that block on this lock.  Currently this
- * is identical to rw_wowner().
- */
-#define	rw_owner(rw)		rw_wowner(rw)
-
 #ifndef INVARIANTS
 #define	_rw_assert(rw, what, file, line)
 #endif
@@ -98,7 +72,6 @@ struct lock_class lock_class_rw = {
 void
 assert_rw(struct lock_object *lock, int what)
 {
-
 	rw_assert((struct rwlock *)lock, what);
 }
 
@@ -162,7 +135,6 @@ rw_init_flags(struct rwlock *rw, const char *name, int opts)
 void
 rw_destroy(struct rwlock *rw)
 {
-
 	KASSERT(rw->rw_lock == RW_UNLOCKED, ("rw lock %p not unlocked", rw));
 	KASSERT(rw->rw_recurse == 0, ("rw lock %p still recursed", rw));
 	rw->rw_lock = RW_DESTROYED;
@@ -188,16 +160,15 @@ rw_sysinit_flags(void *arg)
 int
 rw_wowned(struct rwlock *rw)
 {
-
   return KOS_RWLockOwned(rw);
 }
 
 void
 _rw_wlock(struct rwlock *rw, const char *file, int line)
 {
-
 	if (SCHEDULER_STOPPED())
 		return;
+
 	KASSERT(rw->rw_lock != RW_DESTROYED,
 	    ("rw_wlock() of destroyed rwlock @ %s:%d", file, line));
   KOS_RWLockWriteLock(rw, file, line);
@@ -218,25 +189,13 @@ _rw_try_wlock(struct rwlock *rw, const char *file, int line)
 void
 _rw_wunlock(struct rwlock *rw, const char *file, int line)
 {
-
 	if (SCHEDULER_STOPPED())
 		return;
+
 	KASSERT(rw->rw_lock != RW_DESTROYED,
 	    ("rw_wunlock() of destroyed rwlock @ %s:%d", file, line));
   KOS_RWLockWriteUnLock(rw, file, line);
 }
-
-/*
- * Determines whether a new reader can acquire a lock.  Succeeds if the
- * reader already owns a read lock and the lock is locked for read to
- * prevent deadlock from reader recursion.  Also succeeds if the lock
- * is unlocked and has no writer waiters or spinners.  Failing otherwise
- * prioritizes writers before readers.
- */
-#define	RW_CAN_READ(_rw)						\
-    ((curthread->td_rw_rlocks && (_rw) & RW_LOCK_READ) || ((_rw) &	\
-    (RW_LOCK_READ | RW_LOCK_WRITE_WAITERS | RW_LOCK_WRITE_SPINNER)) ==	\
-    RW_LOCK_READ)
 
 void
 _rw_rlock(struct rwlock *rw, const char *file, int line)
@@ -246,7 +205,6 @@ _rw_rlock(struct rwlock *rw, const char *file, int line)
 
 	KASSERT(rw->rw_lock != RW_DESTROYED,
 	    ("rw_rlock() of destroyed rwlock @ %s:%d", file, line));
-
   KOS_RWLockReadLock(rw, file, line);
 }
 
@@ -267,7 +225,6 @@ _rw_runlock(struct rwlock *rw, const char *file, int line)
 
 	KASSERT(rw->rw_lock != RW_DESTROYED,
 	    ("rw_runlock() of destroyed rwlock @ %s:%d", file, line));
-
   KOS_RWLockReadUnLock(rw, file, line);
 }
 

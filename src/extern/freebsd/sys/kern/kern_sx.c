@@ -169,7 +169,7 @@ _sx_slock(struct sx *sx, int opts, const char *file, int line)
 		return (0);
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
 	    ("sx_slock() of destroyed sx @ %s:%d", file, line));
-	error = __sx_slock(sx, opts, file, line);
+	error = _sx_slock_hard(sx, opts, file, line);
 
 	return (error);
 }
@@ -192,7 +192,7 @@ _sx_xlock(struct sx *sx, int opts, const char *file, int line)
 		return (0);
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
 	    ("sx_xlock() of destroyed sx @ %s:%d", file, line));
-	error = __sx_xlock(sx, curthread, opts, file, line);
+	error = _sx_xlock_hard(sx, 0 /* unused */, opts, file, line);
 
 	return (error);
 }
@@ -216,7 +216,7 @@ _sx_sunlock(struct sx *sx, const char *file, int line)
 		return;
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
 	    ("sx_sunlock() of destroyed sx @ %s:%d", file, line));
-	__sx_sunlock(sx, file, line);
+	_sx_sunlock_hard(sx, file, line);
 }
 
 void
@@ -226,7 +226,7 @@ _sx_xunlock(struct sx *sx, const char *file, int line)
 		return;
 	KASSERT(sx->sx_lock != SX_LOCK_DESTROYED,
 	    ("sx_xunlock() of destroyed sx @ %s:%d", file, line));
-	__sx_xunlock(sx, curthread, file, line);
+	_sx_xunlock_hard(sx, 0 /* unused */, file, line);
 }
 
 /*

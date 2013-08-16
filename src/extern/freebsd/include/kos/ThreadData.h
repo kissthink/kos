@@ -17,9 +17,13 @@ struct ThreadData {
   int lock_count;
   bool savedInterrupt;
   ptr_t wchan;
+  const char* wmesg;
+  int flags;
+  bool sleeping;
 
   ThreadData(Thread *t) : thread(t), func(nullptr), arg(nullptr), running(false),
-      td_inhibitors(0), lock_count(0), savedInterrupt(false), wchan(nullptr) {}
+      td_inhibitors(0), lock_count(0), savedInterrupt(false), wchan(nullptr), wmesg(nullptr),
+      flags(0), sleeping(false) {}
 };
 
 #endif /* _KOS_ThreadData_h_ */
