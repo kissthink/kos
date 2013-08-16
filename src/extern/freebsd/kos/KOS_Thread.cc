@@ -169,6 +169,10 @@ void KOS_Suspend(ptr_t thread) {
     td->lk.acquire();
 }
 
+void KOS_Yield() {
+  kernelScheduler.yield();
+}
+
 void critical_enter() {
   Processor::incLockCount();
 }

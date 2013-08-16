@@ -7,6 +7,8 @@ EXTERNC void KOS_SleepQueueLockAssert();
 EXTERNC void KOS_SleepQueueLock();
 EXTERNC void KOS_SleepQueueUnLock();
 EXTERNC void *KOS_SleepQueueLookUpLocked(void *wchan);
+EXTERNC void *KOS_SleepQueueGetChannel(void *td);
+EXTERNC int  KOS_OnSleepQueue(void *td);
 EXTERNC void *KOS_SleepQueueCreateLocked(void *wchan, const char *wmesg);
 EXTERNC void KOS_SleepQueueBlockThreadLocked(void *td, void *sq);
 EXTERNC void KOS_SleepQueueResetTimeout(void *wchan, int timeout);

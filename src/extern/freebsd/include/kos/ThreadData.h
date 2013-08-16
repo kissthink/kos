@@ -16,9 +16,10 @@ struct ThreadData {
   int td_inhibitors;
   int lock_count;
   bool savedInterrupt;
+  ptr_t wchan;
 
   ThreadData(Thread *t) : thread(t), func(nullptr), arg(nullptr), running(false),
-      td_inhibitors(0), lock_count(0), savedInterrupt(false) {}
+      td_inhibitors(0), lock_count(0), savedInterrupt(false), wchan(nullptr) {}
 };
 
 #endif /* _KOS_ThreadData_h_ */

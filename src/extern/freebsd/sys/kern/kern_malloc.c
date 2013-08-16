@@ -417,7 +417,7 @@ free(void *addr, struct malloc_type *mtp)
 #ifdef SUKWON
 	uma_slab_t slab;
 #endif
-	u_long size;
+	u_long size = 0;
 
 #ifdef SUKWON
 	KASSERT(mtp->ks_magic == M_MAGIC, ("free: bad malloc type magic"));

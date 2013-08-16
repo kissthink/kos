@@ -17,6 +17,7 @@ EXTERNC void *KOS_ThreadCreate(void (*func)(void *), void *arg, int flags, const
 EXTERNC void KOS_Schedule(void *thread, int priority);
 EXTERNC void KOS_ScheduleLocked(void *thread, int priority);
 EXTERNC void KOS_Suspend(void *thread);
+EXTERNC void KOS_Yield();
 EXTERNC void critical_enter();
 EXTERNC void critical_exit();
 

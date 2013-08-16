@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_intr.c 239437 2012-08-20 15:19:3
 
 #ifndef SUKWON
 #include "kos/Thread.h"
+#include "kos/Timer.h"
 //#undef thread_lock
 //#undef thread_unlock
 #undef TD_AWAITING_INTR
@@ -1047,6 +1048,7 @@ ithread_loop(void *arg)
 #ifdef SUKWON
 			mi_switch(SW_VOL | SWT_IWAIT, NULL);
 #else
+      KOS_UpdateVolTick(td);
       KOS_Suspend(td);
 #endif
 		}
