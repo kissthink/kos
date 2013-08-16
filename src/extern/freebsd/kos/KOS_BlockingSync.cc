@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "ipc/BlockingSync.h"
 #include "ipc/SpinLock.h"
+#include "ipc/RecursiveSpinLock.h"
 #include "ipc/ReadWriteLock.h"
 #include "util/Output.h"
 
@@ -142,28 +143,32 @@ struct LockWrapper {
   ptr_t lock;
   MutexType type;
   Thread* owner;
-  virtual void acquire() = 0;
-  virtual void release() = 0;
-  virtual bool tryAcquire() = 0;
+  virtual void acquire(bool debug = true) = 0;
+  virtual void release(bool debug = true) = 0;
+  virtual bool tryAcquire(bool debug = true) = 0;
 };
 
 struct MutexWrapper : public LockWrapper {
   MutexWrapper(Mutex* mtx) : LockWrapper(mtx, MutexType::MUTEX) {}
-  void acquire() {
+  void acquire(bool debug) {
     Mutex* mtx = static_cast<Mutex*>(lock);
-    DBG::outln(DBG::Basic, "acquiring mutex:", FmtHex(mtx), " thread:", FmtHex(Processor::getCurrThread()));
+    if (debug) DBG::outln(DBG::Lock, "acquiring mutex:", FmtHex(mtx),
+          " thread:", FmtHex(Processor::getCurrThread()));
     mtx->acquire();
     owner = Processor::getCurrThread();
-    DBG::outln(DBG::Basic, "acquired mutex:", FmtHex(mtx), " thread:", FmtHex(Processor::getCurrThread()));
+    if (debug) DBG::outln(DBG::Lock, "acquired mutex:", FmtHex(mtx),
+          " thread:", FmtHex(Processor::getCurrThread()));
   }
-  void release() {
+  void release(bool debug) {
     Mutex* mtx = static_cast<Mutex*>(lock);
     owner = nullptr;
-    DBG::outln(DBG::Basic, "releasing mutex:", FmtHex(mtx), " thread:", FmtHex(Processor::getCurrThread()));
+    if (debug) DBG::outln(DBG::Lock, "releasing mutex:", FmtHex(mtx),
+          " thread:", FmtHex(Processor::getCurrThread()));
     mtx->release();
-    DBG::outln(DBG::Basic, "released mutex:", FmtHex(mtx), " thread:", FmtHex(Processor::getCurrThread()));
+    if (debug) DBG::outln(DBG::Lock, "released mutex:", FmtHex(mtx),
+          " thread:", FmtHex(Processor::getCurrThread()));
   }
-  bool tryAcquire() {
+  bool tryAcquire(bool debug) {
     Mutex* mtx = static_cast<Mutex*>(lock);
     bool acquired = mtx->tryAcquire();
     if (acquired)
@@ -176,7 +181,7 @@ struct RecursiveMutexWrapper : public LockWrapper {
   int recurse;
   SpinLock lk;
   RecursiveMutexWrapper(RecursiveMutex* mtx) : LockWrapper(mtx, MutexType::RECURSIVE_MUTEX), recurse(0) {}
-  void acquire() {
+  void acquire(bool debug) {
     RecursiveMutex* mtx = static_cast<RecursiveMutex*>(lock);
     mtx->acquire();
     ScopedLock<> lo(lk);
@@ -184,7 +189,7 @@ struct RecursiveMutexWrapper : public LockWrapper {
     if (recurse == 1)
       owner = Processor::getCurrThread();
   }
-  void release() {
+  void release(bool debug) {
     RecursiveMutex* mtx = static_cast<RecursiveMutex*>(lock);
     ScopedLock<> lo(lk);
     recurse -= 1;
@@ -192,7 +197,7 @@ struct RecursiveMutexWrapper : public LockWrapper {
       owner = nullptr;
     mtx->release();
   }
-  bool tryAcquire() {
+  bool tryAcquire(bool debug) {
     RecursiveMutex* mtx = static_cast<RecursiveMutex*>(lock);
     bool acquired = mtx->tryAcquire();
     if (acquired) {
@@ -208,17 +213,17 @@ struct RecursiveMutexWrapper : public LockWrapper {
 
 struct SpinLockWrapper : public LockWrapper {
   SpinLockWrapper(SpinLock* mtx) : LockWrapper(mtx, MutexType::SPINLOCK) {}
-  void acquire() {
+  void acquire(bool debug) {
     SpinLock* lk = static_cast<SpinLock*>(lock);
     lk->acquire();
-    DBG::outln(DBG::Basic, "acquired spinlock:", FmtHex(lk));
+    if (debug) DBG::outln(DBG::Lock, "acquired spinlock:", FmtHex(lk));
   }
-  void release() {
+  void release(bool debug) {
     SpinLock* lk = static_cast<SpinLock*>(lock);
     lk->release();
-    DBG::outln(DBG::Basic, "released spinlock:", FmtHex(lk));
+    if (debug) DBG::outln(DBG::Lock, "released spinlock:", FmtHex(lk));
   }
-  bool tryAcquire() {
+  bool tryAcquire(bool debug) {
     SpinLock* lk = static_cast<SpinLock*>(lock);
     return lk->tryAcquire();
   }
@@ -226,15 +231,15 @@ struct SpinLockWrapper : public LockWrapper {
 
 struct RecursiveSpinLockWrapper : public LockWrapper {
   RecursiveSpinLockWrapper(RecursiveSpinLock* mtx) : LockWrapper(mtx, MutexType::RECURSIVE_SPINLOCK) {}
-  void acquire () {
+  void acquire (bool debug) {
     RecursiveSpinLock* lk = static_cast<RecursiveSpinLock*>(lock);
     lk->acquire();
   }
-  void release() {
+  void release(bool debug) {
     RecursiveSpinLock* lk = static_cast<RecursiveSpinLock*>(lock);
     lk->release();
   }
-  bool tryAcquire() {
+  bool tryAcquire(bool debug) {
     RecursiveSpinLock* lk = static_cast<RecursiveSpinLock*>(lock);
     return lk->tryAcquire();
   }
@@ -244,6 +249,8 @@ struct RecursiveSpinLockWrapper : public LockWrapper {
 
 static SpinLock lockMapLock;
 static map<ptr_t,LockWrapper*,less<ptr_t>,KernelAllocator<pair<ptr_t,LockWrapper*>>> lockMap; 
+
+#define LOP_QUIET 0x00000002  // do not log
 
 // mutex/recursive mutex
 void KOS_MutexLock(ptr_t mtx, int opts, const char* file, int line) {
@@ -256,8 +263,10 @@ void KOS_MutexLock(ptr_t mtx, int opts, const char* file, int line) {
     KASSERTN(lw->type == MutexType::RECURSIVE_MUTEX || lw->type == MutexType::RECURSIVE_SPINLOCK,
         "recursed on non-recursive mutex @ ", file, ':', line); 
 
-  DBG::outln(DBG::Basic, "KOS_MutexLock:", FmtHex(lw), " @ ", file, ':', line);
-  lw->acquire();  // acquire lock!
+  bool debug = !(opts & LOP_QUIET);
+  if (debug)
+    DBG::outln(DBG::Lock, "KOS_MutexLock:", FmtHex(lw), " @ ", file, ':', line);
+  lw->acquire(debug);  // acquire lock!
 }
 
 void KOS_MutexUnLock(ptr_t mtx, int opts, const char* file, int line) {
@@ -267,8 +276,10 @@ void KOS_MutexUnLock(ptr_t mtx, int opts, const char* file, int line) {
   LockWrapper* lw = lockMap[mtx];
   lockMapLock.release();
 
-  DBG::outln(DBG::Basic, "KOS_MutexUnLock:", FmtHex(lw), " @ ", file, ':', line);
-  lw->release();  // release lock!
+  bool debug = !(opts & LOP_QUIET);
+  if (debug)
+    DBG::outln(DBG::Lock, "KOS_MutexUnLock:", FmtHex(lw), " @ ", file, ':', line);
+  lw->release(debug);  // release lock!
 }
 
 int KOS_MutexTryLock(ptr_t mtx, int opts, const char* file, int line) {
@@ -281,16 +292,13 @@ int KOS_MutexTryLock(ptr_t mtx, int opts, const char* file, int line) {
   return lw->tryAcquire() ? 1 : 0;
 }
 
-// SHOULD MATCH with sys/sys/mutex.h
-#define MTX_DEF     0x00000000
-#define MTX_SPIN    0x00000001
-#define MTX_RECURSE 0x00000004
+// SHOULD MATCH with sys/sys/lock.h
+#define LO_RECURSABLE 0x00080000
 
-void KOS_MutexInit(ptr_t mtx, int flags) {
+void KOS_MutexInit(ptr_t mtx, int flags, int spin) {
   KASSERT1(mtx, "null mutex");
-//  DBG::outln(DBG::Basic, "KOS_MutexInit() - flags:", FmtHex(flags));
-  if (flags & MTX_SPIN) {
-    if (flags & MTX_RECURSE) {
+  if (spin) {
+    if (flags & LO_RECURSABLE) {
       RecursiveSpinLock* l = new RecursiveSpinLock;
       lockMapLock.acquire();
       KASSERTN(!lockMap.count(mtx), "KOS lock already exists for mutex ", FmtHex(mtx));
@@ -304,7 +312,7 @@ void KOS_MutexInit(ptr_t mtx, int flags) {
       lockMapLock.release();
     }
   } else {
-    if (flags & MTX_RECURSE) {
+    if (flags & LO_RECURSABLE) {
       RecursiveMutex* m = new RecursiveMutex;
       lockMapLock.acquire();
       KASSERTN(!lockMap.count(mtx), "KOS lock already exists for mutex ", FmtHex(mtx));

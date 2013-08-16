@@ -19,6 +19,8 @@
 
 #include "mach/platform.h"
 
+extern "C" void callout_tick(); // from FreeBSD code
+
 class PIT {
   static const int frequency = 1000;
   volatile mword currentTick;
@@ -27,6 +29,7 @@ public:
   void init() volatile                                 __section(".boot.text");
   void staticInterruptHandler() volatile {
     currentTick += 1;
+    callout_tick(); // fires swi interrupt for callout
   }
   void wait(mword miliseconds) volatile {
     mword start = currentTick;

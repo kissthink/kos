@@ -68,16 +68,16 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_intr.c 239437 2012-08-20 15:19:3
 
 #ifndef SUKWON
 #include "kos/Thread.h"
-#undef thread_lock
-#undef thread_unlock
+//#undef thread_lock
+//#undef thread_unlock
 #undef TD_AWAITING_INTR
 #undef TD_SET_IWAIT
 #undef TD_CLR_IWAIT
 #undef THREAD_NO_SLEEPING   // TODO implement later
 #undef THREAD_SLEEPING_OK
 
-#define thread_lock(tdp)      KOS_ThreadLock((tdp))
-#define thread_unlock(tdp)    KOS_ThreadUnLock((tdp))
+//#define thread_lock(tdp)      KOS_ThreadLock((tdp))
+//#define thread_unlock(tdp)    KOS_ThreadUnLock((tdp))
 #define TD_AWAITING_INTR(td)  KOS_AWAITING_INTR((td), TDI_IWAIT)
 #define TD_SET_IWAIT(td)      KOS_TD_SET_IWAIT((td), TDI_IWAIT)
 #define TD_CLR_IWAIT(td)      KOS_TD_CLR_IWAIT((td), TDI_IWAIT)
@@ -108,11 +108,11 @@ struct	intr_event *tty_intr_event;
 void	*vm_ih;
 struct proc *intrproc;
 
-#ifdef SUKWON
+//#ifdef SUKWON
 static MALLOC_DEFINE(M_ITHREAD, "ithread", "Interrupt Threads");
-#else
-#define M_ITHREAD 0
-#endif
+//#else
+//#define M_ITHREAD 0
+//#endif
 
 #ifdef SUKWON
 static int intr_storm_threshold = 1000;

@@ -20,6 +20,7 @@
 #include "extern/stl/mod_list"
 #include "extern/stl/mod_set"
 #include "ipc/SpinLock.h"
+#include "ipc/RecursiveSpinLock.h"
 
 class Thread;
 
@@ -52,6 +53,12 @@ public:
   void suspend(volatile SpinLock& rl) {
     ScopedLock<> lo(lk);
     rl.release();
+    schedule();
+  }
+  void suspend(volatile RecursiveSpinLock& rl) {
+    ScopedLock<> lo(lk);
+    rl.release();
+    KASSERT1(!rl.isOwner(), "still being recursed");
     schedule();
   }
   void suspend() {

@@ -254,6 +254,8 @@ _mtx_unlock_spin_flags(struct mtx *m, int opts, const char *file, int line)
 
 #ifdef SUKWON
 	__mtx_unlock_spin(m);
+#else
+  KOS_MutexUnLock(m, opts, file, line);
 #endif
 }
 
@@ -620,7 +622,7 @@ mtx_init(struct mtx *m, const char *name, const char *type, int opts)
 	m->mtx_recurse = 0;
 
 	lock_init(&m->lock_object, class, name, type, flags);
-  KOS_MutexInit(m, flags);
+  KOS_MutexInit(m, flags, opts & MTX_SPIN);
 }
 
 /*
@@ -665,6 +667,7 @@ mutex_init(void)
 #ifdef SUKWON
 	/* Setup turnstiles so that sleep mutexes work. */
 	init_turnstiles();
+#endif
 
 	/*
 	 * Initialize mutexes.
@@ -672,9 +675,10 @@ mutex_init(void)
 	mtx_init(&Giant, "Giant", NULL, MTX_DEF | MTX_RECURSE);
 	mtx_init(&blocked_lock, "blocked lock", NULL, MTX_SPIN);
 	blocked_lock.mtx_lock = 0xdeadc0de;	/* Always blocked. */
+#ifdef SUKWON
 	mtx_init(&proc0.p_mtx, "process lock", NULL, MTX_DEF | MTX_DUPOK);
 	mtx_init(&proc0.p_slock, "process slock", NULL, MTX_SPIN | MTX_RECURSE);
-	mtx_init(&devmtx, "cdev", NULL, MTX_DEF);
-	mtx_lock(&Giant);
+	mtx_init(&devmtx, "cdev", NULL, MTX_DEF); // TODO uncomment later
 #endif
+	mtx_lock(&Giant);
 }
