@@ -27,10 +27,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_intr.c 239437 2012-08-20 15:19:34Z kan $");
 
-#ifdef SUKWON
-#include "opt_ddb.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -39,26 +35,14 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_intr.c 239437 2012-08-20 15:19:3
 #include <sys/systm.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
-#ifdef SUKWON
-#include <sys/kthread.h>
-#endif
-#include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
-#include <sys/random.h>
-#ifdef SUKWON
-#include <sys/resourcevar.h>
-#endif
 #include <sys/sched.h>
 #include <sys/smp.h>
-#include <sys/sysctl.h>
-#ifdef SUKWON
-#include <sys/syslog.h>
-#endif
 #include <sys/unistd.h>
 #include <sys/vmmeter.h>
 #include <machine/atomic.h>
@@ -66,38 +50,19 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/kern_intr.c 239437 2012-08-20 15:19:3
 #include <machine/md_var.h>
 #include <machine/stdarg.h>
 
-#ifndef SUKWON
+#include "kos/Kassert.h"
+#include "kos/Interrupt.h"
 #include "kos/Thread.h"
 #include "kos/Timer.h"
-//#undef thread_lock
-//#undef thread_unlock
-#undef TD_AWAITING_INTR
-#undef TD_SET_IWAIT
-#undef TD_CLR_IWAIT
-#undef THREAD_NO_SLEEPING   // TODO implement later
-#undef THREAD_SLEEPING_OK
-
-//#define thread_lock(tdp)      KOS_ThreadLock((tdp))
-//#define thread_unlock(tdp)    KOS_ThreadUnLock((tdp))
-#define TD_AWAITING_INTR(td)  KOS_AWAITING_INTR((td), TDI_IWAIT)
-#define TD_SET_IWAIT(td)      KOS_TD_SET_IWAIT((td), TDI_IWAIT)
-#define TD_CLR_IWAIT(td)      KOS_TD_CLR_IWAIT((td), TDI_IWAIT)
-#endif
 
 /*
  * Describe an interrupt thread.  There is one of these per interrupt event.
  */
 struct intr_thread {
 	struct intr_event *it_event;
-#ifdef SUKWON
-	struct thread *it_thread;	/* Kernel thread. */
-#else
-  void *it_thread;/* KOS thread */
-#endif
+  void *it_thread;  /* KOS thread */
 	int	it_flags;		/* (j) IT_* flags. */
 	int	it_need;		/* Needs service. */
-  int td_state;   /* not used */
-  int td_inhibitors;  /* for TD_AWAITING_INTR() */
 };
 
 /* Interrupt thread flags kept in it_flags */
@@ -109,15 +74,9 @@ struct	intr_event *tty_intr_event;
 void	*vm_ih;
 struct proc *intrproc;
 
-//#ifdef SUKWON
 static MALLOC_DEFINE(M_ITHREAD, "ithread", "Interrupt Threads");
-//#else
-//#define M_ITHREAD 0
-//#endif
 
-#ifdef SUKWON
-static int intr_storm_threshold = 1000;
-#endif
+//static int intr_storm_threshold = 1000;
 static TAILQ_HEAD(, intr_event) event_list =
     TAILQ_HEAD_INITIALIZER(event_list);
 static struct mtx event_lock;
@@ -178,28 +137,13 @@ ithread_update(struct intr_thread *ithd)
 {
 	struct intr_event *ie;
 	void *td;
-#ifdef SUKWON
-	u_char pri;
-#endif
 
 	ie = ithd->it_event;
 	td = ithd->it_thread;
 
-#ifdef SUKWON
-	/* Determine the overall priority of this event. */
-	if (TAILQ_EMPTY(&ie->ie_handlers))
-		pri = PRI_MAX_ITHD;
-	else
-		pri = TAILQ_FIRST(&ie->ie_handlers)->ih_pri;
-#endif
-
 	/* Update name and priority. */
-#ifdef SUKWON
-	strlcpy(td->td_name, ie->ie_fullname, sizeof(td->td_name));
-#else
   KOS_SetThreadName(td, ie->ie_fullname);
-#endif
-#ifdef SUKWON
+#if 0
 	thread_lock(td);
 	sched_prio(td, pri);
 	thread_unlock(td);
@@ -311,44 +255,22 @@ intr_event_create(struct intr_event **event, void *source, int flags, int irq,
 int
 intr_event_bind(struct intr_event *ie, u_char cpu)
 {
-#ifndef SUKWON
-  return EOPNOTSUPP;
-#else
-	cpuset_t mask;
-	lwpid_t id;
+	cpuset_t mask __attribute__((unused));
+	lwpid_t id __attribute__((unused));
 	int error;
 
 	/* Need a CPU to bind to. */
+#if 0 // maybe dangerous but skip cpu validity check
 	if (cpu != NOCPU && CPU_ABSENT(cpu))
 		return (EINVAL);
+#endif
 
 	if (ie->ie_assign_cpu == NULL)
 		return (EOPNOTSUPP);
 
-	error = priv_check(curthread, PRIV_SCHED_CPUSET_INTR);
-	if (error)
-		return (error);
-
-	/*
-	 * If we have any ithreads try to set their mask first to verify
-	 * permissions, etc.
-	 */
-	mtx_lock(&ie->ie_lock);
-	if (ie->ie_thread != NULL) {
-		CPU_ZERO(&mask);
-		if (cpu == NOCPU)
-			CPU_COPY(cpuset_root, &mask);
-		else
-			CPU_SET(cpu, &mask);
-		id = ie->ie_thread->it_thread->td_tid;
-		mtx_unlock(&ie->ie_lock);
-		error = cpuset_setthread(id, &mask);
-		if (error)
-			return (error);
-	} else
-		mtx_unlock(&ie->ie_lock);
 	error = ie->ie_assign_cpu(ie->ie_source, cpu);
 	if (error) {
+#if 0 // seems irrelevant to KOS
 		mtx_lock(&ie->ie_lock);
 		if (ie->ie_thread != NULL) {
 			CPU_ZERO(&mask);
@@ -361,6 +283,7 @@ intr_event_bind(struct intr_event *ie, u_char cpu)
 			(void)cpuset_setthread(id, &mask);
 		} else
 			mtx_unlock(&ie->ie_lock);
+#endif
 		return (error);
 	}
 
@@ -369,7 +292,6 @@ intr_event_bind(struct intr_event *ie, u_char cpu)
 	mtx_unlock(&ie->ie_lock);
 
 	return (error);
-#endif
 }
 
 static struct intr_event *
@@ -387,61 +309,26 @@ intr_lookup(int irq)
 	return (ie);
 }
 
+// only used in sys/kern/kern_cpuset.c
 int
 intr_setaffinity(int irq, void *m)
 {
-#ifdef SUKWON
-	struct intr_event *ie;
-	cpuset_t *mask;
-	u_char cpu;
-	int n;
-
-	mask = m;
-	cpu = NOCPU;
-	/*
-	 * If we're setting all cpus we can unbind.  Otherwise make sure
-	 * only one cpu is in the set.
-	 */
-	if (CPU_CMP(cpuset_root, mask)) {
-		for (n = 0; n < CPU_SETSIZE; n++) {
-			if (!CPU_ISSET(n, mask))
-				continue;
-			if (cpu != NOCPU)
-				return (EINVAL);
-			cpu = (u_char)n;
-		}
-	}
-	ie = intr_lookup(irq);
-	if (ie == NULL)
-		return (ESRCH);
-	return (intr_event_bind(ie, cpu));
-#else
+  struct intr_event *ie;
+  ie = intr_lookup(irq);
+  if (ie == NULL)
+    return ESRCH;
   return EOPNOTSUPP;
-#endif
 }
 
+// only used in sys/kern/kern_cpuset.c
 int
 intr_getaffinity(int irq, void *m)
 {
-#ifdef SUKWON
 	struct intr_event *ie;
-	cpuset_t *mask;
-
-	mask = m;
 	ie = intr_lookup(irq);
 	if (ie == NULL)
 		return (ESRCH);
-	CPU_ZERO(mask);
-	mtx_lock(&ie->ie_lock);
-	if (ie->ie_cpu == NOCPU)
-		CPU_COPY(cpuset_root, mask);
-	else
-		CPU_SET(ie->ie_cpu, mask);
-	mtx_unlock(&ie->ie_lock);
-	return (0);
-#else
   return 0;
-#endif
 }
 
 int
@@ -474,29 +361,14 @@ ithread_create(const char *name)
 {
 	struct intr_thread *ithd;
 	void *td;
-#ifdef SUKWON
-	int error;
-#endif
 
 	ithd = malloc(sizeof(struct intr_thread), M_ITHREAD, M_WAITOK | M_ZERO);
 
-#ifdef SUKWON
-	error = kproc_kthread_add(ithread_loop, ithd, &intrproc,
-		    &td, RFSTOPPED | RFHIGHPID,
-	    	    0, "intr", "%s", name);
-	if (error)
-		panic("kproc_create() failed with %d", error);
-	thread_lock(td);
-	sched_class(td, PRI_ITHD);
-	TD_SET_IWAIT(td);
-	thread_unlock(td);
-	td->td_pflags |= TDP_ITHREAD;
-#else
   td = KOS_ThreadCreate(ithread_loop, ithd, RFSTOPPED | RFHIGHPID, "%s", name);
   thread_lock(td);
-  TD_SET_IWAIT(td);
+//  TD_SET_IWAIT(td);
+  KOS_IntrSetIWAIT(td);
   thread_unlock(td);
-#endif
   ithd->it_thread = td;
 	return (ithd);
 }
@@ -509,13 +381,9 @@ ithread_destroy(struct intr_thread *ithread)
 	td = ithread->it_thread;
 	thread_lock(td);
 	ithread->it_flags |= IT_DEAD;
-	if (TD_AWAITING_INTR(td)) {
-		TD_CLR_IWAIT(td);
-#ifdef SUKWON
-		sched_add(td, SRQ_INTR);
-#else
+  if (KOS_IntrAwaitingIntr(td)) {
+    KOS_IntrResetIWAIT(td);
     KOS_ScheduleLocked(td, 0);
-#endif
 	}
 	thread_unlock(td);
 }
@@ -684,7 +552,7 @@ _intr_drain(int irq)
 	 * were we to only sample TD_AWAITING_INTR() every tick.
 	 */
 	thread_lock(td);
-	if (!TD_AWAITING_INTR(td)) {
+	if (!KOS_IntrAwaitingIntr(td)) {
 		ithd->it_flags |= IT_WAIT;
 		while (ithd->it_flags & IT_WAIT) {
 			thread_unlock(td);
@@ -731,7 +599,7 @@ intr_event_remove_handler(void *cookie)
 	 * thread do it.
 	 */
 	thread_lock(ie->ie_thread->it_thread);
-	if (!TD_AWAITING_INTR(ie->ie_thread->it_thread) && !cold) {
+	if (!KOS_IntrAwaitingIntr(ie->ie_thread->it_thread) && !cold) {
 		handler->ih_flags |= IH_DEAD;
 
 		/*
@@ -774,13 +642,9 @@ intr_event_schedule_thread(struct intr_event *ie)
 	 */
 	it->it_need = 1;
 	thread_lock(td);
-	if (TD_AWAITING_INTR(td)) {
-		TD_CLR_IWAIT(td);
-#ifdef SUKWON
-		sched_add(td, SRQ_INTR);
-#else
+	if (KOS_IntrAwaitingIntr(td)) {
+    KOS_IntrResetIWAIT(td);
     KOS_ScheduleLocked(td, 0);
-#endif
 	}
 	thread_unlock(td);
 
@@ -807,9 +671,7 @@ int
 swi_add(struct intr_event **eventp, const char *name, driver_intr_t handler,
 	    void *arg, int pri, enum intr_type flags, void **cookiep)
 {
-#ifdef SUKWON
-	void *td;
-#endif
+	void *td __attribute__((unused));
 	struct intr_event *ie;
 	int error;
 
@@ -833,14 +695,6 @@ swi_add(struct intr_event **eventp, const char *name, driver_intr_t handler,
 	    PI_SWI(pri), flags, cookiep);
 	if (error)
 		return (error);
-#ifdef SUKWON
-	if (pri == SWI_CLOCK) {
-		td = ie->ie_thread->it_thread;
-		thread_lock(td);
-		td->td_flags |= TDF_NOLOAD;
-		thread_unlock(td);
-	}
-#endif
 	return (0);
 }
 
@@ -852,7 +706,7 @@ swi_sched(void *cookie, int flags)
 {
 	struct intr_handler *ih = (struct intr_handler *)cookie;
 	struct intr_event *ie = ih->ih_event;
-	int error;
+	int error __attribute__((unused));
 
 	/*
 	 * Set ih_need for this handler so that if the ithread is already
@@ -920,15 +774,11 @@ intr_event_execute_handlers(struct intr_event *ie)
 		}
 
 		/* Execute this handler. */
-#ifdef SUKWON
 		if (!(ih->ih_flags & IH_MPSAFE))
 			mtx_lock(&Giant);
-#endif
 		ih->ih_handler(ih->ih_argument);
-#ifdef SUKWON
 		if (!(ih->ih_flags & IH_MPSAFE))
 			mtx_unlock(&Giant);
-#endif
 	}
 }
 
@@ -937,17 +787,17 @@ ithread_execute_handlers(struct intr_event *ie)
 {
 
 	/* Interrupt handlers should not sleep. */
-#ifdef SUKWON
-	if (!(ie->ie_flags & IE_SOFT))
-		THREAD_NO_SLEEPING();
-#endif
+	if (!(ie->ie_flags & IE_SOFT)) {
+//		THREAD_NO_SLEEPING();
+    critical_enter(); // don't know if this simulates okay
+  }
 	intr_event_execute_handlers(ie);
-#ifdef SUKWON
-	if (!(ie->ie_flags & IE_SOFT))
-		THREAD_SLEEPING_OK();
-#endif
+	if (!(ie->ie_flags & IE_SOFT)) {
+//		THREAD_SLEEPING_OK();
+    critical_exit();
+  }
 
-#ifdef SUKWON
+#if 0 // XXX you can implement this if you want some kind of ratelimiting controls
 	/*
 	 * Interrupt storm handling:
 	 *
@@ -969,7 +819,7 @@ ithread_execute_handlers(struct intr_event *ie)
 		pause("istorm", 1);
 	} else
 #endif
-		ie->ie_count++;
+    ie->ie_count++;
 
 	/*
 	 * Now that all the handlers have had a chance to run, reenable
@@ -990,11 +840,7 @@ ithread_loop(void *arg)
 	void *td;
 	int wake;
 
-#ifdef SUKWON
-	td = curthread;
-#else
   td = KOS_CurThread();
-#endif
 	ithd = (struct intr_thread *)arg;
 	KASSERT(ithd->it_thread == td,
 	    ("%s: ithread and proc linkage out of sync", __func__));
@@ -1012,11 +858,7 @@ ithread_loop(void *arg)
 		 */
 		if (ithd->it_flags & IT_DEAD) {
 			free(ithd, M_ITHREAD);
-#ifdef SUKWON
-			kthread_exit();
-#else
       break;
-#endif
 		}
 
 		/*
@@ -1043,14 +885,10 @@ ithread_loop(void *arg)
 		 */
 		thread_lock(td);
 		if (!ithd->it_need && !(ithd->it_flags & (IT_DEAD | IT_WAIT))) {
-			TD_SET_IWAIT(td);
+      KOS_IntrSetIWAIT(td);
 			ie->ie_count = 0;
-#ifdef SUKWON
-			mi_switch(SW_VOL | SWT_IWAIT, NULL);
-#else
       KOS_UpdateVolTick(td);
       KOS_Suspend(td);
-#endif
 		}
 		if (ithd->it_flags & IT_WAIT) {
 			wake = 1;
@@ -1076,18 +914,14 @@ ithread_loop(void *arg)
  * o EINVAL:                    stray interrupt.
  */
 int
-intr_event_handle(struct intr_event *ie, struct trapframe *frame)
+intr_event_handle(struct intr_event *ie)
 {
 	struct intr_handler *ih;
-	struct trapframe *oldframe;
-	void *td;
-	int error, ret, thread;
+	void *td __attribute__((unused));
+	int error __attribute__((unused));
+  int ret, thread;
 
-#ifdef SUKWON
-	td = curthread;
-#else
   td = KOS_CurThread();
-#endif
 
 	/* An interrupt with no event or handlers is a stray interrupt. */
 	if (ie == NULL || TAILQ_EMPTY(&ie->ie_handlers))
@@ -1099,25 +933,23 @@ intr_event_handle(struct intr_event *ie, struct trapframe *frame)
 	 * with a NULL argument, then we pass it a pointer to
 	 * a trapframe as its argument.
 	 */
-#ifdef SUKWON
+#if 0 // XXX I believe this is not needed for KOS...
 	td->td_intr_nesting_level++;
 #endif
 	thread = 0;
 	ret = 0;
 	critical_enter();
-#ifdef SUKWON
-	oldframe = td->td_intr_frame;
-	td->td_intr_frame = frame;
-#endif
 	TAILQ_FOREACH(ih, &ie->ie_handlers, ih_next) {
 		if (ih->ih_filter == NULL) {
 			thread = 1;
 			continue;
 		}
-		if (ih->ih_argument == NULL)
-			ret = ih->ih_filter(frame);
-		else
+		if (ih->ih_argument == NULL) {
+//			ret = ih->ih_filter(frame);
+      BSD_KASSERTSTR((false), "trapframe passing unimplemented");
+    } else {
 			ret = ih->ih_filter(ih->ih_argument);
+    }
 		KASSERT(ret == FILTER_STRAY ||
 		    ((ret & (FILTER_SCHEDULE_THREAD | FILTER_HANDLED)) != 0 &&
 		    (ret & ~(FILTER_SCHEDULE_THREAD | FILTER_HANDLED)) == 0),
@@ -1143,9 +975,6 @@ intr_event_handle(struct intr_event *ie, struct trapframe *frame)
 				thread = 1;
 		}
 	}
-#ifdef SUKWON
-	td->td_intr_frame = oldframe;
-#endif
 
 	if (thread) {
 		if (ie->ie_pre_ithread != NULL)
@@ -1161,13 +990,13 @@ intr_event_handle(struct intr_event *ie, struct trapframe *frame)
 		KASSERT(error == 0, ("bad stray interrupt"));
 	}
 	critical_exit();
-#ifdef SUKWON
+#if 0  // I believe this is not needed for KOS...
 	td->td_intr_nesting_level--;
 #endif
 	return (0);
 }
 
-#ifdef SUKWON
+#ifdef SUKWON // XXX may need to enable for bus DMA
 /*
  * Start standard software interrupt threads
  */
