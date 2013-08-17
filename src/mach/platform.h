@@ -92,6 +92,11 @@ static inline void MemoryBarrier() {
   asm volatile("mfence" ::: "memory");
 }
 
+template <typename T>
+inline T* adjust_pointer(T* pointer, mword offset) {
+  return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(pointer) + offset);
+}
+
 #if defined(__clang__)
 
 static inline constexpr mword msb_recursive( mword x ) {
