@@ -15,15 +15,16 @@ struct ThreadData {
   SpinLock lk;
   int td_inhibitors;
   int lock_count;
-  bool savedInterrupt;
+  bool md_savedflags;
+  int md_spinlock_count;
   ptr_t wchan;
   const char* wmesg;
   int flags;
   bool sleeping;
 
   ThreadData(Thread *t) : thread(t), func(nullptr), arg(nullptr), running(false),
-      td_inhibitors(0), lock_count(0), savedInterrupt(false), wchan(nullptr), wmesg(nullptr),
-      flags(0), sleeping(false) {}
+      td_inhibitors(0), lock_count(0), md_savedflags(false), md_spinlock_count(0),
+      wchan(nullptr), wmesg(nullptr), flags(0), sleeping(false) {}
 };
 
 #endif /* _KOS_ThreadData_h_ */

@@ -385,10 +385,10 @@ softclock_call_cc(struct callout *c, struct callout_cpu *cc, int *mpcalls,
 		(*mpcalls)++;
 	}
 //	THREAD_NO_SLEEPING();
-  critical_enter(); // don't know if this simulates okay
+  KOS_CriticalEnter(); // don't know if this simulates okay
 	c_func(c_arg);
 //	THREAD_SLEEPING_OK();
-  critical_exit();
+  KOS_CriticalExit();
 	if ((c_flags & CALLOUT_RETURNUNLOCKED) == 0)
 		class->lc_unlock(c_lock);
 skip:

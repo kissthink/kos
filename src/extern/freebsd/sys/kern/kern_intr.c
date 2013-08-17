@@ -789,12 +789,12 @@ ithread_execute_handlers(struct intr_event *ie)
 	/* Interrupt handlers should not sleep. */
 	if (!(ie->ie_flags & IE_SOFT)) {
 //		THREAD_NO_SLEEPING();
-    critical_enter(); // don't know if this simulates okay
+    KOS_CriticalEnter(); // don't know if this simulates okay
   }
 	intr_event_execute_handlers(ie);
 	if (!(ie->ie_flags & IE_SOFT)) {
 //		THREAD_SLEEPING_OK();
-    critical_exit();
+    KOS_CriticalExit();
   }
 
 #if 0 // XXX you can implement this if you want some kind of ratelimiting controls
@@ -938,7 +938,7 @@ intr_event_handle(struct intr_event *ie)
 #endif
 	thread = 0;
 	ret = 0;
-	critical_enter();
+  KOS_CriticalEnter();
 	TAILQ_FOREACH(ih, &ie->ie_handlers, ih_next) {
 		if (ih->ih_filter == NULL) {
 			thread = 1;
@@ -989,7 +989,7 @@ intr_event_handle(struct intr_event *ie)
 		error = intr_event_schedule_thread(ie);
 		KASSERT(error == 0, ("bad stray interrupt"));
 	}
-	critical_exit();
+  KOS_CriticalExit();
 #if 0  // I believe this is not needed for KOS...
 	td->td_intr_nesting_level--;
 #endif

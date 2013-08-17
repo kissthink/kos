@@ -2,7 +2,7 @@ SRCDIR:=$(CURDIR)
 include $(SRCDIR)/Makefile.config
 -include Makefile.state
 
-SOURCEDIRS=util dev mach kern gdb ipc test
+SOURCEDIRS=util dev mach kern gdb ipc int test
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
 BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)

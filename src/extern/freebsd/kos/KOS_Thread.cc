@@ -34,21 +34,18 @@ void KOS_ThreadLock(void* thread, const char* file, int line) {
   DBG::outln(DBG::Basic, "acquiring threadlock:", FmtHex(thread), " @ ", file, ':', line);
   ThreadData* td = (ThreadData *) thread;
   THREAD_DATA_ASSERT(td);
-#if 0
-  if (td->lock_count == 0)  // disable interrupts
-    td->savedInterrupt = Processor::disableInterrupts();
-  td->lock_count += 1;
-#endif
-  bool acquired = false;
-  td->savedInterrupt = Processor::disableInterrupts();
-  while ((acquired = td->lk.tryAcquire()) == false) {
+
+  KOS_SpinlockEnter();
+  while (!td->lk.tryAcquire()) {
     int i = 0;
-    if (td->savedInterrupt) Processor::enableInterrupts(); // give interrupts a chance while we spin
-    while (i++ < 10000000)
+    KOS_SpinlockExit();
+    while (i++ < 10000000)  // give interrupts a chance while we spin
       Pause();
-    td->savedInterrupt = Processor::disableInterrupts();
+    KOS_SpinlockEnter();
   }
-  DBG::outln(DBG::Basic, "acquired threadlock:", FmtHex(thread), " @ ", file, ':', line, " td_count:", td->lock_count);
+
+  DBG::outln(DBG::Basic, "acquired threadlock:", FmtHex(thread),
+      " @ ", file, ':', line, " td_count:", td->lock_count);
 }
 
 void KOS_ThreadUnLock(void* thread, const char* file, int line) {
@@ -56,34 +53,10 @@ void KOS_ThreadUnLock(void* thread, const char* file, int line) {
   ThreadData* td = (ThreadData *) thread;
   THREAD_DATA_ASSERT(td);
   td->lk.release();
-  if (td->savedInterrupt) Processor::enableInterrupts();
-#if 0
-  td->lock_count -= 1;
-  if (td->lock_count == 0) {
-    if (td->savedInterrupt) { // restore interrupt
-      td->savedInterrupt = false;
-      Processor::enableInterrupts();
-    }
-  }
-#endif
-  DBG::outln(DBG::Basic, "released threadlock:", FmtHex(thread), " @ ", file, ':', line, " td_count:", td->lock_count);
-}
+  KOS_SpinlockExit();
 
-// used in sys/kern/kern_intr.c
-int KOS_AWAITING_INTR(void* thread, int flag) {
-  ThreadData* td = (ThreadData *) thread;
-  THREAD_DATA_ASSERT(td);
-  return td->td_inhibitors & flag;
-}
-void KOS_TD_SET_IWAIT(void* thread, int flag) {
-  ThreadData* td = (ThreadData *) thread;
-  THREAD_DATA_ASSERT(td);
-  td->td_inhibitors |= flag;
-}
-void KOS_TD_CLR_IWAIT(void* thread, int flag) {
-  ThreadData* td = (ThreadData *) thread;
-  THREAD_DATA_ASSERT(td);
-  td->td_inhibitors &= ~flag;
+  DBG::outln(DBG::Basic, "released threadlock:", FmtHex(thread),
+      " @ ", file, ':', line, " td_count:", td->lock_count);
 }
 
 ptr_t KOS_CurThread() {
@@ -182,9 +155,32 @@ void KOS_Yield() {
   kernelScheduler.yield();
 }
 
-void critical_enter() {
+void KOS_CriticalEnter() {
   Processor::incLockCount();
 }
-void critical_exit() {
+
+void KOS_CriticalExit() {
   Processor::decLockCount();
+}
+
+void KOS_SpinlockEnter() {
+  ThreadData *td = (ThreadData *)KOS_CurThread();
+  if (td->md_spinlock_count == 0) {
+    td->md_spinlock_count = 1;
+    td->md_savedflags = Processor::disableInterrupts();
+  } else {
+    td->md_spinlock_count += 1;
+  }
+  Processor::incLockCount();
+}
+
+void KOS_SpinlockExit() {
+  ThreadData *td = (ThreadData *)KOS_CurThread();
+  Processor::decLockCount();
+  td->md_spinlock_count -= 1;
+  if (td->md_spinlock_count == 0) {
+    if (td->md_savedflags) {
+      Processor::enableInterrupts();
+    }
+  }
 }
