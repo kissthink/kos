@@ -145,7 +145,7 @@ void PCI::initDevices() {
           dev->addresses().push_back(devAddr);
         }
 
-        DBG::outln(DBG::PCI, "PCI IRQ Line:", cs.InterruptLine, " Pin:", cs.InterruptPin);
+        DBG::outln(DBG::PCI, "PCI IRQ Line:", (int)cs.InterruptLine, " Pin:", (int)cs.InterruptPin);
         dev->setInterruptNumber(cs.InterruptLine);
         bus->addChild(dev);
         dev->setParent(bus);
