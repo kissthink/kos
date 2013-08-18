@@ -39,6 +39,7 @@ public:
     Process,
     Scheduler,
     VM,
+    VFS,
     Warning,
     MaxLevel
   };

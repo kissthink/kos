@@ -72,6 +72,10 @@ public:
       lock.release();
     }
   }
+  mword getValue() {
+    ScopedLock<> sl(lock);
+    return counter;
+  }
 };
 
 class Mutex : public BlockingSync {
@@ -94,6 +98,14 @@ public:
       owner = nullptr;
       lock.release();
     }
+  }
+  bool tryAcquire() {
+    ScopedLock<> sl(lock);
+    if (!owner) {
+      owner = Processor::getCurrThread();
+      return true;
+    }
+    return false;
   }
 };
 

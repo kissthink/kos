@@ -35,6 +35,7 @@ static const char* options[] = {
   "process",
   "scheduler",
   "vm",
+  "vfs",
   "warning",
 };
 

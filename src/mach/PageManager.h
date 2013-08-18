@@ -236,6 +236,8 @@ public:
     return vtolInternal<pagelevels>(vma);
   }
 
+  static inline bool isMapped( vaddr vma );
+  static inline laddr getMapping( vaddr vma );
 };
 
 template<> inline mword PageManager::ptp<1>() {
@@ -252,6 +254,16 @@ template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);
   KASSERT1(pe->P, FmtHex(vma));
   return ADDR(pe->c) + offset<1>(vma);
+}
+
+inline bool PageManager::isMapped( vaddr vma ) {
+  PageEntry* entry = getEntry<1>(vma);
+  return entry->P;
+}
+
+inline laddr PageManager::getMapping( vaddr vma ) {
+  PageEntry* entry = getEntry<1>(vma);
+  return entry->ADDR;
 }
 
 inline ostream& operator<<(ostream &os, const PageManager::FmtFlags& f) {
