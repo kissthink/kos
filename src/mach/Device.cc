@@ -144,7 +144,7 @@ void Device::searchByClassSubClassAndProgInterface(uint16_t classCode, uint16_t 
   }
 }
 
-Device::Address::Address(kstring& n, uintptr_t a, mword s, bool io, mword pad)
+Device::Address::Address(kstring n, uintptr_t a, mword s, bool io, mword pad)
   : isMapped(false), addrName(n), baseAddr(a), addrSize(s), ioSpace(io), addrPadding(pad)
 {
   if (ioSpace) {
@@ -152,7 +152,8 @@ Device::Address::Address(kstring& n, uintptr_t a, mword s, bool io, mword pad)
     ioPort->allocate(a, s);
     ioAddress = ioPort;
   } else {
-    ABORT1("implement memory mapped IO");
+    MemoryMappedIO* io = new MemoryMappedIO(addrName.c_str(), a % pagesize<1>(), pad);
+    ioAddress = io;
   }
 }
 

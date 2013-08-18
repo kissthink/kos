@@ -88,7 +88,7 @@ Please send feedback to mkarsten@uwaterloo.ca.
 
 Contributors (in alphabetical order)
 ============
-- Sukown Oh (GDB support, drivers)
+- Sukwon Oh (GDB support, drivers)
 - Behrooz Shafiee (keyboard, pit, elf, syscall/sysret)
 - Alex Szlavik (bootstrap code)
 - Cameron White (clang support, not in release currently)

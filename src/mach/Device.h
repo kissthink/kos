@@ -34,7 +34,7 @@ public:
 
     bool isMapped;
   public:
-    Address(kstring& n, uintptr_t a, mword s, bool io, mword pad=1);
+    Address(kstring n, uintptr_t a, mword s, bool io, mword pad=1);
     ~Address();
     void map(mword forcedSize = 0, bool bUser = false); // maps address into memory
     kstring addrName;   // address range identifier
@@ -65,7 +65,7 @@ public:
   virtual kstring getSpecificType() {
     return specificType;
   }
-  virtual void setSpecificType(kstring& str) {
+  virtual void setSpecificType(kstring str) {
     specificType = str;
   }
   void setPCIPosition(uint32_t bus, uint32_t device, uint32_t func) {

@@ -18,7 +18,11 @@
 #define _PCI_h_ 1
 
 #include "mach/platform.h"
+#include "mach/Device.h"
+#include "mach/IOPort.h"
 #include "kern/Debug.h"
+
+static IOPort configSpace("PCI Configuration Space");
 
 class PCI {
   static const uint16_t AddressPort = 0xCF8;
@@ -38,9 +42,28 @@ class PCI {
   static const int MaxDevice = pow2(5);
 
   static const BitSeg<uint32_t, 0,16> Vendor;
-  static const BitSeg<uint32_t,16,16> Device;
+  static const BitSeg<uint32_t,16,16> Dev;  // avoid conflict with Device class
 
 public:
+  static void sanityCheck() {
+    if (!configSpace.allocate(0xCF8, 8)) {
+      ABORT1("PCI: Config space unable to allocate IO port!");
+    }
+    configSpace.write32(0x80000000, 0);
+    if (configSpace.read32(0) != 0x80000000) {
+      ABORT1("PCI: Controller not detected.");
+    }
+  }
+
+  static uint32_t readConfigWord8(Device* dev, uint16_t reg) {
+    return readConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 8);
+  }
+  static uint32_t readConfigWord16(Device* dev, uint16_t reg) {
+    return readConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 16);
+  }
+  static uint32_t readConfigWord32(Device* dev, uint16_t reg) {
+    return readConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 32);
+  }
 
   static uint32_t readConfigWord(uint16_t bus, uint16_t dev, uint16_t func, uint16_t reg, uint32_t width) {
     uint32_t addr = Config::Enable() | Config::Bus(bus) | Config::Device(dev)
@@ -52,6 +75,16 @@ public:
       case 32: return in32(DataPort);
       default: ABORT1(width); return 0;
     }
+  }
+
+  static void writeConfigWord8(Device* dev, uint16_t reg, uint32_t value) {
+    writeConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 8, value);
+  }
+  static void writeConfigWord16(Device* dev, uint16_t reg, uint32_t value) {
+    writeConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 16, value);
+  }
+  static void writeConfigWord32(Device* dev, uint16_t reg, uint32_t value) {
+    writeConfigWord(dev->getPCIBusPosition(), dev->getPCIDevicePosition(), dev->getPCIFunctionNumber(), reg, 32, value);
   }
 
   static void writeConfigWord(uint16_t bus, uint16_t dev, uint16_t func, uint16_t reg, uint32_t width, uint32_t value) {
@@ -75,11 +108,13 @@ public:
       for (int dev = 0; dev < MaxDevice; dev += 1) {
         uint32_t r = probeDevice(bus,dev);
         if (Vendor.get(r) != 0xFFFF) {
-          DBG::outln(DBG::PCI, "PCI ", bus, '/', dev, ' ', FmtHex(Vendor.get(r),4), ':', FmtHex(Device.get(r),4));
+          DBG::outln(DBG::PCI, "PCI ", bus, '/', dev, ' ', FmtHex(Vendor.get(r),4), ':', FmtHex(Dev.get(r),4));
         }
       }
     }
   }
+
+  static void initDevices();
 
 };
 

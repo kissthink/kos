@@ -2,7 +2,7 @@ SRCDIR:=$(CURDIR)
 include $(SRCDIR)/Makefile.config
 -include Makefile.state
 
-SOURCEDIRS=util dev mach kern gdb world
+SOURCEDIRS=util dev drivers mach kern gdb world
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
 BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)
@@ -16,7 +16,7 @@ LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o #extern/linux/libdriver.
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
-.PHONY: all libs clean dep depend drivers vclean distclean run\
+.PHONY: all libs clean dep depend vclean distclean run\
 	debug rgdb rgdba rgdbdebug rgdbadebug\
 	bochs pxe lpxe rpxe qpxe\
 	usb usbtest tests defines echo
@@ -136,9 +136,6 @@ extern/dlmalloc/malloc.o: extern/dlmalloc/Makefile
 
 extern/linux/libdriver.a: extern/linux/Makefile
 	$(MAKE) -C extern/linux $(notdir $@)
-
-drivers:
-	$(MAKE) -C extern/linux $@
 
 $(USERLIB):
 	$(MAKE) -C ulib $(notdir $@)
