@@ -32,6 +32,7 @@
 
 // drivers
 #include "mach/IOPortManager.h"
+#include "mach/InterruptManager.h"
 
 #include <atomic>
 #include <list>
@@ -220,6 +221,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   DBG::outln(DBG::Basic, "VM/mbi: ", kernelHeap);
 
   // install global IDT entries -> need to be done, before processor init
+  InterruptManager::init(); // first initialize interrupt manager for use
   setupAllIDTs();
 
   // parse ACPI tables: find/initialize CPUs, APICs, IOAPICs, static devices
@@ -417,15 +419,21 @@ extern "C" void isr_handler_0xff() {
 }
 
 extern "C" void isr_handler_gen(mword num) {
+#if 0
   StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
   Processor::sendEOI();
 //  Reboot();
+#endif
+  InterruptManager::handleInterrupt(num);
 }
 
 extern "C" void isr_handler_gen_err(mword num, mword errcode) {
+#if 0
   StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()), '/', FmtHex(errcode));
   Processor::sendEOI();
 //  Reboot();
+#endif
+  InterruptManager::handleInterrupt(num, errcode);
 }
 
 void Machine::setupIDT(unsigned int number, laddr address) {
