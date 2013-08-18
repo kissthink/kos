@@ -145,6 +145,11 @@ public:
    KASSERT0(!interruptsEnabled());
    CPU::enableInterrupts();
   }
+  static bool disableInterrupts() {
+    bool enabled = interruptsEnabled();
+    if (enabled) CPU::disableInterrupts();
+    return enabled;
+  }
   static bool interruptsEnabled() {
    return RFlags::interruptsEnabled();
   }

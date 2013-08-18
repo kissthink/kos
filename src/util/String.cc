@@ -15,11 +15,10 @@
  */
 
 #include "util/String.h"
-using namespace std;
+#include <cstdarg>
 
-#undef __STRICT_ANSI_ // to get access to vsnprintf
+#undef __STRICT_ANSI__  // for vsnprintf
 #include <cstdio>
-
 
 void String::assign(const String &x)
 {
@@ -116,10 +115,10 @@ void String::rstrip()
     m_Data[m_Length] = 0;
 }
 
-list<String*,KernelAllocator<String*>> String::tokenise(char token)
+List<String*> String::tokenise(char token)
 {
     String copy = *this;
-    list<String*,KernelAllocator<String*>> list;
+    List<String*> list;
 
     size_t idx = 0;
     while (idx < copy.m_Length)
@@ -138,7 +137,7 @@ list<String*,KernelAllocator<String*>> String::tokenise(char token)
             if (pStr->length() == 0)
                 delete pStr;
             else
-                list.push_back(pStr);
+                list.pushBack(pStr);
             idx = 0;
         }
         else
@@ -146,7 +145,7 @@ list<String*,KernelAllocator<String*>> String::tokenise(char token)
     }
 
     if (copy.length() > 0)
-        list.push_back(new String(copy));
+        list.pushBack(new String(copy));
 
     return list;
 }

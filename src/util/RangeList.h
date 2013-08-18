@@ -17,8 +17,10 @@
 #ifndef _RangeList_h_
 #define _RangeList_h_ 1
 
-#include "kern/Kernel.h"
-#include <list>
+#include "util/List.h"
+
+/** @addtogroup kernelutilities
+ * @{ */
 
 /** This class manages a List of ranges. It automatically merges adjacent entries
  *  in the list.
@@ -86,17 +88,17 @@ class RangeList
   private:
 
     /** List of ranges */
-    std::list<Range*,KernelAllocator<Range*>> m_List;
+    List<Range*> m_List;
 
     /** Should we allocate in reverse order? */
     bool m_bReverse;
 
     RangeList &operator = (const RangeList & l);
 
-    typedef typename std::list<Range*,KernelAllocator<Range*>>::iterator Iterator;
-    typedef typename std::list<Range*,KernelAllocator<Range*>>::const_iterator ConstIterator;
-    typedef typename std::list<Range*,KernelAllocator<Range*>>::reverse_iterator ReverseIterator;
-    typedef typename std::list<Range*,KernelAllocator<Range*>>::const_reverse_iterator ConstReverseIterator;
+    typedef typename List<Range*>::Iterator Iterator;
+    typedef typename List<Range*>::ConstIterator ConstIterator;
+    typedef typename List<Range*>::ReverseIterator ReverseIterator;
+    typedef typename List<Range*>::ConstReverseIterator ConstReverseIterator;
 };
 
 /** @} */
@@ -147,7 +149,7 @@ void RangeList<T>::free(T address, T length)
     }
 
   Range *range = new Range(address, length);
-  m_List.push_back(range);
+  m_List.pushBack(range);
 }
 template<typename T>
 bool RangeList<T>::allocate(T length, T &address)
@@ -220,7 +222,7 @@ bool RangeList<T>::allocateSpecific(T address, T length)
              ((*cur)->address + (*cur)->length) > (address + length))
     {
       Range *newRange = new Range(address + length, (*cur)->address + (*cur)->length - address - length);
-      m_List.push_back(newRange);
+      m_List.pushBack(newRange);
       (*cur)->length = address - (*cur)->address;
       return true;
     }

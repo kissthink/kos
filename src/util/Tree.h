@@ -17,6 +17,7 @@
 #ifndef _Tree_h_
 #define _Tree_h_ 1
 
+#include "util/basics.h"
 #include "util/Iterator.h"
 
 /** @addtogroup kernelutilities

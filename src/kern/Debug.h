@@ -76,4 +76,9 @@ public:
 #endif
 #define KASSERTN(expr,args...)  { if unlikely(!(expr)) { kassertprint( "KASSERT: " #expr " in " __FILE__ ":", __LINE__, __func__); StdErr.outln(args); StdDbg.outln(args); Reboot(); } }
 
+#if defined(ABORTN)
+#error macro collision: ABORTN
+#endif
+#define ABORTN(msg...)          {                      { kassertprint( "ABORT  : "       " in " __FILE__ ":", __LINE__, __func__); StdErr.outln(msg); StdDbg.outln(msg); Reboot(); } }
+
 #endif /* _Debug_h_ */

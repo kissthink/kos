@@ -17,11 +17,11 @@
 #ifndef _String_h_
 #define _String_h_ 1
 
-#include "kern/Kernel.h"
-#include <list>
-
 /** @addtogroup kernelutilities
  * @{ */
+
+#include "util/List.h"
+#include <cstring>
 
 /** String class for ASCII strings
  *\todo provide documentation */
@@ -66,7 +66,7 @@ class String
          *  the back portion (including the character at 'offset' will be returned in a new string. */
         String split(size_t offset);
 
-        std::list<String*,KernelAllocator<String*>> tokenise(char token);
+        List<String*> tokenise(char token);
 
         /** Converts a UTF-32 character to its UTF-8 representation.
          *\param[in] utf32 Input UTF-32 character.
