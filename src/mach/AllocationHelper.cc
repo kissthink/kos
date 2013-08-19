@@ -1,22 +1,52 @@
 #include "mach/AllocationHelper.h"
-#include "ipc/SpinLock.h"
 #include "kern/Kernel.h"
+#include "kern/FrameManager.h"
 
-static SpinLock lk;
+#define CONST_1MB   0x100000    // 1048576
+#define CONST_16MB  0x1000000   // 16777216
 
-static const size_t continuous = 1 << 0;
-static const size_t nonRamMemory = 1 << 1;
-static const size_t force = 1 << 2;
+SpinLock AllocationHelper::lk;
 
-bool allocateRegion(MemoryRegion& region, size_t pages, size_t constraints, size_t flags) {
+bool AllocationHelper::allocRegion(MemoryRegion& region, size_t pages, Constraints con,
+                                   PageOwner owner, PageType type) {
   ScopedLock<> lo(lk);
-  vaddr vAddress = kernelSpace.allocPages<1>(pagesize<1>() * pages, AddressSpace::Data);
+  if (!Processor::getFrameManager()) {
+    ABORT1("FrameManager is not initialized yet");
+  }
+
+  // for continuous memory, use address below 16MB
+  if (con & Continuous) {
+    if (!(con & Below1MB) && !(con & Below16MB)) {
+      con = con|Below16MB;
+    }
+  }
+  // allocate physical address range
+  laddr physicalAddr = 0;
+  if (con & Below1MB) {
+    physicalAddr = Processor::getFrameManager()->alloc<true>(pages * pagesize<1>(), CONST_1MB);
+    DBG::outln(DBG::VM, "allocRegion() allocated below 1MB phyAddr: ", FmtHex(physicalAddr));
+  } else if (con & Below16MB) {
+    physicalAddr = Processor::getFrameManager()->alloc<true>(pages * pagesize<1>(), CONST_16MB);
+    DBG::outln(DBG::VM, "allocRegion() allocated below 16MB phyAddr: ", FmtHex(physicalAddr));
+  } else {
+    physicalAddr = Processor::getFrameManager()->alloc<true>(pages * pagesize<1>());
+    DBG::outln(DBG::VM, "allocRegion() allocated phyAddr: ", FmtHex(physicalAddr));
+  }
+
+  if (physicalAddr == 0) {
+    DBG::outln(DBG::VM, "allocRegion() failed allocating address");
+    return false;
+  }
+  if (owner == PageManager::User) {
+    ABORT1("user space allocation not implemented yet");
+  }
+  vaddr vAddress = kernelSpace.mapPages<1>(physicalAddr, pages * pagesize<1>(), type);
   if (vAddress) {
+    DBG::outln(DBG::VM, "allocRegion() mapped to virtual addr: ", FmtHex(vAddress));
     region.virtualAddr = reinterpret_cast<ptr_t>(vAddress);
-    region.physicalAddr = 0;
+    region.physicalAddr = physicalAddr;
     region.regSize = pages * pagesize<1>();
     return true;
   }
   return false;
 }
-

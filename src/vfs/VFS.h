@@ -35,89 +35,88 @@
  * The 'root' filesystem - that is the FS with system data on, is visible by the alias
  * 'root', thus; 'root:/System/Boot/kernel' could be used to access the kernel image.
  */
-class VFS {
+class VFS
+{
   VFS() = delete;
   VFS(const VFS&) = delete;
   VFS& operator=(const VFS&) = delete;
 public:
-    /** Callback type, called when a disk is mounted or unmounted. */
-    typedef void (*MountCallback)();
+  /** Callback type, called when a disk is mounted or unmounted. */
+  typedef void (*MountCallback)();
 
-    /** Mounts a Disk device as the alias "alias".
-        If alias is zero-length, the Filesystem is asked for its preferred name
-        (usually a volume name of some sort), and returned in "alias" */
-    static bool mount(Disk *pDisk, String &alias);
+  /** Mounts a Disk device as the alias "alias".
+      If alias is zero-length, the Filesystem is asked for its preferred name
+      (usually a volume name of some sort), and returned in "alias" */
+  static bool mount(Disk *pDisk, String &alias);
 
-    /** Adds an alias to an existing filesystem.
-     *\param pFs The filesystem to add an alias for.
-     *\param pAlias The alias to add. */
-    static void addAlias(Filesystem *pFs, String alias);
-    static void addAlias(String oldAlias, String newAlias);
+  /** Adds an alias to an existing filesystem.
+   *\param pFs The filesystem to add an alias for.
+   *\param pAlias The alias to add. */
+  static void addAlias(Filesystem *pFs, String alias);
+  static void addAlias(String oldAlias, String newAlias);
 
-    /** Gets a unique alias for a filesystem. */
-    static String getUniqueAlias(String alias);
+  /** Gets a unique alias for a filesystem. */
+  static String getUniqueAlias(String alias);
 
-    /** Does a given alias exist? */
-    static bool aliasExists(String alias);
+  /** Does a given alias exist? */
+  static bool aliasExists(String alias);
 
-    /** Obtains a list of all filesystem aliases */
-    static inline RadixTree<Filesystem*> &getAliases()
-    {
-        return m_Aliases;
-    }
-    
-    /** Obtains a list of all mounted filesystems */
-    static inline Tree<Filesystem *, std::list<String*,KernelAllocator<String*>>* > &getMounts()
-    {
-        return m_Mounts;
-    }
+  /** Obtains a list of all filesystem aliases */
+  static inline RadixTree<Filesystem*> &getAliases() {
+    return m_Aliases;
+  }
 
-    /** Removes an alias from a filesystem. If no aliases remain for that filesystem,
-     *  the filesystem is destroyed.
-     *\param pAlias The alias to remove. */
-    static void removeAlias(String alias);
+  /** Obtains a list of all mounted filesystems */
+  static inline Tree<Filesystem *, std::list<String*,KernelAllocator<String*>>* > &getMounts() {
+    return m_Mounts;
+  }
 
-    /** Removes all aliases from a filesystem - the filesystem is destroyed.
-     *\param pFs The filesystem to destroy. */
-    static void removeAllAliases(Filesystem *pFs);
+  /** Removes an alias from a filesystem. If no aliases remain for that filesystem,
+   *  the filesystem is destroyed.
+   *\param pAlias The alias to remove. */
+  static void removeAlias(String alias);
 
-    /** Looks up the Filesystem from a given alias.
-     *\param pAlias The alias to search for.
-     *\return The filesystem aliased by pAlias or 0 if none found. */
-    static Filesystem *lookupFilesystem(String alias);
+  /** Removes all aliases from a filesystem - the filesystem is destroyed.
+   *\param pFs The filesystem to destroy. */
+  static void removeAllAliases(Filesystem *pFs);
 
-    /** Attempts to obtain a File for a specific path. */
-    static File *find(String path, File *pStartNode=0);
+  /** Looks up the Filesystem from a given alias.
+   *\param pAlias The alias to search for.
+   *\return The filesystem aliased by pAlias or 0 if none found. */
+  static Filesystem *lookupFilesystem(String alias);
 
-    /** Attempts to create a file. */
-    static bool createFile(String path, uint32_t mask, File *pStartNode=0);
+  /** Attempts to obtain a File for a specific path. */
+  static File *find(String path, File *pStartNode=0);
 
-    /** Attempts to create a directory. */
-    static bool createDirectory(String path, File *pStartNode=0);
+  /** Attempts to create a file. */
+  static bool createFile(String path, uint32_t mask, File *pStartNode=0);
 
-    /** Attempts to create a symlink. */
-    static bool createSymlink(String path, String value, File *pStartNode=0);
+  /** Attempts to create a directory. */
+  static bool createDirectory(String path, File *pStartNode=0);
 
-    /** Attempts to remove a file/directory/symlink. WILL FAIL IF DIRECTORY NOT EMPTY */
-    static bool remove(String path, File *pStartNode=0);
+  /** Attempts to create a symlink. */
+  static bool createSymlink(String path, String value, File *pStartNode=0);
 
-    /** Adds a filesystem probe callback - this is called when a device is mounted. */
-    static void addProbeCallback(Filesystem::ProbeCallback callback);
+  /** Attempts to remove a file/directory/symlink. WILL FAIL IF DIRECTORY NOT EMPTY */
+  static bool remove(String path, File *pStartNode=0);
 
-    /** Adds a mount callback - the function is called when a disk is mounted or
-        unmounted. */
-    static void addMountCallback(MountCallback callback);
+  /** Adds a filesystem probe callback - this is called when a device is mounted. */
+  static void addProbeCallback(Filesystem::ProbeCallback callback);
+
+  /** Adds a mount callback - the function is called when a disk is mounted or
+      unmounted. */
+  static void addMountCallback(MountCallback callback);
 
 private:
-    /** A static File object representing an invalid file */
-    static File* m_EmptyFile;
+  /** A static File object representing an invalid file */
+  static File* m_EmptyFile;
 
 private:
-    static RadixTree<Filesystem*> m_Aliases;
-    static Tree<Filesystem*, std::list<String*,KernelAllocator<String*>>* > m_Mounts;
+  static RadixTree<Filesystem*> m_Aliases;
+  static Tree<Filesystem*, std::list<String*,KernelAllocator<String*>>* > m_Mounts;
 
-    static std::list<Filesystem::ProbeCallback*,KernelAllocator<Filesystem::ProbeCallback*>> m_ProbeCallbacks;
-    static std::list<MountCallback*,KernelAllocator<MountCallback*>> m_MountCallbacks;
+  static std::list<Filesystem::ProbeCallback*,KernelAllocator<Filesystem::ProbeCallback*>> m_ProbeCallbacks;
+  static std::list<MountCallback*,KernelAllocator<MountCallback*>> m_MountCallbacks;
 };
 
 #endif /* _VFS_h_ */

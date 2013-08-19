@@ -38,6 +38,7 @@ class FrameManager {
   friend class Multiboot;
   friend class AddressSpace;
   friend class PageManager;
+  friend class AllocationHelper;
 
   FileCache fc;
 

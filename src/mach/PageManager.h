@@ -59,7 +59,9 @@ public:
     Code      = 0,
     RoData    = XD(),
     PageTable = RW(),
-    Data      = RW() | XD()
+    Data      = RW() | XD(),
+    WriteThough = PWT(),
+    CacheDiable = PCD()
   };
 
   struct FmtFlags {
@@ -259,11 +261,6 @@ template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
 inline bool PageManager::isMapped( vaddr vma ) {
   PageEntry* entry = getEntry<1>(vma);
   return entry->P;
-}
-
-inline laddr PageManager::getMapping( vaddr vma ) {
-  PageEntry* entry = getEntry<1>(vma);
-  return entry->ADDR;
 }
 
 inline ostream& operator<<(ostream &os, const PageManager::FmtFlags& f) {

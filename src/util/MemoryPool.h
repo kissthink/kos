@@ -28,58 +28,57 @@
   * regularly allocated, such as networking code. */
 class MemoryPool
 {
-    public:
-        MemoryPool();
-        MemoryPool(const char *poolName);
-        virtual ~MemoryPool();
+public:
+  MemoryPool();
+  MemoryPool(const char *poolName);
+  virtual ~MemoryPool();
 
-        /// Initialises the pool, preparing it for use
-        /// @param poolSize Number of pages in the pool.
-        /// @param bufferSize Size of each buffer. Will be rounded to the
-        ///                   next power of two.
-        bool initialise(size_t poolSize, size_t bufferSize = 1024);
-        
-        /// Call if you aren't certain that the object has been initialised yet
-        inline bool initialised()
-        {
-            return m_bInitialised;
-        }
+  /// Initialises the pool, preparing it for use
+  /// @param poolSize Number of pages in the pool.
+  /// @param bufferSize Size of each buffer. Will be rounded to the
+  ///                   next power of two.
+  bool initialise(size_t poolSize, size_t bufferSize = 1024);
 
-        /// Allocates a buffer from the pool. Will block if no buffers are
-        /// available yet.
-        uintptr_t allocate();
+  /// Call if you aren't certain that the object has been initialised yet
+  inline bool initialised() {
+    return m_bInitialised;
+  }
 
-        /// Allocates a buffer from the pool. If no buffers are available, this
-        /// function will return straight away.
-        /// @return Zero if a buffer couldn't be allocated.
-        uintptr_t allocateNow();
+  /// Allocates a buffer from the pool. Will block if no buffers are
+  /// available yet.
+  uintptr_t allocate();
 
-        /// Frees an allocated buffer, allowing it to be used elsewhere
-        void free(uintptr_t buffer);
+  /// Allocates a buffer from the pool. If no buffers are available, this
+  /// function will return straight away.
+  /// @return Zero if a buffer couldn't be allocated.
+  uintptr_t allocateNow();
 
-    private:
-        /// This Semaphore tracks the number of buffers allocated, and allows
-        /// blocking when the buffers run out.
-        Semaphore m_BlockSemaphore;
+  /// Frees an allocated buffer, allowing it to be used elsewhere
+  void free(uintptr_t buffer);
 
-        /// This Spinlock turns bitmap operations into an atomic operation to
-        /// avoid race conditions where the same buffer is allocated twice.
-        SpinLock m_BitmapLock;
+private:
+  /// This Semaphore tracks the number of buffers allocated, and allows
+  /// blocking when the buffers run out.
+  Semaphore m_BlockSemaphore;
 
-        /// Size of each buffer in this pool
-        size_t m_BufferSize;
+  /// This Spinlock turns bitmap operations into an atomic operation to
+  /// avoid race conditions where the same buffer is allocated twice.
+  SpinLock m_BitmapLock;
 
-        /// MemoryRegion describing the actual pool of memory
-        MemoryRegion m_Pool;
-        
-        /// Has this instance been initialised yet?
-        bool m_bInitialised;
+  /// Size of each buffer in this pool
+  size_t m_BufferSize;
 
-        /// Allocation bitmap
-        ExtensibleBitmap m_AllocBitmap;
+  /// MemoryRegion describing the actual pool of memory
+  MemoryRegion m_Pool;
 
-        /// Allocation doer
-        uintptr_t allocateDoer();
+  /// Has this instance been initialised yet?
+  bool m_bInitialised;
+
+  /// Allocation bitmap
+  ExtensibleBitmap m_AllocBitmap;
+
+  /// Allocation doer
+  uintptr_t allocateDoer();
 };
 
 #endif /* _MemoryPool_h_ */

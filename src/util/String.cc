@@ -22,145 +22,141 @@
 
 void String::assign(const String &x)
 {
-    m_Length = x.length();
-    reserve(m_Length + 1);
-    if (m_Length && x.m_Data)
-        memcpy(m_Data, x.m_Data, m_Length + 1);
-    else
-        m_Data[0] = '\0';
+  m_Length = x.length();
+  reserve(m_Length + 1);
+  if (m_Length && x.m_Data)
+    memcpy(m_Data, x.m_Data, m_Length + 1);
+  else
+    m_Data[0] = '\0';
 }
 void String::assign(const char *s)
 {
-    if(!s)
-        m_Length = 0;
-    else
-        m_Length = strlen(s);
-    reserve(m_Length + 1);
-    if (m_Length && s)
-        memcpy(m_Data, s, m_Length + 1);
-    else
-        m_Data[0] = '\0';
+  if(!s)
+    m_Length = 0;
+  else
+    m_Length = strlen(s);
+  reserve(m_Length + 1);
+  if (m_Length && s)
+    memcpy(m_Data, s, m_Length + 1);
+  else
+    m_Data[0] = '\0';
 }
 void String::reserve(size_t size)
 {
-    if (size > m_Size)
-    {
-        char *tmp = m_Data;
-        m_Data = new char [size];
-        if (tmp != 0 && m_Size != 0)
-            memcpy(m_Data, tmp, m_Size);
-        delete []tmp;
-        m_Size = size;
-    }
+  if (size > m_Size) {
+    char *tmp = m_Data;
+    m_Data = new char [size];
+    if (tmp != 0 && m_Size != 0)
+      memcpy(m_Data, tmp, m_Size);
+    delete []tmp;
+    m_Size = size;
+  }
 }
 void String::free()
 {
-    delete [] m_Data;
-    m_Data = 0;
-    m_Length = 0;
-    m_Size = 0;
+  delete [] m_Data;
+  m_Data = 0;
+  m_Length = 0;
+  m_Size = 0;
 }
 
 String String::split(size_t offset)
 {
-    String s(&m_Data[offset]);
-    m_Data[offset] = '\0';
-    m_Length = offset;
+  String s(&m_Data[offset]);
+  m_Data[offset] = '\0';
+  m_Length = offset;
 
-    return s;
+  return s;
 }
 
 void String::strip()
 {
-    lstrip();
-    rstrip();
+  lstrip();
+  rstrip();
 }
 
 void String::lstrip()
 {
-    // Sanity check...
-    if(!m_Data)
-        return;
-    
-    if(m_Data[0] != ' ')
-        return;
+  // Sanity check...
+  if(!m_Data)
+    return;
 
-    size_t n = 0;
-    while(n < m_Length && m_Data[n] == ' ')
-        n++;
+  if(m_Data[0] != ' ')
+    return;
 
-    // Move the data to cover up the whitespace and avoid reallocating m_Data
-    m_Length -= n;
-    memmove(m_Data, (m_Data + n), m_Length);
-    m_Data[m_Length] = 0;
+  size_t n = 0;
+  while(n < m_Length && m_Data[n] == ' ')
+    n++;
+
+  // Move the data to cover up the whitespace and avoid reallocating m_Data
+  m_Length -= n;
+  memmove(m_Data, (m_Data + n), m_Length);
+  m_Data[m_Length] = 0;
 }
 
 void String::rstrip()
 {
-    // Sanity check...
-    if(!m_Data)
-        return;
+  // Sanity check...
+  if(!m_Data)
+    return;
 
-    if(m_Data[m_Length - 1] != ' ')
-        return;
+  if(m_Data[m_Length - 1] != ' ')
+    return;
 
-    size_t n = m_Length;
-    while(n > 0 && m_Data[n - 1] == ' ')
-        n--;
+  size_t n = m_Length;
+  while(n > 0 && m_Data[n - 1] == ' ')
+    n--;
 
-    // m_Size is still valid - it's the size of the buffer. m_Length is now
-    // updated to contain the proper length of the string, but the buffer is
-    // not reallocated.
-    m_Length = n;
-    m_Data[m_Length] = 0;
+  // m_Size is still valid - it's the size of the buffer. m_Length is now
+  // updated to contain the proper length of the string, but the buffer is
+  // not reallocated.
+  m_Length = n;
+  m_Data[m_Length] = 0;
 }
 
 List<String*> String::tokenise(char token)
 {
-    String copy = *this;
-    List<String*> list;
+  String copy = *this;
+  List<String*> list;
 
-    size_t idx = 0;
-    while (idx < copy.m_Length)
-    {
-        if (copy.m_Data[idx] == token)
-        {
-            String tmp = copy.split(idx+1);
+  size_t idx = 0;
+  while (idx < copy.m_Length) {
+    if (copy.m_Data[idx] == token) {
+      String tmp = copy.split(idx+1);
 
-            String *pStr = new String(copy);
-            copy = tmp;
+      String *pStr = new String(copy);
+      copy = tmp;
 
-            // pStr will include token, so remove the last character from it.
-            pStr->m_Length --;
-            pStr->m_Data[pStr->length()] = '\0';
+      // pStr will include token, so remove the last character from it.
+      pStr->m_Length --;
+      pStr->m_Data[pStr->length()] = '\0';
 
-            if (pStr->length() == 0)
-                delete pStr;
-            else
-                list.pushBack(pStr);
-            idx = 0;
-        }
-        else
-            idx = copy.nextCharacter(idx);
-    }
+      if (pStr->length() == 0)
+        delete pStr;
+      else
+        list.pushBack(pStr);
+      idx = 0;
+    } else
+      idx = copy.nextCharacter(idx);
+  }
 
-    if (copy.length() > 0)
-        list.pushBack(new String(copy));
+  if (copy.length() > 0)
+    list.pushBack(new String(copy));
 
-    return list;
+  return list;
 }
 
 void String::chomp()
 {
-    m_Length --;
-    m_Data[m_Length] = '\0';
+  m_Length --;
+  m_Data[m_Length] = '\0';
 }
 
 void String::sprintf(const char *fmt, ...)
 {
-    reserve(256);
-    va_list vl;
-    va_start(vl, fmt);
-    vsprintf(m_Data, fmt, vl);
-    va_end(vl);
+  reserve(256);
+  va_list vl;
+  va_start(vl, fmt);
+  vsprintf(m_Data, fmt, vl);
+  va_end(vl);
 }

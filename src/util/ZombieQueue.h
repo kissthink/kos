@@ -17,61 +17,54 @@
 #define _ZombieQueue_h_ 1
 
 #include "util/RequestQueue.h"
+#include "kern/Process.h"
 
 /// Wrapper object for ZombieQueue so it can delete any type of object with
 /// the correct destructors called in MI situations.
 class ZombieObject
 {
-    public:
-        ZombieObject()
-        {
-        }
-        /// When inheriting this class, you delete your object here.
-        virtual ~ZombieObject()
-        {
-        }
+public:
+  ZombieObject() {
+  }
+  /// When inheriting this class, you delete your object here.
+  virtual ~ZombieObject() {
+  }
 };
 
-#if 0
-class Process;
 /// Special wrapper object for Process
 class ZombieProcess : public ZombieObject
 {
-    public:
-        ZombieProcess(Process *pProcess) : m_pProcess(pProcess)
-        {
-        }
-        virtual ~ZombieProcess()
-        {
-            delete m_pProcess;
-        }
-    private:
-        Process *m_pProcess;
+public:
+  ZombieProcess(Process *pProcess) : m_pProcess(pProcess) {
+  }
+  virtual ~ZombieProcess() {
+    delete m_pProcess;
+  }
+private:
+  Process *m_pProcess;
 };
-#endif
 
-/** 
+/**
   * ZombieQueue: takes zombie objects and frees them. This is used so those
   * objects do not have to do something like "delete this", which is bad.
   */
 class ZombieQueue : public RequestQueue
 {
-    public:
-        ZombieQueue();
-        virtual ~ZombieQueue();
+public:
+  ZombieQueue();
+  virtual ~ZombieQueue();
 
-        static ZombieQueue &instance()
-        {
-            return m_Instance;
-        }
+  static ZombieQueue &instance() {
+    return m_Instance;
+  }
 
-        void addObject(ZombieObject *pObject);
+  void addObject(ZombieObject *pObject);
 
-    private:
-        virtual uint64_t executeRequest(uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4, uint64_t p5,
-                                        uint64_t p6, uint64_t p7, uint64_t p8);
+private:
+  virtual uint64_t executeRequest(uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4, uint64_t p5,
+                                  uint64_t p6, uint64_t p7, uint64_t p8);
 
-        static ZombieQueue m_Instance;
+  static ZombieQueue m_Instance;
 };
 
 #endif /* _ZombieQueue_h_ */

@@ -23,24 +23,23 @@
 
 template <typename T>
 List<T>::List()
-    : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
+  : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
 {
 }
 
 template <typename T>
 List<T>::List(const List &x)
-    : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
+  : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
 {
   assign(x);
 }
 template <typename T>
 List<T>::~List()
 {
-    if (m_Magic != 0x1BADB002)
-    {
-        ABORTN("List: bad magic [", m_Magic, "].");
-    }
-    clear();
+  if (m_Magic != 0x1BADB002) {
+    ABORTN("List: bad magic [", m_Magic, "].");
+  }
+  clear();
 }
 
 template <typename T>
@@ -82,7 +81,7 @@ T List<T>::popBack()
   // Handle an extremely unusual case
   if(!m_Last && !m_First)
     return 0;
-    
+
   node_t *node = m_Last;
   if(m_Last)
     m_Last = m_Last->m_Previous;
@@ -121,7 +120,7 @@ T List<T>::popFront()
   // Handle an extremely unusual case
   if(!m_Last && !m_First)
     return 0;
-  
+
   node_t *node = m_First;
   if(m_First)
     m_First = m_First->m_Next;
@@ -186,8 +185,7 @@ template <typename T>
 void List<T>::clear()
 {
   node_t *cur = m_First;
-  for (size_t i = 0;i < m_Count;i++)
-  {
+  for (size_t i = 0; i < m_Count; i++) {
     node_t *tmp = cur;
     cur = cur->m_Next;
     delete tmp;
@@ -204,7 +202,7 @@ void List<T>::assign(const List &x)
 
   ConstIterator Cur(x.begin());
   ConstIterator End(x.end());
-  for (;Cur != End;++Cur)
+  for (; Cur != End; ++Cur)
     pushBack(*Cur);
 }
 
@@ -213,21 +211,20 @@ void List<T>::assign(const List &x)
 //
 
 List<void*>::List()
-    : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
+  : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
 {
 }
 List<void*>::List(const List &x)
-    : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
+  : m_Count(0), m_First(0), m_Last(0), m_Magic(0x1BADB002)
 {
   assign(x);
 }
 List<void*>::~List()
 {
-    if (m_Magic != 0x1BADB002)
-    {
-        ABORTN("List: bad magic [", m_Magic, "].");
-    }
-    clear();
+  if (m_Magic != 0x1BADB002) {
+    ABORTN("List: bad magic [", m_Magic, "].");
+  }
+  clear();
 }
 
 List<void*> &List<void*>::operator = (const List &x)
@@ -346,8 +343,7 @@ List<void*>::ReverseIterator List<void*>::erase(ReverseIterator &Iter)
 void List<void*>::clear()
 {
   node_t *cur = m_First;
-  for (size_t i = 0;i < m_Count;i++)
-  {
+  for (size_t i = 0; i < m_Count; i++) {
     node_t *tmp = cur;
     cur = cur->m_Next;
     delete tmp;
@@ -363,7 +359,7 @@ void List<void*>::assign(const List &x)
 
   ConstIterator Cur(x.begin());
   ConstIterator End(x.end());
-  for (;Cur != End;++Cur)
+  for (; Cur != End; ++Cur)
     pushBack(*Cur);
 }
 

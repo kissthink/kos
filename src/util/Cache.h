@@ -35,23 +35,22 @@ class Cache;
 /** Provides a clean abstraction to a set of data caches. */
 class CacheManager
 {
-    public:
-        CacheManager();
-        virtual ~CacheManager();
+public:
+  CacheManager();
+  virtual ~CacheManager() {}
 
-        static CacheManager &instance()
-        {
-            return m_Instance;
-        }
+  static CacheManager &instance() {
+    return m_Instance;
+  }
 
-        void registerCache(Cache *pCache);
-        void unregisterCache(Cache *pCache);
+  void registerCache(Cache *pCache);
+  void unregisterCache(Cache *pCache);
 
-        void compactAll();
-    private:
-        static CacheManager m_Instance;
+  void compactAll();
+private:
+  static CacheManager m_Instance;
 
-        List<Cache*> m_Caches;
+  List<Cache*> m_Caches;
 };
 
 /** Provides an abstraction of a data cache. */
@@ -59,58 +58,57 @@ class Cache
 {
 public:
 
-    Cache();
-    virtual ~Cache();
+  Cache();
+  virtual ~Cache();
 
-    /** Looks for \p key , increasing \c refcnt by one if returned. */
-    uintptr_t lookup (uintptr_t key);
+  /** Looks for \p key , increasing \c refcnt by one if returned. */
+  uintptr_t lookup (uintptr_t key);
 
-    /** Creates a cache entry with the given key. */
-    uintptr_t insert (uintptr_t key);
-    
-    /** Creates a bunch of cache entries to fill a specific size. Note that
-     *  this is just a monster allocation of a virtual address - the physical
-     *  pages are NOT CONTIGUOUS.
-     */
-    uintptr_t insert (uintptr_t key, size_t size);
+  /** Creates a cache entry with the given key. */
+  uintptr_t insert (uintptr_t key);
 
-    /** Decreases \p key 's \c refcnt by one. */
-    void release(uintptr_t key);
+  /** Creates a bunch of cache entries to fill a specific size. Note that
+   *  this is just a monster allocation of a virtual address - the physical
+   *  pages are NOT CONTIGUOUS.
+   */
+  uintptr_t insert (uintptr_t key, size_t size);
 
-    /** Attempts to "compact" the cache - (hopefully) reduces
-     *  resource usage by throwing away items in a
-     *  least-recently-used fashion. This is called in an
-     *  emergency "physical memory getting full" situation by the
-     *  PMM. */
-    void compact ();
+  /** Decreases \p key 's \c refcnt by one. */
+  void release(uintptr_t key);
+
+  /** Attempts to "compact" the cache - (hopefully) reduces
+   *  resource usage by throwing away items in a
+   *  least-recently-used fashion. This is called in an
+   *  emergency "physical memory getting full" situation by the
+   *  PMM. */
+  void compact ();
 
 private:
 
-    struct CachePage
-    {
-        /// The location of this page in memory
-        uintptr_t location;
+  struct CachePage {
+    /// The location of this page in memory
+    uintptr_t location;
 
-        /// Reference count to handle release() being called with multiple
-        /// threads having access to the page.
-        size_t refcnt;
+    /// Reference count to handle release() being called with multiple
+    /// threads having access to the page.
+    size_t refcnt;
 
-        /// The time at which this page was allocated. This is used by
-        /// compact() to determine the best pages to evict.
-        uint32_t timeAllocated;
-    };
+    /// The time at which this page was allocated. This is used by
+    /// compact() to determine the best pages to evict.
+    uint32_t timeAllocated;
+  };
 
-    /** Key-item pairs. */
-    Tree<uintptr_t, CachePage*> m_Pages;
+  /** Key-item pairs. */
+  Tree<uintptr_t, CachePage*> m_Pages;
 
-    /** Static MemoryAllocator to allocate virtual address space for all caches. */
-    static RangeList<uintptr_t> m_Allocator;
+  /** Static MemoryAllocator to allocate virtual address space for all caches. */
+  static RangeList<uintptr_t> m_Allocator;
 
-    /** Lock for using the allocator. */
-    static SpinLock m_AllocatorLock;
+  /** Lock for using the allocator. */
+  static SpinLock m_AllocatorLock;
 
-    /** Lock for this cache. */
-    UnlikelyLock m_Lock;
+  /** Lock for this cache. */
+  UnlikelyLock m_Lock;
 };
 
 #endif /* _Cache_h_ */

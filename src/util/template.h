@@ -58,16 +58,14 @@ T operator -- (T &x, int)
 /** Remove the const qualifier of a type without const qualifier
  *\brief Remove the const qualifier of a type */
 template<typename T>
-struct nonconst_type
-{
+struct nonconst_type {
   /** The same type */
   typedef T type;
 };
 /** Remove the const qualifier of a type with const qualifier
  *\brief Remove the const qualifier of a type */
 template<typename T>
-struct nonconst_type<const T>
-{
+struct nonconst_type<const T> {
   /** The Type without the const qualifier */
   typedef T type;
 };

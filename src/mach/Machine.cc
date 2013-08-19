@@ -33,6 +33,8 @@
 // drivers
 #include "mach/IOPortManager.h"
 #include "mach/InterruptManager.h"
+#include "mach/AllocationHelper.h"
+#include "mach/MemoryRegion.h"
 
 #include <atomic>
 #include <list>
@@ -253,8 +255,23 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   rtc.init();
   pit.init();
 
+  // test AllocationHelper
+  MemoryRegion region("test region");
+  AllocationHelper::allocRegion(region, 1, AllocationHelper::Continuous|AllocationHelper::Below1MB, PageManager::Kernel, PageManager::Data);
+  AllocationHelper::allocRegion(region, 1, AllocationHelper::Continuous|AllocationHelper::Below16MB, PageManager::Kernel, PageManager::Data);
+  if (PageManager::isMapped(vaddr(region.virtualAddress()))) {
+    DBG::outln(DBG::VM, "virtual address: ", FmtHex(vaddr(region.virtualAddress())), " is mapped");
+    DBG::outln(DBG::VM, "physical address: ", FmtHex(PageManager::vtol(vaddr(region.virtualAddress()))), " is mapped");
+    if (!frameManager.release(PageManager::vtol(vaddr(region.virtualAddress())), pagesize<1>())) {
+      ABORT1("releasing frame failed");
+    }
+  } else {
+    ABORT1("error!");
+  }
+//  AllocationHelper::allocRegion(region, 1, AllocationHelper::Continuous, PageManager::User, PageManager::Data);
+
   // initialize IOPortManager
-  IOPortManager::init(0, 0x10000);
+  IOPortManager::init(0, 0x10000);  // 64K should be enough
 
   // check if PCI can be used
   PCI::sanityCheck();

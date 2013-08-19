@@ -24,22 +24,22 @@ ZombieQueue::ZombieQueue() : RequestQueue()
 
 ZombieQueue::~ZombieQueue()
 {
-    destroy();
+  destroy();
 }
 
 void ZombieQueue::addObject(ZombieObject *pObject)
 {
-    addAsyncRequest(1, reinterpret_cast<uint64_t>(pObject));
+  addAsyncRequest(1, reinterpret_cast<uint64_t>(pObject));
 }
 
 uint64_t ZombieQueue::executeRequest(uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4, uint64_t p5,
                                      uint64_t p6, uint64_t p7, uint64_t p8)
 {
-    if(!p1)
-        return 0;
-    
-    delete reinterpret_cast<ZombieObject*>(p1);
-    
+  if(!p1)
     return 0;
+
+  delete reinterpret_cast<ZombieObject*>(p1);
+
+  return 0;
 }
 

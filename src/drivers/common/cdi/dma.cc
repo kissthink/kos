@@ -8,22 +8,15 @@
  * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
  */  
 
-#include <processor/types.h>
-#include <processor/MemoryRegion.h>
-#include <processor/PhysicalMemoryManager.h>
-#include <processor/VirtualAddressSpace.h>
-#include <Log.h>
+#include "util/basics.h"
+#include "mach/MemoryRegion.h"
+#include "kern/Debug.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
 #include "cdi/dma.h"
-
-#include <dma/IsaDma.h>
-
-#ifndef X86_COMMON
-#warning ISA DMA not supported on non-x86 architectures. TODO: FIXME
-#endif
+#include "drivers/common/dma/IsaDma.h"
 
 /**
  * Initialisiert einen Transport per DMA
@@ -32,7 +25,6 @@
  */
 int cdi_dma_open(struct cdi_dma_handle* handle, uint8_t channel, uint8_t mode, size_t length, void* buffer)
 {
-#ifdef X86_COMMON
     // All good
     handle->channel = channel;
     handle->mode = mode;
@@ -40,7 +32,7 @@ int cdi_dma_open(struct cdi_dma_handle* handle, uint8_t channel, uint8_t mode, s
     handle->buffer = handle->meta.realbuffer = buffer;
 
     MemoryRegion* region = new MemoryRegion("isa-dma");
-    size_t page_size = PhysicalMemoryManager::instance().getPageSize();
+    size_t page_size = pagesize<1>();
 
     // Allocate memory under 16 MB for the transfer
     if (!PhysicalMemoryManager::instance().allocateRegion(*region,
@@ -67,9 +59,6 @@ int cdi_dma_open(struct cdi_dma_handle* handle, uint8_t channel, uint8_t mode, s
         delete region;
         return -1;
     }
-#else
-    return -1; /// \todo Other architectures
-#endif
 }
 
 /**

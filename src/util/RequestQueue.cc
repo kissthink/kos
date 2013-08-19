@@ -22,8 +22,8 @@ RequestQueue::RequestQueue() :
   m_Stop(false), m_RequestQueueLock()
   , m_RequestQueueSize(), m_pThread(0)
 {
-    for (size_t i = 0; i < REQUEST_QUEUE_NUM_PRIORITIES; i++)
-        m_pRequestQueue[i] = 0;
+  for (size_t i = 0; i < REQUEST_QUEUE_NUM_PRIORITIES; i++)
+    m_pRequestQueue[i] = 0;
 }
 
 RequestQueue::~RequestQueue()
@@ -33,8 +33,7 @@ RequestQueue::~RequestQueue()
 void RequestQueue::initialise()
 {
   // Start the worker thread.
-  if(m_pThread)
-  {
+  if(m_pThread) {
     ABORT1("RequestQueue initialized multiple times");
   }
   m_pThread = Thread::create(kernelSpace);
@@ -54,7 +53,14 @@ uint64_t RequestQueue::addRequest(size_t priority, uint64_t p1, uint64_t p2, uin
 {
   // Create a new request object.
   Request *pReq = new Request();
-  pReq->p1 = p1; pReq->p2 = p2; pReq->p3 = p3; pReq->p4 = p4; pReq->p5 = p5; pReq->p6 = p6; pReq->p7 = p7; pReq->p8 = p8;
+  pReq->p1 = p1;
+  pReq->p2 = p2;
+  pReq->p3 = p3;
+  pReq->p4 = p4;
+  pReq->p5 = p5;
+  pReq->p6 = p6;
+  pReq->p7 = p7;
+  pReq->p8 = p8;
   pReq->isAsync = false;
   pReq->next = 0;
   pReq->bReject = false;
@@ -97,7 +103,7 @@ uint64_t RequestQueue::addRequest(size_t priority, uint64_t p1, uint64_t p2, uin
     // interrupted and clean up by itself.
     DBG::outln(DBG::Basic, "RequestQueue::addRequest - interrupted");
     if(pReq->bReject)
-        delete pReq; // Safe to delete, unexpected exit condition
+      delete pReq; // Safe to delete, unexpected exit condition
     pReq->sem.V();
     return 0;
   }
@@ -114,7 +120,14 @@ uint64_t RequestQueue::addAsyncRequest(size_t priority, uint64_t p1, uint64_t p2
 {
   // Create a new request object.
   Request *pReq = new Request();
-  pReq->p1 = p1; pReq->p2 = p2; pReq->p3 = p3; pReq->p4 = p4; pReq->p5 = p5; pReq->p6 = p6; pReq->p7 = p7; pReq->p8 = p8;
+  pReq->p1 = p1;
+  pReq->p2 = p2;
+  pReq->p3 = p3;
+  pReq->p4 = p4;
+  pReq->p5 = p5;
+  pReq->p6 = p6;
+  pReq->p7 = p7;
+  pReq->p8 = p8;
   pReq->isAsync = true;
   pReq->next = 0;
   pReq->bReject = false;
@@ -173,12 +186,14 @@ uint64_t RequestQueue::addAsyncRequest(size_t priority, uint64_t p1, uint64_t p2
   return 0;
 }
 
-static void trampoline(ptr_t p) {
+static void trampoline(ptr_t p)
+{
   RequestQueue *pRQ = reinterpret_cast<RequestQueue*>(p);
   pRQ->work();
 }
 
-int RequestQueue::work() {
+int RequestQueue::work()
+{
   for(;;) {
     // Sleep on the queue length semaphore - wake when there's something to do.
     m_RequestQueueSize.P();
@@ -194,8 +209,8 @@ int RequestQueue::work() {
     /// \todo Stop possible starvation here.
     size_t priority = 0;
     for (priority = 0; priority < REQUEST_QUEUE_NUM_PRIORITIES-1; priority++)
-        if (m_pRequestQueue[priority])
-            break;
+      if (m_pRequestQueue[priority])
+        break;
 
     Request *pReq = m_pRequestQueue[priority];
     // Quick sanity check:
@@ -208,10 +223,10 @@ int RequestQueue::work() {
 
     // Verify that it's still valid to run the request
     if(pReq->bReject) {
-        DBG::outln(DBG::Basic, "RequestQueue request rejected");
-        if(pReq->isAsync)
-            delete pReq;
-        continue;
+      DBG::outln(DBG::Basic, "RequestQueue request rejected");
+      if(pReq->isAsync)
+        delete pReq;
+      continue;
     }
 
     // Perform the request.
