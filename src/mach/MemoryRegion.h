@@ -6,6 +6,7 @@
 #include "mach/platform.h"
 
 class MemoryRegion {
+  friend bool allocateRegion(MemoryRegion&, size_t, size_t, size_t);
   MemoryRegion(const MemoryRegion&) = delete;
   MemoryRegion& operator=(const MemoryRegion&) = delete;
   ptr_t virtualAddr;

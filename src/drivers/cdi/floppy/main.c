@@ -118,4 +118,4 @@ static struct cdi_storage_driver floppy_driver = {
     .write_blocks       = floppy_write_blocks,
 };
 
-//CDI_DRIVER(DRIVER_NAME, floppy_driver)
+CDI_DRIVER(DRIVER_NAME, floppy_driver)

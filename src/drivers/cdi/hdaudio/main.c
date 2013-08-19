@@ -564,4 +564,4 @@ static struct cdi_audio_driver driver = {
     .get_position           = hda_get_position,
 };
 
-//CDI_DRIVER(DRIVER_NAME, driver)
+CDI_DRIVER(DRIVER_NAME, driver)

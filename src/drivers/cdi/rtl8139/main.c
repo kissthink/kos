@@ -77,4 +77,4 @@ static struct cdi_net_driver rtl8139_driver = {
     .send_packet        = rtl8139_send_packet,
 };
 
-//CDI_DRIVER(DRIVER_NAME, rtl8139_driver)
+CDI_DRIVER(DRIVER_NAME, rtl8139_driver)

@@ -78,4 +78,4 @@ static struct cdi_net_driver pcnet_driver = {
     .send_packet        = pcnet_send_packet,
 };
 
-//CDI_DRIVER(DRIVER_NAME, pcnet_driver)
+CDI_DRIVER(DRIVER_NAME, pcnet_driver)

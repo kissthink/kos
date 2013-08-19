@@ -198,5 +198,5 @@ static struct cdi_scsi_driver driver_scsi = {
     .request            = atapi_request,
 };
 
-//CDI_DRIVER(DRIVER_STORAGE_NAME, driver_storage)
-//CDI_DRIVER(DRIVER_SCSI_NAME, driver_scsi)
+CDI_DRIVER(DRIVER_STORAGE_NAME, driver_storage)
+CDI_DRIVER(DRIVER_SCSI_NAME, driver_scsi)

@@ -61,5 +61,5 @@ static struct cdi_audio_driver driver = {
     .set_number_of_channels = ac97_set_channel_count
 };
 
-//CDI_DRIVER(DRIVER_NAME, driver)
+CDI_DRIVER(DRIVER_NAME, driver)
 

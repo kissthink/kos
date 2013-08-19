@@ -71,4 +71,4 @@ static struct cdi_fs_driver serial_driver = {
     .fs_destroy     = serial_fs_destroy,
 };
 
-//CDI_DRIVER(DRIVER_NAME, serial_driver)
+CDI_DRIVER(DRIVER_NAME, serial_driver)

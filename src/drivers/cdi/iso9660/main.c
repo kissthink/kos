@@ -78,4 +78,4 @@ static struct cdi_fs_driver iso9660_driver = {
     .fs_destroy         = iso9660_fs_destroy,
 };
 
-//CDI_DRIVER(DRIVER_NAME, iso9660_driver)
+CDI_DRIVER(DRIVER_NAME, iso9660_driver)

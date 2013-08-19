@@ -71,4 +71,4 @@ static struct cdi_fs_driver ramdisk_driver = {
     .fs_destroy         = ramdisk_fs_destroy,
 };
 
-//CDI_DRIVER(DRIVER_NAME, ramdisk_driver)
+CDI_DRIVER(DRIVER_NAME, ramdisk_driver)

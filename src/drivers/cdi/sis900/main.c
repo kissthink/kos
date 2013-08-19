@@ -79,4 +79,4 @@ static struct cdi_net_driver sis900_driver = {
     .send_packet        = sis900_send_packet,
 };
 
-//CDI_DRIVER(DRIVER_NAME, sis900_driver)
+CDI_DRIVER(DRIVER_NAME, sis900_driver)

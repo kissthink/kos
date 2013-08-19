@@ -74,4 +74,4 @@ static struct cdi_net_driver ne2k_driver = {
     .send_packet        = ne2k_send_packet,
 };
 
-//CDI_DRIVER(DRIVER_NAME, ne2k_driver)
+CDI_DRIVER(DRIVER_NAME, ne2k_driver)

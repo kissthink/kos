@@ -76,4 +76,4 @@ static struct cdi_fs_driver ext2_driver = {
     .fs_destroy     = ext2_fs_destroy,
 };
 
-//CDI_DRIVER(DRIVER_NAME, ext2_driver)
+CDI_DRIVER(DRIVER_NAME, ext2_driver)
