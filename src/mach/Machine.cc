@@ -91,6 +91,10 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
+// FreeBSD callout initialization
+extern "C" char* kern_timeout_callwheel_alloc(char*);
+extern "C" void kern_timeout_callwheel_init();
+
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
 #if 1
@@ -256,6 +260,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 
   // start gdb -> need to have IDT installed
   Gdb::start();
+
+  // initialize FreeBSD callout
+  kern_timeout_callwheel_alloc(0);
+  kern_timeout_callwheel_init();
 
   // start dynamic timer
   DynamicTimer::init();
@@ -428,19 +436,14 @@ extern "C" void isr_handler_0xff() {
 }
 
 extern "C" void isr_handler_gen(mword num) {
-  ISource* s = Interrupt::lookupSource(num);
-  DBG::outln(DBG::Basic, "source:", FmtHex(s));
-  if (!s) {
+  ISource* src = Interrupt::lookupSource(num);
+  if likely(src != nullptr) {
+    Interrupt::runHandlers(src);
+  } else {
     StdErr.outln("\nNULL SOURCE: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
     Processor::sendEOI();
-  } else {
-    Interrupt::runHandlers(s);
+//    Reboot();
   }
-#if 0
-  StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
-  Processor::sendEOI();
-#endif
-//  Reboot();
 }
 
 extern "C" void isr_handler_gen_err(mword num, mword errcode) {

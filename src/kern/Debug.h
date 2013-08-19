@@ -27,6 +27,7 @@ public:
     Boot,
     Basic,
     Libc,
+    Lock,
     Devices,
     Error,
     Frame,

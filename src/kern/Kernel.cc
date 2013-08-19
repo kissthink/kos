@@ -100,8 +100,8 @@ void mainLoop(ptr_t) {
     kernelSpace.activate();
   }
 
-//  sysinit_startup();
-  RunTests();
+  sysinit_startup();
+//  RunTests();
 
   // TODO: create processes and leave BSP thread waiting for events
   Thread::create(task, nullptr, kernelSpace, "A");

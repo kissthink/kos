@@ -24,6 +24,7 @@ extern "C" {
 #include "kern/AddressSpace.h"
 #include "kern/Kernel.h"
 #include "ipc/BlockingSync.h"
+#include "int/Interrupt.h"
 
 #include <map>
 
@@ -112,6 +113,7 @@ laddr Machine::initACPI(vaddr r) {
       uint8_t rdr = ioapic->getRedirects() + 1;
       if ( io->GlobalIrqBase + rdr > irqCount ) irqCount = io->GlobalIrqBase + rdr;
       // mask all interrupts and store irq/ioapic information
+      DBG::outln(DBG::Basic, "Global:", FmtHex(io->GlobalIrqBase));
       for (uint8_t x = 0; x < rdr; x += 1 ) {
         ioapic->maskIRQ(x);
         irqMap.insert( {io->GlobalIrqBase + x, {io->Address, x}} );
@@ -176,6 +178,7 @@ laddr Machine::initACPI(vaddr r) {
   for (const pair<uint32_t,IrqInfo>& i : irqMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount );
     irqTable[i.first] = i.second;
+    Interrupt::registerSource(i.first, i.second.ioapicIrq, i.second.ioApicAddr);
   }
   for (const pair<uint32_t,IrqOverrideInfo>& i : irqOverrideMap) {
     KASSERTN( i.first < irqCount, i.first, ' ', irqCount )

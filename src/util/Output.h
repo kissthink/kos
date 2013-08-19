@@ -35,6 +35,9 @@ extern void kassertprint1(const FmtHex& ptr);
 #if defined(ABORT1)
 #error macro collision: ABORT1
 #endif
+#if defined(ABORTN)
+#error macro collision: ABORTN
+#endif
 #if defined(KASSERT0)
 #error macro collision: KASSERT0
 #endif
@@ -44,6 +47,7 @@ extern void kassertprint1(const FmtHex& ptr);
 
 #define ABORT0()           {                      { kassertprint( "ABORT  : "       " in " __FILE__ ":", __LINE__, __func__); Reboot(); } }
 #define ABORT1(msg)        {                      { kassertprint( "ABORT  : "       " in " __FILE__ ":", __LINE__, __func__); kassertprint1(msg); Reboot(); } }
+#define ABORTN(args...)    {                      { kassertprint( "ABORT  : "       " in " __FILE__ ":", __LINE__, __func__); StdErr.outln(args); StdDbg.outln(args); Reboot(); } }
 #define KASSERT0(expr)     { if unlikely(!(expr)) { kassertprint( "KASSERT: " #expr " in " __FILE__ ":", __LINE__, __func__); Reboot(); } }
 #define KASSERT1(expr,msg) { if unlikely(!(expr)) { kassertprint( "KASSERT: " #expr " in " __FILE__ ":", __LINE__, __func__); kassertprint1(msg); Reboot(); } }
 

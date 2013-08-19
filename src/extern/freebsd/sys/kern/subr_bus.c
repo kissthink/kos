@@ -27,10 +27,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_bus.c 235522 2012-05-16 21:06:56Z jhb $");
 
-#ifdef SUKWON
-#include "opt_bus.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/filio.h>
@@ -49,7 +45,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_bus.c 235522 2012-05-16 21:06:56
 #include <sys/rman.h>
 #include <sys/selinfo.h>
 #include <sys/signalvar.h>
-#include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/bus.h>
@@ -58,16 +53,6 @@ __FBSDID("$FreeBSD: release/9.1.0/sys/kern/subr_bus.c 235522 2012-05-16 21:06:56
 #include <machine/stdarg.h>
 
 #include <vm/uma.h>
-
-#ifndef SUKWON
-#undef M_TEMP
-#define M_TEMP  0
-#endif
-
-#ifdef SUKWON
-SYSCTL_NODE(_hw, OID_AUTO, bus, CTLFLAG_RW, NULL, NULL);
-SYSCTL_NODE(, OID_AUTO, dev, CTLFLAG_RW, NULL, NULL);
-#endif
 
 /*
  * Used to attach drivers to devclasses.
@@ -96,11 +81,6 @@ struct devclass {
 	int		maxunit;	/* size of devices array */
 	int		flags;
 #define DC_HAS_CHILDREN		1
-
-#ifdef SUKWON
-	struct sysctl_ctx_list sysctl_ctx;
-	struct sysctl_oid *sysctl_tree;
-#endif
 };
 
 /**
@@ -144,20 +124,10 @@ struct device {
 	u_int	order;			/**< order from device_add_child_ordered() */
 	void	*ivars;			/**< instance variables  */
 	void	*softc;			/**< current driver's variables  */
-
-#ifdef SUKWON
-	struct sysctl_ctx_list sysctl_ctx; /**< state for sysctl variables  */
-	struct sysctl_oid *sysctl_tree;	/**< state for sysctl variables */
-#endif
 };
 
-#ifdef SUKWON
 static MALLOC_DEFINE(M_BUS, "bus", "Bus data structures");
 static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
-#else
-#define M_BUS     0
-#define M_BUS_SC  0
-#endif
 
 /* Make the compiler ignore the function calls */
 #define PDEBUG(a)			/* nop */
@@ -177,147 +147,6 @@ static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
 #define print_devclass_list_short()	/* nop */
 #define print_devclass_list()		/* nop */
 
-#ifdef SUKWON
-/*
- * dev sysctl tree
- */
-
-enum {
-	DEVCLASS_SYSCTL_PARENT,
-};
-
-static int
-devclass_sysctl_handler(SYSCTL_HANDLER_ARGS)
-{
-	devclass_t dc = (devclass_t)arg1;
-	const char *value;
-
-	switch (arg2) {
-	case DEVCLASS_SYSCTL_PARENT:
-		value = dc->parent ? dc->parent->name : "";
-		break;
-	default:
-		return (EINVAL);
-	}
-	return (SYSCTL_OUT(req, value, strlen(value)));
-}
-
-static void
-devclass_sysctl_init(devclass_t dc)
-{
-
-	if (dc->sysctl_tree != NULL)
-		return;
-	sysctl_ctx_init(&dc->sysctl_ctx);
-	dc->sysctl_tree = SYSCTL_ADD_NODE(&dc->sysctl_ctx,
-	    SYSCTL_STATIC_CHILDREN(_dev), OID_AUTO, dc->name,
-	    CTLFLAG_RD, NULL, "");
-	SYSCTL_ADD_PROC(&dc->sysctl_ctx, SYSCTL_CHILDREN(dc->sysctl_tree),
-	    OID_AUTO, "%parent", CTLTYPE_STRING | CTLFLAG_RD,
-	    dc, DEVCLASS_SYSCTL_PARENT, devclass_sysctl_handler, "A",
-	    "parent class");
-}
-
-enum {
-	DEVICE_SYSCTL_DESC,
-	DEVICE_SYSCTL_DRIVER,
-	DEVICE_SYSCTL_LOCATION,
-	DEVICE_SYSCTL_PNPINFO,
-	DEVICE_SYSCTL_PARENT,
-};
-
-static int
-device_sysctl_handler(SYSCTL_HANDLER_ARGS)
-{
-	device_t dev = (device_t)arg1;
-	const char *value;
-	char *buf;
-	int error;
-
-	buf = NULL;
-	switch (arg2) {
-	case DEVICE_SYSCTL_DESC:
-		value = dev->desc ? dev->desc : "";
-		break;
-	case DEVICE_SYSCTL_DRIVER:
-		value = dev->driver ? dev->driver->name : "";
-		break;
-	case DEVICE_SYSCTL_LOCATION:
-		value = buf = malloc(1024, M_BUS, M_WAITOK | M_ZERO);
-		bus_child_location_str(dev, buf, 1024);
-		break;
-	case DEVICE_SYSCTL_PNPINFO:
-		value = buf = malloc(1024, M_BUS, M_WAITOK | M_ZERO);
-		bus_child_pnpinfo_str(dev, buf, 1024);
-		break;
-	case DEVICE_SYSCTL_PARENT:
-		value = dev->parent ? dev->parent->nameunit : "";
-		break;
-	default:
-		return (EINVAL);
-	}
-	error = SYSCTL_OUT(req, value, strlen(value));
-	if (buf != NULL)
-		free(buf, M_BUS);
-	return (error);
-}
-
-static void
-device_sysctl_init(device_t dev)
-{
-	devclass_t dc = dev->devclass;
-
-	if (dev->sysctl_tree != NULL)
-		return;
-	devclass_sysctl_init(dc);
-	sysctl_ctx_init(&dev->sysctl_ctx);
-	dev->sysctl_tree = SYSCTL_ADD_NODE(&dev->sysctl_ctx,
-	    SYSCTL_CHILDREN(dc->sysctl_tree), OID_AUTO,
-	    dev->nameunit + strlen(dc->name),
-	    CTLFLAG_RD, NULL, "");
-	SYSCTL_ADD_PROC(&dev->sysctl_ctx, SYSCTL_CHILDREN(dev->sysctl_tree),
-	    OID_AUTO, "%desc", CTLTYPE_STRING | CTLFLAG_RD,
-	    dev, DEVICE_SYSCTL_DESC, device_sysctl_handler, "A",
-	    "device description");
-	SYSCTL_ADD_PROC(&dev->sysctl_ctx, SYSCTL_CHILDREN(dev->sysctl_tree),
-	    OID_AUTO, "%driver", CTLTYPE_STRING | CTLFLAG_RD,
-	    dev, DEVICE_SYSCTL_DRIVER, device_sysctl_handler, "A",
-	    "device driver name");
-	SYSCTL_ADD_PROC(&dev->sysctl_ctx, SYSCTL_CHILDREN(dev->sysctl_tree),
-	    OID_AUTO, "%location", CTLTYPE_STRING | CTLFLAG_RD,
-	    dev, DEVICE_SYSCTL_LOCATION, device_sysctl_handler, "A",
-	    "device location relative to parent");
-	SYSCTL_ADD_PROC(&dev->sysctl_ctx, SYSCTL_CHILDREN(dev->sysctl_tree),
-	    OID_AUTO, "%pnpinfo", CTLTYPE_STRING | CTLFLAG_RD,
-	    dev, DEVICE_SYSCTL_PNPINFO, device_sysctl_handler, "A",
-	    "device identification");
-	SYSCTL_ADD_PROC(&dev->sysctl_ctx, SYSCTL_CHILDREN(dev->sysctl_tree),
-	    OID_AUTO, "%parent", CTLTYPE_STRING | CTLFLAG_RD,
-	    dev, DEVICE_SYSCTL_PARENT, device_sysctl_handler, "A",
-	    "parent device");
-}
-
-static void
-device_sysctl_update(device_t dev)
-{
-	devclass_t dc = dev->devclass;
-
-	if (dev->sysctl_tree == NULL)
-		return;
-	sysctl_rename_oid(dev->sysctl_tree, dev->nameunit + strlen(dc->name));
-}
-
-static void
-device_sysctl_fini(device_t dev)
-{
-	if (dev->sysctl_tree == NULL)
-		return;
-	sysctl_ctx_free(&dev->sysctl_ctx);
-	dev->sysctl_tree = NULL;
-}
-#endif
-
-#ifdef SUKWON
 /*
  * /dev/devctl implementation
  */
@@ -339,20 +168,9 @@ device_sysctl_fini(device_t dev)
  * tested since 3.4 or 2.2.8!
  */
 
-#ifdef SUKWON
 /* Deprecated way to adjust queue length */
-static int sysctl_devctl_disable(SYSCTL_HANDLER_ARGS);
-/* XXX Need to support old-style tunable hw.bus.devctl_disable" */
-SYSCTL_PROC(_hw_bus, OID_AUTO, devctl_disable, CTLTYPE_INT | CTLFLAG_RW, NULL,
-    0, sysctl_devctl_disable, "I", "devctl disable -- deprecated");
-
 #define DEVCTL_DEFAULT_QUEUE_LEN 1000
-static int sysctl_devctl_queue(SYSCTL_HANDLER_ARGS);
 static int devctl_queue_length = DEVCTL_DEFAULT_QUEUE_LEN;
-TUNABLE_INT("hw.bus.devctl_queue", &devctl_queue_length);
-SYSCTL_PROC(_hw_bus, OID_AUTO, devctl_queue, CTLTYPE_INT | CTLFLAG_RW, NULL,
-    0, sysctl_devctl_queue, "I", "devctl queue length");
-#endif
 
 static d_open_t		devopen;
 static d_close_t	devclose;
@@ -725,62 +543,7 @@ devnomatch(device_t dev)
 	devaddq("?", "", dev);
 }
 
-#ifdef SUKWON
-static int
-sysctl_devctl_disable(SYSCTL_HANDLER_ARGS)
-{
-	struct dev_event_info *n1;
-	int dis, error;
-
-	dis = devctl_queue_length == 0;
-	error = sysctl_handle_int(oidp, &dis, 0, req);
-	if (error || !req->newptr)
-		return (error);
-	mtx_lock(&devsoftc.mtx);
-	if (dis) {
-		while (!TAILQ_EMPTY(&devsoftc.devq)) {
-			n1 = TAILQ_FIRST(&devsoftc.devq);
-			TAILQ_REMOVE(&devsoftc.devq, n1, dei_link);
-			free(n1->dei_data, M_BUS);
-			free(n1, M_BUS);
-		}
-		devsoftc.queued = 0;
-		devctl_queue_length = 0;
-	} else {
-		devctl_queue_length = DEVCTL_DEFAULT_QUEUE_LEN;
-	}
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
-}
-
-static int
-sysctl_devctl_queue(SYSCTL_HANDLER_ARGS)
-{
-	struct dev_event_info *n1;
-	int q, error;
-
-	q = devctl_queue_length;
-	error = sysctl_handle_int(oidp, &q, 0, req);
-	if (error || !req->newptr)
-		return (error);
-	if (q < 0)
-		return (EINVAL);
-	mtx_lock(&devsoftc.mtx);
-	devctl_queue_length = q;
-	while (devsoftc.queued > devctl_queue_length) {
-		n1 = TAILQ_FIRST(&devsoftc.devq);
-		TAILQ_REMOVE(&devsoftc.devq, n1, dei_link);
-		free(n1->dei_data, M_BUS);
-		free(n1, M_BUS);
-		devsoftc.queued--;
-	}
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
-}
-#endif
-
 /* End of /dev/devctl code */
-#endif
 
 static TAILQ_HEAD(,device)	bus_data_devices;
 static int bus_data_generation = 1;
@@ -1124,9 +887,7 @@ devclass_driver_deleted(devclass_t busclass, devclass_t dc, driver_t *driver)
 				if ((error = device_detach(dev)) != 0)
 					return (error);
 				BUS_PROBE_NOMATCH(dev->parent, dev);
-#ifdef SUKWON
 				devnomatch(dev);
-#endif
 				dev->flags |= DF_DONENOMATCH;
 			}
 		}
@@ -1502,20 +1263,6 @@ devclass_get_parent(devclass_t dc)
 	return (dc->parent);
 }
 
-#ifdef SUKWON
-struct sysctl_ctx_list *
-devclass_get_sysctl_ctx(devclass_t dc)
-{
-	return (&dc->sysctl_ctx);
-}
-
-struct sysctl_oid *
-devclass_get_sysctl_tree(devclass_t dc)
-{
-	return (dc->sysctl_tree);
-}
-#endif
-
 /**
  * @internal
  * @brief Allocate a unit number
@@ -1558,12 +1305,10 @@ devclass_alloc_unit(devclass_t dc, device_t dev, int *unitp)
 		/* Unwired device, find the next available slot for it */
 		unit = 0;
 		for (unit = 0;; unit++) {
-#ifdef SUKWON
 			/* If there is an "at" hint for a unit then skip it. */
 			if (resource_string_value(dc->name, unit, "at", &s) ==
 			    0)
 				continue;
-#endif
 
 			/* If this device slot is already in use, skip it. */
 			if (unit < dc->maxunit && dc->devices[unit] != NULL)
@@ -2028,10 +1773,8 @@ device_probe_child(device_t dev, device_t child)
 			}
 
 			/* Fetch any flags for the device before probing. */
-#ifdef SUKWON
 			resource_int_value(dl->driver->name, child->unit,
 			    "flags", &child->devflags);
-#endif
 
 			result = DEVICE_PROBE(child);
 
@@ -2121,10 +1864,8 @@ device_probe_child(device_t dev, device_t child)
 		result = device_set_driver(child, best->driver);
 		if (result != 0)
 			return (result);
-#ifdef SUKWON
 		resource_int_value(best->driver->name, child->unit,
 		    "flags", &child->devflags);
-#endif
 
 		if (pri < 0) {
 			/*
@@ -2273,20 +2014,6 @@ device_get_flags(device_t dev)
 {
 	return (dev->devflags);
 }
-
-#ifdef SUKWON
-struct sysctl_ctx_list *
-device_get_sysctl_ctx(device_t dev)
-{
-	return (&dev->sysctl_ctx);
-}
-
-struct sysctl_oid *
-device_get_sysctl_tree(device_t dev)
-{
-	return (dev->sysctl_tree);
-}
-#endif
 
 /**
  * @brief Print the name of the device followed by a colon and a space
@@ -2677,9 +2404,7 @@ device_probe(device_t dev)
 		if (bus_current_pass == BUS_PASS_DEFAULT &&
 		    !(dev->flags & DF_DONENOMATCH)) {
 			BUS_PROBE_NOMATCH(dev->parent, dev);
-#ifdef SUKWON
 			devnomatch(dev);
-#endif
 			dev->flags |= DF_DONENOMATCH;
 		}
 		return (error);
@@ -2731,9 +2456,6 @@ device_attach(device_t dev)
 {
 	int error;
 
-#ifdef SUKWON
-	device_sysctl_init(dev);
-#endif
 	if (!device_is_quiet(dev))
 		device_print_child(dev->parent, dev);
 	dev->state = DS_ATTACHING;
@@ -2743,24 +2465,16 @@ device_attach(device_t dev)
 		if (!(dev->flags & DF_FIXEDCLASS))
 			devclass_delete_device(dev->devclass, dev);
 		(void)device_set_driver(dev, NULL);
-#ifdef SUKWON
-		device_sysctl_fini(dev);
-#endif
 		KASSERT(dev->busy == 0, ("attach failed but busy"));
 		dev->state = DS_NOTPRESENT;
 		return (error);
 	}
-#ifdef SUKWON
-	device_sysctl_update(dev);
-#endif
 	if (dev->busy)
 		dev->state = DS_BUSY;
 	else
 		dev->state = DS_ATTACHED;
 	dev->flags &= ~DF_DONENOMATCH;
-#ifdef SUKWON
 	devadded(dev);
-#endif
 	return (0);
 }
 
@@ -2795,9 +2509,7 @@ device_detach(device_t dev)
 
 	if ((error = DEVICE_DETACH(dev)) != 0)
 		return (error);
-#ifdef SUKWON
 	devremoved(dev);
-#endif
 	if (!device_is_quiet(dev))
 		device_printf(dev, "detached\n");
 	if (dev->parent)
@@ -2808,9 +2520,6 @@ device_detach(device_t dev)
 
 	dev->state = DS_NOTPRESENT;
 	(void)device_set_driver(dev, NULL);
-#ifdef SUKWON
-	device_sysctl_fini(dev);
-#endif
 
 	return (0);
 }
@@ -4344,10 +4053,8 @@ root_resume(device_t dev)
 	int error;
 
 	error = bus_generic_resume(dev);
-#ifdef SUKWON
 	if (error == 0)
 		devctl_notify("kern", "power", "resume", NULL);
-#endif
 	return (error);
 }
 
@@ -4423,9 +4130,7 @@ root_bus_module_handler(module_t mod, int what, void* arg)
 		root_bus->driver = &root_driver;
 		root_bus->state = DS_ATTACHED;
 		root_devclass = devclass_find_internal("root", NULL, FALSE);
-#ifdef SUKWON
 		devinit();
-#endif
 		return (0);
 
 	case MOD_SHUTDOWN:
@@ -4535,7 +4240,6 @@ driver_module_handler(module_t mod, int what, void *arg)
 void
 bus_enumerate_hinted_children(device_t bus)
 {
-#ifdef SUKWON
 	int i;
 	const char *dname, *busname;
 	int dunit;
@@ -4555,89 +4259,160 @@ bus_enumerate_hinted_children(device_t bus)
 	i = 0;
 	while (resource_find_match(&i, &dname, &dunit, "at", busname) == 0)
 		BUS_HINTED_CHILD(bus, dname, dunit);
-#endif
 }
 
-#ifdef SUKWON
-/*
- * User-space access to the device tree.
- *
- * We implement a small set of nodes:
- *
- * hw.bus			Single integer read method to obtain the
- *				current generation count.
- * hw.bus.devices		Reads the entire device tree in flat space.
- * hw.bus.rman			Resource manager interface
- *
- * We might like to add the ability to scan devclasses and/or drivers to
- * determine what else is currently loaded/available.
+#ifdef BUS_DEBUG
+
+/* the _short versions avoid iteration by not calling anything that prints
+ * more than oneliners. I love oneliners.
  */
 
-static int
-sysctl_bus(SYSCTL_HANDLER_ARGS)
+static void
+print_device_short(device_t dev, int indent)
 {
-	struct u_businfo	ubus;
+	if (!dev)
+		return;
 
-	ubus.ub_version = BUS_USER_VERSION;
-	ubus.ub_generation = bus_data_generation;
-
-	return (SYSCTL_OUT(req, &ubus, sizeof(ubus)));
+	indentprintf(("device %d: <%s> %sparent,%schildren,%s%s%s%s%s,%sivars,%ssoftc,busy=%d\n",
+	    dev->unit, dev->desc,
+	    (dev->parent? "":"no "),
+	    (TAILQ_EMPTY(&dev->children)? "no ":""),
+	    (dev->flags&DF_ENABLED? "enabled,":"disabled,"),
+	    (dev->flags&DF_FIXEDCLASS? "fixed,":""),
+	    (dev->flags&DF_WILDCARD? "wildcard,":""),
+	    (dev->flags&DF_DESCMALLOCED? "descmalloced,":""),
+	    (dev->flags&DF_REBID? "rebiddable,":""),
+	    (dev->ivars? "":"no "),
+	    (dev->softc? "":"no "),
+	    dev->busy));
 }
-SYSCTL_NODE(_hw_bus, OID_AUTO, info, CTLFLAG_RW, sysctl_bus,
-    "bus-related data");
 
-static int
-sysctl_devices(SYSCTL_HANDLER_ARGS)
+static void
+print_device(device_t dev, int indent)
 {
-	int			*name = (int *)arg1;
-	u_int			namelen = arg2;
-	int			index;
-	struct device		*dev;
-	struct u_device		udev;	/* XXX this is a bit big */
-	int			error;
+	if (!dev)
+		return;
 
-	if (namelen != 2)
-		return (EINVAL);
+	print_device_short(dev, indent);
 
-	if (bus_data_generation_check(name[0]))
-		return (EINVAL);
+	indentprintf(("Parent:\n"));
+	print_device_short(dev->parent, indent+1);
+	indentprintf(("Driver:\n"));
+	print_driver_short(dev->driver, indent+1);
+	indentprintf(("Devclass:\n"));
+	print_devclass_short(dev->devclass, indent+1);
+}
 
-	index = name[1];
+void
+print_device_tree_short(device_t dev, int indent)
+/* print the device and all its children (indented) */
+{
+	device_t child;
 
-	/*
-	 * Scan the list of devices, looking for the requested index.
-	 */
-	TAILQ_FOREACH(dev, &bus_data_devices, devlink) {
-		if (index-- == 0)
-			break;
+	if (!dev)
+		return;
+
+	print_device_short(dev, indent);
+
+	TAILQ_FOREACH(child, &dev->children, link) {
+		print_device_tree_short(child, indent+1);
 	}
-	if (dev == NULL)
-		return (ENOENT);
-
-	/*
-	 * Populate the return array.
-	 */
-	bzero(&udev, sizeof(udev));
-	udev.dv_handle = (uintptr_t)dev;
-	udev.dv_parent = (uintptr_t)dev->parent;
-	if (dev->nameunit != NULL)
-		strlcpy(udev.dv_name, dev->nameunit, sizeof(udev.dv_name));
-	if (dev->desc != NULL)
-		strlcpy(udev.dv_desc, dev->desc, sizeof(udev.dv_desc));
-	if (dev->driver != NULL && dev->driver->name != NULL)
-		strlcpy(udev.dv_drivername, dev->driver->name,
-		    sizeof(udev.dv_drivername));
-	bus_child_pnpinfo_str(dev, udev.dv_pnpinfo, sizeof(udev.dv_pnpinfo));
-	bus_child_location_str(dev, udev.dv_location, sizeof(udev.dv_location));
-	udev.dv_devflags = dev->devflags;
-	udev.dv_flags = dev->flags;
-	udev.dv_state = dev->state;
-	error = SYSCTL_OUT(req, &udev, sizeof(udev));
-	return (error);
 }
 
-SYSCTL_NODE(_hw_bus, OID_AUTO, devices, CTLFLAG_RD, sysctl_devices,
-    "system device tree");
+void
+print_device_tree(device_t dev, int indent)
+/* print the device and all its children (indented) */
+{
+	device_t child;
+
+	if (!dev)
+		return;
+
+	print_device(dev, indent);
+
+	TAILQ_FOREACH(child, &dev->children, link) {
+		print_device_tree(child, indent+1);
+	}
+}
+
+static void
+print_driver_short(driver_t *driver, int indent)
+{
+	if (!driver)
+		return;
+
+	indentprintf(("driver %s: softc size = %zd\n",
+	    driver->name, driver->size));
+}
+
+static void
+print_driver(driver_t *driver, int indent)
+{
+	if (!driver)
+		return;
+
+	print_driver_short(driver, indent);
+}
+
+static void
+print_driver_list(driver_list_t drivers, int indent)
+{
+	driverlink_t driver;
+
+	TAILQ_FOREACH(driver, &drivers, link) {
+		print_driver(driver->driver, indent);
+	}
+}
+
+static void
+print_devclass_short(devclass_t dc, int indent)
+{
+	if ( !dc )
+		return;
+
+	indentprintf(("devclass %s: max units = %d\n", dc->name, dc->maxunit));
+}
+
+static void
+print_devclass(devclass_t dc, int indent)
+{
+	int i;
+
+	if ( !dc )
+		return;
+
+	print_devclass_short(dc, indent);
+	indentprintf(("Drivers:\n"));
+	print_driver_list(dc->drivers, indent+1);
+
+	indentprintf(("Devices:\n"));
+	for (i = 0; i < dc->maxunit; i++)
+		if (dc->devices[i])
+			print_device(dc->devices[i], indent+1);
+}
+
+void
+print_devclass_list_short(void)
+{
+	devclass_t dc;
+
+	printf("Short listing of devclasses, drivers & devices:\n");
+	TAILQ_FOREACH(dc, &devclasses, link) {
+		print_devclass_short(dc, 0);
+	}
+}
+
+void
+print_devclass_list(void)
+{
+	devclass_t dc;
+
+	printf("Full listing of devclasses, drivers & devices:\n");
+	TAILQ_FOREACH(dc, &devclasses, link) {
+		print_devclass(dc, 0);
+	}
+}
+
 #endif
 
 int

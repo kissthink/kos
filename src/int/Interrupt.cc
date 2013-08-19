@@ -7,6 +7,7 @@
 
 ISource* Interrupt::sources[NUM_IO_INTS];
 InPlaceList<IEvent*> Interrupt::eventList;
+int Interrupt::LAPIC_IRQS[APIC_NUM_IOINTS+1];
 SpinLock Interrupt::lk;
 
 static void enableSource(ptr_t arg) {
@@ -36,8 +37,8 @@ static void assignCPU(ptr_t arg) {
 
 void Interrupt::init() {
   ScopedLock<> lo(lk);
-  for (int i = 0; i < NUM_IO_INTS; i++) {
-    sources[i] = nullptr;
+  for (int i = 0; i <= APIC_NUM_IOINTS; i++) {
+    LAPIC_IRQS[i] = -1;
   }
 }
 
@@ -59,9 +60,9 @@ void Interrupt::registerSource(uint32_t irq, uint32_t pin, laddr ioApicAddr) {
   }
 }
 
-ISource* Interrupt::lookupSource(int vector) {
+ISource* Interrupt::lookupSource(int irq) {
   ScopedLock<> lo(lk);
-  return sources[vector];
+  return sources[irq];
 }
 
 // add an interrupt handler for an interrupt vector
@@ -69,14 +70,14 @@ ISource* Interrupt::lookupSource(int vector) {
 void Interrupt::addHandler(int vector, IHandler* handler) {
   KASSERT1(vector, vector);
   KASSERT1(handler, "null handler");
-  ISource* s = sources[vector];         // vector must be from registered interrupt source
-  KASSERT1(s, "source is not registered");
-  IEvent* e = s->getEvent();
-  handler->setEvent(e);
-  bool added = e->addHandler(handler);  // checks for exclusive mode
+  ISource* src = sources[vector];         // vector must be from registered interrupt source
+  KASSERT1(src, "source is not registered");
+  IEvent* event = src->getEvent();
+  handler->setEvent(event);
+  bool added = event->addHandler(handler);  // checks for exclusive mode
   if (added) {
     if (handler->hasHandler()) {
-      e->createIThread("");
+      event->createIThread("");
     }
   }
 }
@@ -151,11 +152,12 @@ void Interrupt::shuffleIRQs() {
   // TODO
 }
 
-void Interrupt::createEvent(ISource* source, int irq, preIThreadFunc f1 = nullptr,
+IEvent* Interrupt::createEvent(ISource* source, int irq, preIThreadFunc f1 = nullptr,
                             postIThreadFunc f2 = nullptr, postFilterFunc f3 = nullptr, bool soft=false) {
   IEvent* e = new IEvent(source, f1, f2, f3, soft);
   ScopedLock<> lo(lk);
   eventList.push_back(e);
+  return e;
 }
 
 // looks for hardware interrupt event with registered handlers for an IRQ
@@ -174,4 +176,16 @@ void Interrupt::scheduleSWI(IHandler* h) {
   KASSERT1(e, "null event");
   KASSERT1(!e->handlers.empty(), "no handlers are registered");
   e->ithread->schedule();
+}
+
+uint32_t Interrupt::allocateVector(uint32_t irq) {
+  KASSERT1(irq < NUM_IO_INTS, irq);
+  ScopedLock<> lo(lk);
+  for (int vector = 0; vector < APIC_NUM_IOINTS; vector++) {
+    if (LAPIC_IRQS[vector] != -1)
+      continue;
+    LAPIC_IRQS[vector] = irq;
+    return vector + APIC_IO_INTS;
+  }
+  return 0;
 }

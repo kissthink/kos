@@ -19,10 +19,15 @@ typedef void postIThreadFunc(ptr_t);
 typedef void postFilterFunc(ptr_t);
 
 class Interrupt {
-  static const int NUM_IO_INTS = 191;
+  static const int APIC_NUM_IOINTS = 191;
+  static const int APIC_IO_INTS = 48;
+  static const int NUM_IO_INTS = 768;
   static ISource* sources[NUM_IO_INTS];   // look for interrupt source with idt vector value
   static InPlaceList<IEvent*> eventList;
+  static int LAPIC_IRQS[APIC_NUM_IOINTS+1];
   static SpinLock lk;
+
+  static uint32_t allocateVector(uint32_t irq);   // use to find IOAPIC irq for given vector later
 
   Interrupt() = delete;
   Interrupt(const Interrupt&) = delete;
@@ -31,7 +36,7 @@ public:
   static void init();
   static void registerSource(ISource* source);
   static void registerSource(uint32_t,uint32_t,laddr);
-  static ISource* lookupSource(int vector);
+  static ISource* lookupSource(int irq);
   static void addHandler(int vector, IHandler* handler);
   static void removeHandler(IHandler* handler);
   static void disableSource(ISource* source);
@@ -44,7 +49,7 @@ public:
   static void shuffleIRQs();
 
   // kern_intr.c
-  static void createEvent(ISource*, int, preIThreadFunc, postIThreadFunc, postFilterFunc, bool soft);
+  static IEvent* createEvent(ISource*, int, preIThreadFunc, postIThreadFunc, postFilterFunc, bool soft);
   static IEvent* lookUp(int irq);
   static void scheduleSWI(IHandler* h);   // schedule software interrupt
 };

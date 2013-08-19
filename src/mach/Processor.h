@@ -55,6 +55,7 @@ class Processor {
   static constexpr volatile LAPIC* apic() { return (LAPIC*)lapicAddr; }
 
   friend class Machine;
+  friend class ILAPIC;
   friend void set_interrupt_state(void);
   friend void reset_interrupt_state(void);
 
@@ -155,6 +156,11 @@ public:
   static void enableInterrupts(){
    KASSERT0(!interruptsEnabled());
    CPU::enableInterrupts();
+  }
+  static bool disableInterrupts() {
+    bool enabled = interruptsEnabled();
+    CPU::disableInterrupts();
+    return enabled;
   }
   static bool interruptsEnabled() {
    return RFlags::interruptsEnabled();

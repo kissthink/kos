@@ -45,7 +45,7 @@ class Machine {
   static laddr initACPI( vaddr rsdp )                  __section(".boot.text");
   static void parseACPI()                              __section(".boot.text");
 
-  static void setupIDT( uint32_t n, laddr addr )       __section(".boot.text");
+  static void setupIDT( uint32_t n, laddr addr, int type = 0x0E, int dpl = 0, int ist = 0 )       __section(".boot.text");
   static void setupAllIDTs()                           __section(".boot.text");
 
 public:

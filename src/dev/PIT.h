@@ -29,7 +29,8 @@ public:
   void init() volatile                                 __section(".boot.text");
   void staticInterruptHandler() volatile {
     currentTick += 1;
-    callout_tick(); // fires swi interrupt for callout
+//    if (currentTick % 16 == 0) callout_tick(); // callout_tick for every tick seems too fast...(XXX is this too slow?)
+    callout_tick();
   }
   void wait(mword miliseconds) volatile {
     mword start = currentTick;

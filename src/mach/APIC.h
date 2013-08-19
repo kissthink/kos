@@ -36,9 +36,12 @@ struct PIC {
   static void disable();
 };
 
+class ILAPIC;
+
 // Note that APIC registers have to be written as a complete 32-bit word
 class LAPIC { // see Intel Vol 3, Section 10.4 "Local APIC"
   friend class Processor;
+  friend class ILAPIC;
 
   __aligned(0x10) uint32_t Reserved0x000;         // 0x000
   __aligned(0x10) uint32_t Reserved0x010;
@@ -46,11 +49,17 @@ class LAPIC { // see Intel Vol 3, Section 10.4 "Local APIC"
     const BitSeg<uint32_t,24,8> LAPIC_ID;
 
   __aligned(0x10) uint32_t Version;               // 0x030
+  const BitSeg<uint32_t, 0,8> LAPIC_Version;
+  const BitSeg<uint32_t,16,8> MaxLVTEntry;
+  const BitSeg<uint32_t,24,1> SuppressEOIBroadcast;
   __aligned(0x10) uint32_t Reserved0x040;
   __aligned(0x10) uint32_t Reserved0x050;
   __aligned(0x10) uint32_t Reserved0x060;
   __aligned(0x10) uint32_t Reserved0x070;
   __aligned(0x10) uint32_t TaskPriority;          // 0x080
+  const BitSeg<uint32_t, 0,4> TaskPrioSubClass;
+  const BitSeg<uint32_t, 4,4> TaskPrioClass;
+  const BitSeg<uint32_t, 0,8> TaskPriorityClass;
   __aligned(0x10) uint32_t ArbitrationPriority;
   __aligned(0x10) uint32_t ProcessorPriority;
   __aligned(0x10) uint32_t EOI;
@@ -174,6 +183,17 @@ class LAPIC { // see Intel Vol 3, Section 10.4 "Local APIC"
   void sendEOI() volatile {
     EOI = 0;
   }
+  void setTaskPriority(uint8_t vec) volatile {
+    TaskPriority &= ~TaskPriorityClass();
+    TaskPriority |= vec;
+  }
+  uint32_t maxLVTEntry() volatile {
+    return MaxLVTEntry.get(Version);
+  }
+  /*
+  uint32_t getLVT(LVT_Type type) volatile;
+  void setLVT(uint32_t val, LVT_Type type) volatile;
+  */
   uint32_t sendInitIPI( uint8_t dest ) volatile {
     ICR_HIGH = DestField(dest);
     ICR_LOW = DeliveryMode(Init) | Level();

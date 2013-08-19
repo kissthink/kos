@@ -33,5 +33,5 @@ void taskqueueTest2() {
   free(t, 0);
 }
 
-SYSINIT(taskqueueTest1, SI_SUB_RUN_SCHEDULER, SI_ORDER_FIRST, taskqueueTest1, NULL);
-SYSINIT(taskqueueTest2, SI_SUB_RUN_SCHEDULER, SI_ORDER_FIRST, taskqueueTest2, NULL);
+//SYSINIT(taskqueueTest1, SI_SUB_RUN_SCHEDULER, SI_ORDER_FIRST, taskqueueTest1, NULL);
+//SYSINIT(taskqueueTest2, SI_SUB_RUN_SCHEDULER, SI_ORDER_FIRST, taskqueueTest2, NULL);

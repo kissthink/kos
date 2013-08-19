@@ -23,6 +23,7 @@ static const char* options[] = {
   "boot",
   "basic",
   "libc",
+  "lock",
   "devices",
   "error",
   "frame",
