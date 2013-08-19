@@ -18,6 +18,7 @@
 #define _PIT_h_ 1
 
 #include "mach/platform.h"
+#include "kern/DynamicTimer.h"
 
 class PIT {
   static const int frequency = 1000;
@@ -27,6 +28,7 @@ public:
   void init() volatile                                 __section(".boot.text");
   void staticInterruptHandler() volatile {
     currentTick += 1;
+    DynamicTimer::run(currentTick);
   }
   void wait(mword miliseconds) volatile {
     mword start = currentTick;

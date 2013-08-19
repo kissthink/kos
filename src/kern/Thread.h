@@ -58,10 +58,10 @@ public:
   void runDirect(funcvoid_t func);
 
   int getErrno() const {
-    return errNo;
+    return errorNo;
   }
   void setErrno(int err) {
-    errNo = err;
+    errorNo = err;
   }
 } __packed;
 
