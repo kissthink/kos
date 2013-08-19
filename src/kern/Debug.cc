@@ -30,6 +30,7 @@ static const char* options[] = {
   "gdbdebug",
   "gdbenable",
   "memacpi",
+  "net",
   "paging",
   "pci",
   "process",

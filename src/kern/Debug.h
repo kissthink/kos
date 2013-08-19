@@ -34,6 +34,7 @@ public:
     GDBDebug,
     GDBEnable,
     MemAcpi,
+    Net,
     Paging,
     PCI,
     Process,

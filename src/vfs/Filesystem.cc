@@ -20,6 +20,9 @@
 #include "vfs/Directory.h"
 #include "vfs/Symlink.h"
 #include "util/Output.h"
+#include "kern/Thread.h"
+#include "mach/Processor.h"
+#include <cerrno>
 
 Filesystem::Filesystem() :
     m_bReadOnly(false),
@@ -41,8 +44,8 @@ bool Filesystem::createFile(String path, uint32_t mask, File *pStartNode)
 
     if (pFile)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(FileExists);
+        Processor::getCurrThread()->setErrno(EEXIST);
         return false;
     }
 
@@ -52,8 +55,8 @@ bool Filesystem::createFile(String path, uint32_t mask, File *pStartNode)
     // Check the parent existed.
     if (!pParent)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(DoesNotExist);
+        Processor::getCurrThread()->setErrno(ENOENT);
         return false;
     }
 
@@ -68,8 +71,8 @@ bool Filesystem::createDirectory(String path, File *pStartNode)
 
     if (pFile)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(FileExists);
+        Processor::getCurrThread()->setErrno(EEXIST);
         return false;
     }
 
@@ -79,8 +82,8 @@ bool Filesystem::createDirectory(String path, File *pStartNode)
     // Check the parent existed.
     if (!pParent)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(DoesNotExist);
+        Processor::getCurrThread()->setErrno(ENOENT);
         return false;
     }
 
@@ -97,8 +100,8 @@ bool Filesystem::createSymlink(String path, String value, File *pStartNode)
 
     if (pFile)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(FileExists);
+        Processor::getCurrThread()->setErrno(EEXIST);
         return false;
     }
 
@@ -108,8 +111,8 @@ bool Filesystem::createSymlink(String path, String value, File *pStartNode)
     // Check the parent existed.
     if (!pParent)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(DoesNotExist);
+        Processor::getCurrThread()->setErrno(ENOENT);
         return false;
     }
 
@@ -127,8 +130,8 @@ bool Filesystem::remove(String path, File *pStartNode)
 
     if (!pFile)
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(DoesNotExist);
+        Processor::getCurrThread()->setErrno(ENOENT);
         return false;
     }
 
@@ -192,8 +195,8 @@ File *Filesystem::findNode(File *pNode, String path)
     // Next, if the current node isn't a directory, die.
     if (!pNode->isDirectory())
     {
-      ABORT1("implement this");
 //        SYSCALL_ERROR(NotADirectory);
+        Processor::getCurrThread()->setErrno(ENOTDIR);
         return 0;
     }
 

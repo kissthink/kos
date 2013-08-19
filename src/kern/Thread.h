@@ -39,6 +39,7 @@ private:
   vaddr stackPointer;
   mword timeout;
   int priority;
+  int errorNo;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
     : name(n), addressSpace(&as), stackSize(s), stackPointer(sp),
@@ -55,6 +56,13 @@ public:
   static Thread* create(AddressSpace& as, size_t stackSize = defaultStack);
   static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack);
   void runDirect(funcvoid_t func);
+
+  int getErrno() const {
+    return errNo;
+  }
+  void setErrno(int err) {
+    errNo = err;
+  }
 } __packed;
 
 #endif /* _Thread_h_ */
