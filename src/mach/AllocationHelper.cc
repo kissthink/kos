@@ -10,8 +10,8 @@ static const size_t force = 1 << 2;
 
 bool allocateRegion(MemoryRegion& region, size_t pages, size_t constraints, size_t flags) {
   ScopedLock<> lo(lk);
-  vaddr vAddress;
-  if (kernelSpace.allocPages<1>(pagesize<1>() * pages, AddressSpace::Data)) {
+  vaddr vAddress = kernelSpace.allocPages<1>(pagesize<1>() * pages, AddressSpace::Data);
+  if (vAddress) {
     region.virtualAddr = reinterpret_cast<ptr_t>(vAddress);
     region.physicalAddr = 0;
     region.regSize = pages * pagesize<1>();

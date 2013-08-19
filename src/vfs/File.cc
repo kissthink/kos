@@ -23,7 +23,7 @@
 File::File() :
     m_Name(""), m_AccessedTime(0), m_ModifiedTime(0),
     m_CreationTime(0), m_Inode(0), m_pFilesystem(0), m_Size(0),
-    m_pParent(0), m_nWriters(0), m_nReaders(0), m_Uid(0), m_Gid(0), m_Permissions(0), m_DataCache(), m_Lock()//, m_MonitorTargets()
+    m_pParent(0), m_nWriters(0), m_nReaders(0), m_Uid(0), m_Gid(0), m_Permissions(0), m_DataCache(), m_Lock(), m_MonitorTargets()
 {
 }
 
@@ -31,7 +31,7 @@ File::File(String name, time_t accessedTime, time_t modifiedTime, time_t creatio
            uintptr_t inode, Filesystem *pFs, size_t size, File *pParent) :
     m_Name(name), m_AccessedTime(accessedTime), m_ModifiedTime(modifiedTime),
     m_CreationTime(creationTime), m_Inode(inode), m_pFilesystem(pFs),
-    m_Size(size), m_pParent(pParent), m_nWriters(0), m_nReaders(0), m_Uid(0), m_Gid(0), m_Permissions(0), m_DataCache(), m_Lock()//, m_MonitorTargets()
+    m_Size(size), m_pParent(pParent), m_nWriters(0), m_nReaders(0), m_Uid(0), m_Gid(0), m_Permissions(0), m_DataCache(), m_Lock(), m_MonitorTargets()
 {
 }
 
@@ -214,10 +214,9 @@ void File::truncate()
 {
 }
 
-#if 0
 void File::dataChanged()
 {
-    LockGuard<Mutex> guard(m_Lock);
+    ScopedLock<Mutex> guard(m_Lock);
 
     for (List<MonitorTarget*>::Iterator it = m_MonitorTargets.begin();
          it != m_MonitorTargets.end();
@@ -231,12 +230,10 @@ void File::dataChanged()
 
     m_MonitorTargets.clear();
 }
-#endif
 
-#if 0
 void File::cullMonitorTargets(Thread *pThread)
 {
-    LockGuard<Mutex> guard(m_Lock);
+    ScopedLock<Mutex> guard(m_Lock);
 
     for (List<MonitorTarget*>::Iterator it = m_MonitorTargets.begin();
          it != m_MonitorTargets.end();
@@ -254,4 +251,3 @@ void File::cullMonitorTargets(Thread *pThread)
         }
     }
 }
-#endif

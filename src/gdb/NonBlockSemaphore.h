@@ -9,7 +9,7 @@
  */
 class NonBlockSemaphore {
   SpinLock lock;
-  atomic<int> counter;
+  std::atomic<int> counter;
 public:
   NonBlockSemaphore(int counter = 0): counter(counter) {}
   ptr_t operator new(size_t) { return ::operator new(NonBlockSemaphore::size()); }

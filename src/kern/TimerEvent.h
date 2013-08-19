@@ -22,7 +22,7 @@ public:
     return Machine::now() >= nextTimeout;
   }
   void reset() {
-    nextTimeout += timeoutPeriod;
+    nextTimeout = Machine::now() + timeoutPeriod;
   }
   void setMode(TimerEventMode m) {
     mode = m;

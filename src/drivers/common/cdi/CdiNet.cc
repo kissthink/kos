@@ -15,7 +15,7 @@
 */
 #include "drivers/common/cdi/CdiNet.h"
 #include "mach/Network.h"
-#include <network-stack/NetworkStack.h>
+#include "network-stack/NetworkStack.h"
 
 // Prototypes in the extern "C" block to ensure that they are not mangled
 extern "C" {

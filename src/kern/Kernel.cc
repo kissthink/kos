@@ -24,6 +24,9 @@
 #include "kern/Thread.h"
 #include "world/File.h"
 
+#include "kern/DynamicTimer.h"
+#include "kern/TimerEvent.h"
+
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;
 Scheduler kernelScheduler;
@@ -57,6 +60,19 @@ extern "C" void kmain(mword magic, mword addr) {
   }
 }
 
+struct TimerTest : public TimerEvent {
+  TimerTest(mword timeout) : TimerEvent(timeout) {
+    DBG::outln(DBG::Basic, "running  dynamic timer test with 5 sec timeout period");
+  }
+  bool run(mword currentTick) {
+    if (timedout()) {
+      DBG::outln(DBG::Basic, "timedout!!!");
+      return true;
+    }
+    return false;
+  }
+};
+
 static void mainLoop(ptr_t) {
   File* f1 = kernelFS.find("motd")->second;
   for (;;) {
@@ -68,6 +84,8 @@ static void mainLoop(ptr_t) {
 
   Process p;
   p.execElfFile("testprogram2");
+
+  DynamicTimer::registerEvent(new TimerTest(5000));
 
   // TODO: create processes and leave BSP thread waiting for events
   kernelScheduler.run( *Thread::create(kernelSpace, "TT"), timertest, nullptr);

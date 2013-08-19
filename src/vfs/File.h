@@ -18,7 +18,9 @@
 
 #include "kern/Kernel.h"
 #include "ipc/BlockingSync.h"
+#include "kern/Event.h"
 #include "util/String.h"
+#include "util/List.h"
 #include "util/Tree.h"
 #include "util/RadixTree.h"
 #include "mach/platform.h"
@@ -204,19 +206,17 @@ public:
     virtual int select(bool bWriting = false, int timeout = 0)
     {return 1;}
 
-#if 0
     /** Causes the event pEvent to be dispatched to pThread when activity occurs
         on this File. Activity includes the file becoming available for reading,
         writing or erroring. */
     void monitor(Thread *pThread, Event *pEvent)
     {
         ScopedLock<Mutex> lo(m_Lock);
-        m_MonitorTargets.push_back(new MonitorTarget(pThread, pEvent));
+        m_MonitorTargets.pushBack(new MonitorTarget(pThread, pEvent));
     }
 
     /** Walks the monitor-target queue, removing all for \p pThread .*/
     void cullMonitorTargets(Thread *pThread);
-#endif
 
 protected:
 
@@ -238,9 +238,7 @@ protected:
     }
 
     /** Internal function to notify all registered MonitorTargets. */
-#if 0
     void dataChanged();
-#endif
 
     String m_Name;
     time_t m_AccessedTime;
@@ -263,7 +261,6 @@ protected:
 
     Mutex m_Lock;
 
-#if 0
     struct MonitorTarget
     {
         MonitorTarget(Thread *pT, Event *pE) :
@@ -272,9 +269,8 @@ protected:
         Thread *pThread;
         Event  *pEvent;
     };
-#endif
 
-//    std::list<MonitorTarget*,KernelAllocator<MonitorTarget*>> m_MonitorTargets;
+    List<MonitorTarget*> m_MonitorTargets;
 };
 
-#endif
+#endif /* _File_h_ */

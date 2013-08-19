@@ -38,3 +38,14 @@ void Thread::runDirect(funcvoid_t func) {
   stackPointer = stackInitSimple(stackPointer, func);
   stackStart(stackPointer);
 }
+
+#if 0
+void Thread::sendEvent(Event* event) {
+  ScopedLock<> lo(lk);
+  eventQueue.pushBack(event);
+  if (status == Sleeping) {
+    status = Ready;
+    kernelScheduler.start(*this);
+  }
+}
+#endif

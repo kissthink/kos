@@ -19,6 +19,8 @@
 
 #include "extern/stl/mod_set"
 #include "util/basics.h"
+#include "kern/Event.h"
+#include "util/Output.h"
 
 class AddressSpace;
 class Scheduler;
@@ -40,6 +42,13 @@ private:
   mword timeout;
   int priority;
   int errorNo;
+  enum Status {
+    Ready,
+    Running,
+    Sleeping,
+    Zombie
+  };
+  Status status;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
     : name(n), addressSpace(&as), stackSize(s), stackPointer(sp),
@@ -57,6 +66,9 @@ public:
   static Thread* create(AddressSpace& as, const char *n, size_t stackSize = defaultStack);
   void runDirect(funcvoid_t func);
 
+  void sendEvent(Event* event) {
+    ABORT1("unimplemented");
+  }
   int getErrno() const {
     return errorNo;
   }
