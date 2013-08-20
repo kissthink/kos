@@ -41,7 +41,7 @@ class Scheduler {
   Scheduler(const Scheduler&) = delete;                  // no copy
   const Scheduler& operator=(const Scheduler&) = delete; // no assignment
 
-  void ready(Thread& t) { readyQueue[t.priority].push_back(&t); }
+  void ready(Thread& t) { t.status = Thread::Ready; readyQueue[t.priority].push_back(&t); }
   void schedule(bool ei = false);
   void timerEvent(mword ticks);
 

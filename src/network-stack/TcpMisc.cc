@@ -28,164 +28,156 @@ void stateBlockFree(void* p)
 
 size_t TcpBuffer::write(uintptr_t buffer, size_t nBytes)
 {
-    ScopedLock<Mutex> guard(m_Lock);
+  ScopedLock<Mutex> guard(m_Lock);
 
-    // Validation
-    if(!m_Buffer || !m_BufferSize)
-        return 0;
+  // Validation
+  if(!m_Buffer || !m_BufferSize)
+    return 0;
 
-    // Is the buffer full?
-    if(m_DataSize >= m_BufferSize)
-        return 0;
+  // Is the buffer full?
+  if(m_DataSize >= m_BufferSize)
+    return 0;
 
-    // If adding this data will cause an overflow, limit the write
-    if((nBytes + m_DataSize) > m_BufferSize)
-        nBytes = m_BufferSize - m_DataSize;
+  // If adding this data will cause an overflow, limit the write
+  if((nBytes + m_DataSize) > m_BufferSize)
+    nBytes = m_BufferSize - m_DataSize;
 
-    // If there's still too many bytes, restrict further
-    if(nBytes > m_BufferSize)
-        nBytes = m_BufferSize;
+  // If there's still too many bytes, restrict further
+  if(nBytes > m_BufferSize)
+    nBytes = m_BufferSize;
 
-    // If however there's no more room, we can't write
-    if(!nBytes)
-        return 0;
+  // If however there's no more room, we can't write
+  if(!nBytes)
+    return 0;
 
-    // Can we just write the whole thing?
-    if((m_Writer + nBytes) < m_BufferSize)
-    {
-        // Yes, so just copy directly into the buffer
-        memcpy(reinterpret_cast<void*>(m_Buffer+m_Writer),
-               reinterpret_cast<void*>(buffer),
-               nBytes);
-        m_Writer += nBytes;
-        m_DataSize += nBytes;
-        return nBytes;
-    }
-    else
-    {
-        // This write will overlap the buffer
-        size_t numNormalBytes = m_BufferSize - m_Writer;
-        size_t numOverlapBytes = (m_Writer + nBytes) % m_BufferSize;
+  // Can we just write the whole thing?
+  if((m_Writer + nBytes) < m_BufferSize) {
+    // Yes, so just copy directly into the buffer
+    memcpy(reinterpret_cast<void*>(m_Buffer+m_Writer),
+           reinterpret_cast<void*>(buffer),
+           nBytes);
+    m_Writer += nBytes;
+    m_DataSize += nBytes;
+    return nBytes;
+  } else {
+    // This write will overlap the buffer
+    size_t numNormalBytes = m_BufferSize - m_Writer;
+    size_t numOverlapBytes = (m_Writer + nBytes) % m_BufferSize;
 
-        // Does the write overlap the reader position?
-        if(numOverlapBytes >= m_Reader && m_Reader != 0)
-            numOverlapBytes = m_Reader - 1;
-        // Has the reader position progressed, at all?
-        else if(m_Reader == 0 && m_DataSize == 0)
-            numOverlapBytes = 0;
+    // Does the write overlap the reader position?
+    if(numOverlapBytes >= m_Reader && m_Reader != 0)
+      numOverlapBytes = m_Reader - 1;
+    // Has the reader position progressed, at all?
+    else if(m_Reader == 0 && m_DataSize == 0)
+      numOverlapBytes = 0;
 
-        // Copy the normal bytes
-        if(numNormalBytes)
-            memcpy(reinterpret_cast<void*>(m_Buffer+m_Writer),
-                   reinterpret_cast<void*>(buffer),
-                   numNormalBytes);
-        if(numOverlapBytes)
-            memcpy(reinterpret_cast<void*>(m_Buffer),
-                   reinterpret_cast<void*>(buffer),
-                   numOverlapBytes);
+    // Copy the normal bytes
+    if(numNormalBytes)
+      memcpy(reinterpret_cast<void*>(m_Buffer+m_Writer),
+             reinterpret_cast<void*>(buffer),
+             numNormalBytes);
+    if(numOverlapBytes)
+      memcpy(reinterpret_cast<void*>(m_Buffer),
+             reinterpret_cast<void*>(buffer),
+             numOverlapBytes);
 
-        // Update the writer position, if needed
-        if(numOverlapBytes)
-            m_Writer = numOverlapBytes;
+    // Update the writer position, if needed
+    if(numOverlapBytes)
+      m_Writer = numOverlapBytes;
 
-        // Return the number of bytes written
-        m_DataSize += numNormalBytes + numOverlapBytes;
-        return numNormalBytes + numOverlapBytes;
-    }
+    // Return the number of bytes written
+    m_DataSize += numNormalBytes + numOverlapBytes;
+    return numNormalBytes + numOverlapBytes;
+  }
 }
 
 size_t TcpBuffer::read(uintptr_t buffer, size_t nBytes, bool bDoNotMove)
 {
-    ScopedLock<Mutex> guard(m_Lock);
+  ScopedLock<Mutex> guard(m_Lock);
 
-    // Verify that we will actually be able to read this data
-    if(!m_Buffer || !m_BufferSize)
-        return 0;
+  // Verify that we will actually be able to read this data
+  if(!m_Buffer || !m_BufferSize)
+    return 0;
 
-    // Do not read past the end of the allocated buffer
-    if(nBytes > m_BufferSize)
-        nBytes = m_BufferSize;
+  // Do not read past the end of the allocated buffer
+  if(nBytes > m_BufferSize)
+    nBytes = m_BufferSize;
 
-    // And do not read more than the data that is already in the buffer
-    if(nBytes > m_DataSize)
-        nBytes = m_DataSize;
+  // And do not read more than the data that is already in the buffer
+  if(nBytes > m_DataSize)
+    nBytes = m_DataSize;
 
-    // If either of these checks cause nBytes to be zero, just return
+  // If either of these checks cause nBytes to be zero, just return
+  if(!nBytes)
+    return 0;
+
+  // Can we just read the whole thing?
+  if((m_Reader + nBytes) < m_BufferSize) {
+    // Limit the number of bytes to the writer position
+    if(m_Writer == 0 && m_Reader == 0)
+      return 0; // No data to read
+    else if(m_Writer == m_Reader && m_DataSize == 0) // If there's data, the writer has wrapped around
+      return 0; // Reader == Writer, no data
+    else if(nBytes > m_DataSize)
+      nBytes = m_DataSize;
     if(!nBytes)
-        return 0;
+      return 0; // No data?
 
-    // Can we just read the whole thing?
-    if((m_Reader + nBytes) < m_BufferSize)
-    {
-        // Limit the number of bytes to the writer position
-        if(m_Writer == 0 && m_Reader == 0)
-            return 0; // No data to read
-        else if(m_Writer == m_Reader && m_DataSize == 0) // If there's data, the writer has wrapped around
-            return 0; // Reader == Writer, no data
-        else if(nBytes > m_DataSize)
-            nBytes = m_DataSize;
-        if(!nBytes)
-            return 0; // No data?
-
-        // Yes, so just copy directly into the buffer
-        memcpy(reinterpret_cast<void*>(buffer),
-               reinterpret_cast<void*>(m_Buffer+m_Reader),
-               nBytes);
-        if(!bDoNotMove)
-        {
-            m_Reader += nBytes;
-            m_DataSize -= nBytes;
-        }
-        return nBytes;
+    // Yes, so just copy directly into the buffer
+    memcpy(reinterpret_cast<void*>(buffer),
+           reinterpret_cast<void*>(m_Buffer+m_Reader),
+           nBytes);
+    if(!bDoNotMove) {
+      m_Reader += nBytes;
+      m_DataSize -= nBytes;
     }
+    return nBytes;
+  } else {
+    // This read will wrap around to the beginning
+    size_t numNormalBytes = m_BufferSize - m_Reader;
+    size_t numOverlapBytes = (m_Reader + nBytes) % m_BufferSize;
+
+    // Does the read overlap the write position?
+    if(numOverlapBytes >= m_Writer && m_Writer != 0)
+      numOverlapBytes = m_Writer - 1;
+    // If the writer's sitting at position 0, don't overlap
+    else if(m_Writer == 0)
+      numOverlapBytes = 0;
+
+    // Copy the normal bytes
+    if(numNormalBytes)
+      memcpy(reinterpret_cast<void*>(buffer),
+             reinterpret_cast<void*>(m_Buffer+m_Reader),
+             numNormalBytes);
+    if(numOverlapBytes)
+      memcpy(reinterpret_cast<void*>(buffer + numNormalBytes),
+             reinterpret_cast<void*>(m_Buffer),
+             numOverlapBytes);
+
+    // Update the writer position, if needed
+    if(numOverlapBytes)
+      m_Reader = numOverlapBytes;
+
+    // Return the number of bytes written
+    if((numNormalBytes + numOverlapBytes) > m_DataSize)
+      m_DataSize = 0;
     else
-    {
-        // This read will wrap around to the beginning
-        size_t numNormalBytes = m_BufferSize - m_Reader;
-        size_t numOverlapBytes = (m_Reader + nBytes) % m_BufferSize;
-
-        // Does the read overlap the write position?
-        if(numOverlapBytes >= m_Writer && m_Writer != 0)
-            numOverlapBytes = m_Writer - 1;
-        // If the writer's sitting at position 0, don't overlap
-        else if(m_Writer == 0)
-            numOverlapBytes = 0;
-
-        // Copy the normal bytes
-        if(numNormalBytes)
-            memcpy(reinterpret_cast<void*>(buffer),
-                   reinterpret_cast<void*>(m_Buffer+m_Reader),
-                   numNormalBytes);
-        if(numOverlapBytes)
-            memcpy(reinterpret_cast<void*>(buffer + numNormalBytes),
-                   reinterpret_cast<void*>(m_Buffer),
-                   numOverlapBytes);
-
-        // Update the writer position, if needed
-        if(numOverlapBytes)
-            m_Reader = numOverlapBytes;
-
-        // Return the number of bytes written
-        if((numNormalBytes + numOverlapBytes) > m_DataSize)
-            m_DataSize = 0;
-        else
-            m_DataSize -= numNormalBytes + numOverlapBytes;
-        return numNormalBytes + numOverlapBytes;
-    }
+      m_DataSize -= numNormalBytes + numOverlapBytes;
+    return numNormalBytes + numOverlapBytes;
+  }
 }
 
 void TcpBuffer::setSize(size_t newBufferSize)
 {
-    ScopedLock<Mutex> guard(m_Lock);
+  ScopedLock<Mutex> guard(m_Lock);
 
-    if(m_Buffer)
-        delete [] reinterpret_cast<uint8_t*>(m_Buffer);
+  if(m_Buffer)
+    delete [] reinterpret_cast<uint8_t*>(m_Buffer);
 
-    if(newBufferSize)
-    {
-        m_BufferSize = newBufferSize;
-        m_Buffer = reinterpret_cast<uintptr_t>(new uint8_t[newBufferSize + 1]);
-    }
+  if(newBufferSize) {
+    m_BufferSize = newBufferSize;
+    m_Buffer = reinterpret_cast<uintptr_t>(new uint8_t[newBufferSize + 1]);
+  }
 }
 
 //
@@ -255,52 +247,39 @@ void Tree<StateBlockHandle,void*>::insert(StateBlockHandle key, void *value)
 
   bool inserted = false;
 
-  if (lookup(key))
-  {
-      delete n;
-      return; // Key already in tree.
+  if (lookup(key)) {
+    delete n;
+    return; // Key already in tree.
   }
 
-  if (root == 0)
-  {
+  if (root == 0) {
     root = n; // We are the root node.
 
     m_Begin = new IteratorNode(root, 0);
-  }
-  else
-  {
+  } else {
     // Traverse the tree.
     Node *currentNode = root;
 
-    while (!inserted)
-    {
-      if (key > currentNode->key)
-      {
-        if (currentNode->rightChild == 0) // We have found our insert point.
-        {
+    while (!inserted) {
+      if (key > currentNode->key) {
+        if (currentNode->rightChild == 0) { // We have found our insert point.
           currentNode->rightChild = n;
           n->parent = currentNode;
           inserted = true;
-        }
-        else
+        } else
           currentNode = currentNode->rightChild;
-      }
-      else
-      {
-        if (currentNode->leftChild == 0) // We have found our insert point.
-        {
+      } else {
+        if (currentNode->leftChild == 0) { // We have found our insert point.
           currentNode->leftChild = n;
           n->parent = currentNode;
           inserted = true;
-        }
-        else
+        } else
           currentNode = currentNode->leftChild;
       }
     }
 
     // The value has been inserted, but has that messed up the balance of the tree?
-    while (currentNode)
-    {
+    while (currentNode) {
       int b = balanceFactor(currentNode);
       if ( (b<-1) || (b>1) )
         rebalanceNode(currentNode);
@@ -314,18 +293,12 @@ void Tree<StateBlockHandle,void*>::insert(StateBlockHandle key, void *value)
 void *Tree<StateBlockHandle,void*>::lookup(StateBlockHandle key)
 {
   Node *n = root;
-  while (n != 0)
-  {
-    if (n->key == key)
-    {
+  while (n != 0) {
+    if (n->key == key) {
       return n->element;
-    }
-    else if (key > n->key)
-    {
+    } else if (key > n->key) {
       n = n->rightChild;
-    }
-    else
-    {
+    } else {
       n = n->leftChild;
     }
   }
@@ -335,8 +308,7 @@ void *Tree<StateBlockHandle,void*>::lookup(StateBlockHandle key)
 void Tree<StateBlockHandle,void*>::remove(StateBlockHandle key)
 {
   Node *n = root;
-  while (n != 0)
-  {
+  while (n != 0) {
     if (n->key == key)
       break;
     else if (n->key > key)
@@ -348,21 +320,17 @@ void Tree<StateBlockHandle,void*>::remove(StateBlockHandle key)
   Node *orign = n;
   if (n == 0) return;
 
-  while (n->leftChild || n->rightChild) // While n is not a leaf.
-  {
+  while (n->leftChild || n->rightChild) { // While n is not a leaf.
     size_t hl = height(n->leftChild);
     size_t hr = height(n->rightChild);
     if (hl == 0)
       rotateLeft(n); // N is now a leaf.
     else if (hr == 0)
       rotateRight(n); // N is now a leaf.
-    else if (hl <= hr)
-    {
+    else if (hl <= hr) {
       rotateRight(n);
       rotateLeft(n); // These are NOT inverse operations - rotateRight changes n's position.
-    }
-    else
-    {
+    } else {
       rotateLeft(n);
       rotateRight(n);
     }
@@ -371,15 +339,13 @@ void Tree<StateBlockHandle,void*>::remove(StateBlockHandle key)
   // N is now a leaf, so can be easily pruned.
   if (n->parent == 0)
     root = 0;
+  else if (n->parent->leftChild == n)
+    n->parent->leftChild = 0;
   else
-    if (n->parent->leftChild == n)
-      n->parent->leftChild = 0;
-    else
-      n->parent->rightChild = 0;
+    n->parent->rightChild = 0;
 
   // Work our way up the path, balancing.
-  while (n)
-  {
+  while (n) {
     int b = balanceFactor(n);
     if ( (b < -1) || (b > 1) )
       rebalanceNode(n);
@@ -462,13 +428,10 @@ size_t Tree<StateBlockHandle,void*>::height(Node *n)
   tempL++; // Account for the height increase stepping up to us, its parent.
   tempR++;
 
-  if (tempL > tempR) // If one is actually bigger than the other, return that, else return the other.
-  {
+  if (tempL > tempR) { // If one is actually bigger than the other, return that, else return the other.
     n->height = tempL;
     return tempL;
-  }
-  else
-  {
+  } else {
     n->height = tempR;
     return tempR;
   }
@@ -484,30 +447,21 @@ void Tree<StateBlockHandle,void*>::rebalanceNode(Node *n)
   // This way of choosing which rotation to do took me AGES to find...
   // See http://www.cmcrossroads.com/bradapp/ftp/src/libs/C++/AvlTrees.html
   int balance = balanceFactor(n);
-  if (balance < -1) // If it's left imbalanced, we need a right rotation.
-  {
-    if (balanceFactor(n->leftChild) > 0) // If its left child is right heavy...
-    {
+  if (balance < -1) { // If it's left imbalanced, we need a right rotation.
+    if (balanceFactor(n->leftChild) > 0) { // If its left child is right heavy...
       // We need a RL rotation - left rotate n's left child, then right rotate N.
       rotateLeft(n->leftChild);
       rotateRight(n);
-    }
-    else
-    {
+    } else {
       // RR rotation will do.
       rotateRight(n);
     }
-  }
-  else if (balance > 1)
-  {
-    if (balanceFactor(n->rightChild) < 0) // If its right child is left heavy...
-    {
+  } else if (balance > 1) {
+    if (balanceFactor(n->rightChild) < 0) { // If its right child is left heavy...
       // We need a LR rotation; Right rotate N's right child, then left rotate N.
       rotateRight(n->rightChild);
       rotateLeft(n);
-    }
-    else
-    {
+    } else {
       // LL rotation.
       rotateLeft(n);
     }

@@ -24,8 +24,8 @@
 #include "mach/Machine.h"
 #include "util/RequestQueue.h"
 
-#include "NetworkStack.h"
-#include "Ethernet.h"
+#include "network-stack/NetworkStack.h"
+#include "network-stack/Ethernet.h"
 
 #define ARP_OP_REQUEST  0x0001
 #define ARP_OP_REPLY    0x0002
@@ -40,8 +40,7 @@ public:
   virtual ~Arp();
 
   /** For access to the stack without declaring an instance of it */
-  static Arp& instance()
-  {
+  static Arp& instance() {
     return arpInstance;
   }
 
@@ -53,7 +52,7 @@ public:
 
   /** Gets an entry from the ARP cache, and optionally resolves it if needed. */
   bool getFromCache(IpAddress ip, bool resolve, MacAddress* ent, Network* pCard);
-  
+
   /** Direct cache manipulation */
   bool isInCache(IpAddress ip);
   void insertToCache(IpAddress ip, MacAddress mac);
@@ -67,8 +66,7 @@ private:
 
   static Arp arpInstance;
 
-  struct arpHeader
-  {
+  struct arpHeader {
     uint16_t  hwType;
     uint16_t  protocol;
     uint8_t   hwSize;
@@ -83,8 +81,7 @@ private:
   // an entry in the arp cache
   /// \todo Will need to store *time* and *type* - time for removing from cache
   ///       and type for static entries
-  struct arpEntry
-  {
+  struct arpEntry {
     arpEntry() :
       valid(false), ip(), mac()
     {};
@@ -97,16 +94,16 @@ private:
   // an ARP request we've sent
   class ArpRequest // : public TimerHandler
   {
-    public:
-      ArpRequest() :
-        destIp(), mac(), waitSem(0), success(false)
-      {};
+  public:
+    ArpRequest() :
+      destIp(), mac(), waitSem(0), success(false)
+    {};
 
-      IpAddress destIp;
-      MacAddress mac;
-      Semaphore waitSem;
+    IpAddress destIp;
+    MacAddress mac;
+    Semaphore waitSem;
 
-      bool success;
+    bool success;
   };
 
   // ARP Cache

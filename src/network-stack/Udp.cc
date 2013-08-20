@@ -50,26 +50,22 @@ bool Udp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, size_t nByte
   /// \note The NIC is grabbed here *as well as* IP because we need to use the
   ///       NIC IP address for the checksum.
   IpAddress tmp = dest;
-  if(!pCard)
-  {
-      if(broadcast)
-      {
-          DBG::outln(DBG::Warning, "UDP: No NIC given to send(), and attempting to send a broadcast packet!");
-          return false;
-      }
+  if(!pCard) {
+    if(broadcast) {
+      DBG::outln(DBG::Warning, "UDP: No NIC given to send(), and attempting to send a broadcast packet!");
+      return false;
+    }
 
-      if(!RoutingTable::instance().hasRoutes())
-      {
-          DBG::outln(DBG::Warning, "UDP: No NIC given to send(), and no routes available in the routing table");
-          return false;
-      }
+    if(!RoutingTable::instance().hasRoutes()) {
+      DBG::outln(DBG::Warning, "UDP: No NIC given to send(), and no routes available in the routing table");
+      return false;
+    }
 
-      pCard = RoutingTable::instance().DetermineRoute(&tmp);
-      if(!pCard)
-      {
-          DBG::outln(DBG::Warning, "UDP: Couldn't find a route for destination '", dest.toString(), "'.");
-          return false;
-      }
+    pCard = RoutingTable::instance().DetermineRoute(&tmp);
+    if(!pCard) {
+      DBG::outln(DBG::Warning, "UDP: Couldn't find a route for destination '", dest.toString(), "'.");
+      return false;
+    }
   }
 
   // Grab information about ourselves
@@ -79,11 +75,9 @@ bool Udp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, size_t nByte
 
   // Source address determination.
   IpAddress src = me.ipv4;
-  if(dest.getType() == IpAddress::IPv6)
-  {
+  if(dest.getType() == IpAddress::IPv6) {
     // Handle IPv6 source address determination.
-    if(!me.nIpv6Addresses)
-    {
+    if(!me.nIpv6Addresses) {
       DBG::outln(DBG::Warning, "TCP: can't send to an IPv6 host without an IPv6 address.");
       return false;
     }
@@ -92,18 +86,15 @@ bool Udp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, size_t nByte
     ///       choosing the right one.
     /// \bug Assumes any non-link-local address is fair game.
     size_t i;
-    for(i = 0; i < me.nIpv6Addresses; i++)
-    {
-        if(!me.ipv6[i].isLinkLocal())
-        {
-            src = me.ipv6[i];
-            break;
-        }
+    for(i = 0; i < me.nIpv6Addresses; i++) {
+      if(!me.ipv6[i].isLinkLocal()) {
+        src = me.ipv6[i];
+        break;
+      }
     }
-    if(i == me.nIpv6Addresses)
-    {
-        DBG::outln(DBG::Warning, "No IPv6 address available for TCP");
-        return false;
+    if(i == me.nIpv6Addresses) {
+      DBG::outln(DBG::Warning, "No IPv6 address available for TCP");
+      return false;
     }
   }
 
@@ -137,47 +128,44 @@ bool Udp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, size_t nByte
 
 void Udp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes, IpBase *pIp, Network* pCard)
 {
-    if(!packet || !nBytes)
-        return;
+  if(!packet || !nBytes)
+    return;
 
-    // Check for filtering
-    if(!NetworkFilter::instance().filter(3, packet, nBytes))
-    {
-        pCard->droppedPacket();
-        return;
+  // Check for filtering
+  if(!NetworkFilter::instance().filter(3, packet, nBytes)) {
+    pCard->droppedPacket();
+    return;
+  }
+
+  // check if this packet is for us, or if it's a broadcast
+  StationInfo cardInfo = pCard->getStationInfo();
+  /*if(cardInfo.ipv4.getIp() != ip->ipDest && ip->ipDest != 0xffffffff)
+  {
+      // not for us, TODO: check a flag to see if we'll accept these sorts of packets
+      // as an example, DHCP will need this
+      return;
+  }*/
+
+  // Grab the header now
+  udpHeader* header = reinterpret_cast<udpHeader*>(packet);
+
+  // Find the payload and its size - udpHeader::len is the size of the header + data
+  // we use it rather than calculating the size from offsets in order to be able to handle
+  // packets that may have been padded (for whatever reason)
+  uintptr_t payload = reinterpret_cast<uintptr_t>(header) + sizeof(udpHeader);
+  size_t payloadSize = BIG_TO_HOST16(header->len) - sizeof(udpHeader);
+
+  // Check the checksum, if it's not zero
+  if(header->checksum != 0) {
+    uint16_t checksum = pIp->ipChecksum(from, to, IP_UDP, reinterpret_cast<uintptr_t>(header), BIG_TO_HOST16(header->len));
+    if(checksum) {
+      DBG::outln(DBG::Warning, "UDP Checksum failed on incoming packet [", FmtHex(header->checksum), ", and ", FmtHex(checksum), " should be zero]!");
+      pCard->badPacket();
+      return;
     }
+  }
 
-    // check if this packet is for us, or if it's a broadcast
-    StationInfo cardInfo = pCard->getStationInfo();
-    /*if(cardInfo.ipv4.getIp() != ip->ipDest && ip->ipDest != 0xffffffff)
-    {
-        // not for us, TODO: check a flag to see if we'll accept these sorts of packets
-        // as an example, DHCP will need this
-        return;
-    }*/
-
-    // Grab the header now
-    udpHeader* header = reinterpret_cast<udpHeader*>(packet);
-
-    // Find the payload and its size - udpHeader::len is the size of the header + data
-    // we use it rather than calculating the size from offsets in order to be able to handle
-    // packets that may have been padded (for whatever reason)
-    uintptr_t payload = reinterpret_cast<uintptr_t>(header) + sizeof(udpHeader);
-    size_t payloadSize = BIG_TO_HOST16(header->len) - sizeof(udpHeader);
-
-    // Check the checksum, if it's not zero
-    if(header->checksum != 0)
-    {
-        uint16_t checksum = pIp->ipChecksum(from, to, IP_UDP, reinterpret_cast<uintptr_t>(header), BIG_TO_HOST16(header->len));
-        if(checksum)
-        {
-            DBG::outln(DBG::Warning, "UDP Checksum failed on incoming packet [", FmtHex(header->checksum), ", and ", FmtHex(checksum), " should be zero]!");
-            pCard->badPacket();
-            return;
-        }
-    }
-
-    // Either no checksum, or calculation was successful, either way go on to handle it
-    UdpManager::instance().receive(from, to, BIG_TO_HOST16(header->src_port), BIG_TO_HOST16(header->dest_port), payload, payloadSize, pCard);
+  // Either no checksum, or calculation was successful, either way go on to handle it
+  UdpManager::instance().receive(from, to, BIG_TO_HOST16(header->src_port), BIG_TO_HOST16(header->dest_port), payload, payloadSize, pCard);
 }
 

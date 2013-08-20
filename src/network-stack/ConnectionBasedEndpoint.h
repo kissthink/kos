@@ -25,97 +25,87 @@
 class ConnectionBasedEndpoint : public Endpoint
 {
 private:
-    ConnectionBasedEndpoint(const ConnectionBasedEndpoint &e);
-    const ConnectionBasedEndpoint& operator = (const ConnectionBasedEndpoint& e);
+  ConnectionBasedEndpoint(const ConnectionBasedEndpoint &e);
+  const ConnectionBasedEndpoint& operator = (const ConnectionBasedEndpoint& e);
 public:
-    ConnectionBasedEndpoint() :
-            Endpoint()
-    {};
-    ConnectionBasedEndpoint(uint16_t local, uint16_t remote) :
-            Endpoint(local, remote)
-    {};
-    ConnectionBasedEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
-            Endpoint(remoteIp, local, remote)
-    {};
-    virtual ~ConnectionBasedEndpoint() {};
+  ConnectionBasedEndpoint() :
+    Endpoint()
+  {};
+  ConnectionBasedEndpoint(uint16_t local, uint16_t remote) :
+    Endpoint(local, remote)
+  {};
+  ConnectionBasedEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
+    Endpoint(remoteIp, local, remote)
+  {};
+  virtual ~ConnectionBasedEndpoint() {};
 
-    EndpointType getType()
-    {
-        return ConnectionBased;
-    }
+  EndpointType getType() {
+    return ConnectionBased;
+  }
 
-    /** Grabs an integer representation of the connection state */
-    virtual int state()
-    {
-        return 0xff;
-    }
+  /** Grabs an integer representation of the connection state */
+  virtual int state() {
+    return 0xff;
+  }
 
-    /** Connects to the given remote host */
-    virtual bool connect(Endpoint::RemoteEndpoint remoteHost, bool bBlock = true)
-    {
-        return false;
-    }
+  /** Connects to the given remote host */
+  virtual bool connect(Endpoint::RemoteEndpoint remoteHost, bool bBlock = true) {
+    return false;
+  }
 
-    /** Closes the connection */
-    virtual void close()
-    {
-    }
+  /** Closes the connection */
+  virtual void close() {
+  }
 
-    /**
-     * Puts the connection into the listening state, waiting for incoming
-     * connections.
-     */
-    virtual void listen()
-    {
-    }
+  /**
+   * Puts the connection into the listening state, waiting for incoming
+   * connections.
+   */
+  virtual void listen() {
+  }
 
-    /**
-     * Blocks until an incoming connection is available, then accepts it
-     * and returns an Endpoint for that connection.
-     */
-    virtual Endpoint* accept()
-    {
-        return 0;
-    }
+  /**
+   * Blocks until an incoming connection is available, then accepts it
+   * and returns an Endpoint for that connection.
+   */
+  virtual Endpoint* accept() {
+    return 0;
+  }
 
-    /**
-     * Sends nBytes of buffer
-     * \param nBytes the number of bytes to send
-     * \param buffer the buffer to send
-     * \returns -1 on failure, the number of bytes sent otherwise
-     */
-    virtual int send(size_t nBytes, uintptr_t buffer)
-    {
-        return -1;
-    }
+  /**
+   * Sends nBytes of buffer
+   * \param nBytes the number of bytes to send
+   * \param buffer the buffer to send
+   * \returns -1 on failure, the number of bytes sent otherwise
+   */
+  virtual int send(size_t nBytes, uintptr_t buffer) {
+    return -1;
+  }
 
-    /**
-     * Receives from the network into the given buffer
-     * \param buffer the buffer to receive into
-     * \param maxSize the size of the buffer
-     * \param block whether or not to block
-     * \param bPeek whether or not to keep messages in the data buffer
-     * \returns -1 on failure, the number of bytes received otherwise
-     */
-    virtual int recv(uintptr_t buffer, size_t maxSize, bool block, bool bPeek)
-    {
-        return -1;
-    }
+  /**
+   * Receives from the network into the given buffer
+   * \param buffer the buffer to receive into
+   * \param maxSize the size of the buffer
+   * \param block whether or not to block
+   * \param bPeek whether or not to keep messages in the data buffer
+   * \returns -1 on failure, the number of bytes received otherwise
+   */
+  virtual int recv(uintptr_t buffer, size_t maxSize, bool block, bool bPeek) {
+    return -1;
+  }
 
-    /** Retrieves the connection ID for this connection. */
-    virtual inline uint32_t getConnId()
-    {
-        return 0;
-    }
+  /** Retrieves the connection ID for this connection. */
+  virtual inline uint32_t getConnId() {
+    return 0;
+  }
 
-    /**
-     * Because TCP works with RemoteEndpoints a lot, it's easier to set our
-     * internal state using this kind of function rather than several calls
-     * to the setXyz functions.
-     */
-    virtual void setRemoteHost(RemoteEndpoint host)
-    {
-    }
+  /**
+   * Because TCP works with RemoteEndpoints a lot, it's easier to set our
+   * internal state using this kind of function rather than several calls
+   * to the setXyz functions.
+   */
+  virtual void setRemoteHost(RemoteEndpoint host) {
+  }
 };
 
 #endif /* _ConnectionBasedEndpoint_h_ */

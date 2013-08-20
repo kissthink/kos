@@ -11,7 +11,7 @@
 #ifndef _CDI_OSDEP_H_
 #define _CDI_OSDEP_H_
 
-#include "drivers/Module.h"
+#include "util/Module.h"
 
 struct cdi_driver;
 

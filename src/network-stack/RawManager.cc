@@ -30,8 +30,7 @@ RawManager RawManager::manager;
 
 RawEndpoint::~RawEndpoint()
 {
-  while(m_DataQueue.count())
-  {
+  while(m_DataQueue.count()) {
     DataBlock* ptr = m_DataQueue.popFront();
     delete [] reinterpret_cast<uint8_t*>(ptr->ptr);
     delete ptr;
@@ -41,43 +40,40 @@ RawEndpoint::~RawEndpoint()
 int RawEndpoint::send(size_t nBytes, uintptr_t buffer, Endpoint::RemoteEndpoint remoteHost, bool broadcast, Network *pCard)
 {
   // Grab the NIC to send on.
-  if(!pCard)
-  {
+  if(!pCard) {
     IpAddress tmp = remoteHost.ip;
     pCard = RoutingTable::instance().DetermineRoute(&tmp);
-    if(!pCard)
-    {
+    if(!pCard) {
       DBG::outln(DBG::Warning, "RAW: Couldn't find a route for destination '", remoteHost.ip.toString(), "'.");
       return false;
     }
   }
 
   bool success = false;
-  switch(m_Type)
-  {
-    case RAW_ICMP:
-      success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_ICMP, nBytes, buffer);
-      if(success)
-        return static_cast<int>(nBytes);
-      break;
-    case RAW_UDP:
-      success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_UDP, nBytes, buffer);
-      if(success)
-        return static_cast<int>(nBytes);
-      break;
-    case RAW_TCP:
-      success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_TCP, nBytes, buffer);
-      if(success)
-        return static_cast<int>(nBytes);
-      break;
+  switch(m_Type) {
+  case RAW_ICMP:
+    success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_ICMP, nBytes, buffer);
+    if(success)
+      return static_cast<int>(nBytes);
+    break;
+  case RAW_UDP:
+    success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_UDP, nBytes, buffer);
+    if(success)
+      return static_cast<int>(nBytes);
+    break;
+  case RAW_TCP:
+    success = Ipv4::instance().send(remoteHost.ip, pCard->getStationInfo().ipv4, IP_TCP, nBytes, buffer);
+    if(success)
+      return static_cast<int>(nBytes);
+    break;
 
     // RAW_WIRE is for them PF_SOCKET things... it'll allow you direct access to the very bottom level of the
     // implementation.
-    case RAW_WIRE:
-    default:
-      pCard->send(nBytes, buffer);
-      return static_cast<int>(nBytes);
-      break;
+  case RAW_WIRE:
+  default:
+    pCard->send(nBytes, buffer);
+    return static_cast<int>(nBytes);
+    break;
   };
   return -1;
 };
@@ -90,16 +86,13 @@ int RawEndpoint::recv(uintptr_t buffer, size_t maxSize, bool bBlock, Endpoint::R
   bool bDataReady = true;
   if(m_DataQueue.count())
     bDataReady = true;
-  else if(bBlock)
-  {
+  else if(bBlock) {
     if(!dataReady(true, nTimeout))
       bDataReady = false;
-  }
-  else
+  } else
     bDataReady = false;
 
-  if(bDataReady)
-  {
+  if(bDataReady) {
     DataBlock* ptr = m_DataQueue.popFront();
 
     // only read in this packet
@@ -116,14 +109,12 @@ int RawEndpoint::recv(uintptr_t buffer, size_t maxSize, bool bBlock, Endpoint::R
     return nBytes;
   }
 
-  if(!bBlock)
-  {
+  if(!bBlock) {
     // EAGAIN, or EWOULDBLOCK
 //    SYSCALL_ERROR(NoMoreProcesses);
     Processor::getCurrThread()->setErrno(EAGAIN);
     return -1;
-  }
-  else
+  } else
     return 0;
 };
 
@@ -142,7 +133,7 @@ size_t RawEndpoint::depositPacket(size_t nBytes, uintptr_t payload, Endpoint::Re
     newBlock->remoteHost = *remoteHost;
 
   m_DataQueue.pushBack(newBlock);
-  m_DataQueueSize.release();
+  m_DataQueueSize.V();
 
   // Data has arrived!
   for(List<Socket*>::Iterator it = m_Sockets.begin(); it != m_Sockets.end(); ++it)
@@ -152,24 +143,23 @@ size_t RawEndpoint::depositPacket(size_t nBytes, uintptr_t payload, Endpoint::Re
 
 bool RawEndpoint::dataReady(bool block, uint32_t tmout)
 {
-    // Attempt to avoid setting up the timeout if possible
-    if(m_DataQueueSize.tryAcquire())
-        return true;
-    else if(!block)
-        return false;
-
-    // Otherwise jump straight into blocking
-    if(block)
-    {
-        if(tmout)
-            m_DataQueueSize.acquire(1, tmout);
-        else
-            m_DataQueueSize.acquire();
-
-        if(Processor::information().getCurrentThread()->wasInterrupted())
-            return false;
-    }
+  // Attempt to avoid setting up the timeout if possible
+  if(m_DataQueueSize.tryP())
     return true;
+  else if(!block)
+    return false;
+
+  // Otherwise jump straight into blocking
+  if(block) {
+    if(tmout)
+      m_DataQueueSize.P(tmout * 1000);
+    else
+      m_DataQueueSize.P();
+
+    if(Processor::getCurrThread()->isInterrupted())
+      return false;
+  }
+  return true;
 }
 
 void RawManager::receive(uintptr_t payload, size_t payloadSize, Endpoint::RemoteEndpoint* remoteHost, int type, Network* pCard)
@@ -185,13 +175,11 @@ void RawManager::receive(uintptr_t payload, size_t payloadSize, Endpoint::Remote
     endType = RawEndpoint::RAW_WIRE;
 
   // iterate through each endpoint, add this packet
-  for(List<Endpoint*>::Iterator it = m_Endpoints.begin(); it != m_Endpoints.end(); it++)
-  {
+  for(List<Endpoint*>::Iterator it = m_Endpoints.begin(); it != m_Endpoints.end(); it++) {
     RawEndpoint* e = reinterpret_cast<RawEndpoint*>((*it));
 
-    if(e->getRawType() == endType)
-    {
-        NOTICE("Depositing payload");
+    if(e->getRawType() == endType) {
+      DBG::outln(DBG::Net, "Depositing payload");
       e->depositPacket(payloadSize, payload, remoteHost);
     }
   }
@@ -199,12 +187,9 @@ void RawManager::receive(uintptr_t payload, size_t payloadSize, Endpoint::Remote
 
 void RawManager::returnEndpoint(Endpoint* e)
 {
-  if(e)
-  {
-    for(List<Endpoint*>::Iterator it = m_Endpoints.begin(); it != m_Endpoints.end(); it++)
-    {
-      if((*it) == e)
-      {
+  if(e) {
+    for(List<Endpoint*>::Iterator it = m_Endpoints.begin(); it != m_Endpoints.end(); it++) {
+      if((*it) == e) {
         m_Endpoints.erase(it);
         delete e;
         break;
@@ -216,30 +201,28 @@ void RawManager::returnEndpoint(Endpoint* e)
 Endpoint* RawManager::getEndpoint(int proto)
 {
   Endpoint* ret;
-  switch(proto)
-  {
+  switch(proto) {
     // icmp
-    case IPPROTO_ICMP:
-      ret = new RawEndpoint(RawEndpoint::RAW_ICMP);
-      break;
+  case IPPROTO_ICMP:
+    ret = new RawEndpoint(RawEndpoint::RAW_ICMP);
+    break;
 
     // udp
-    case IPPROTO_UDP:
-      ret = new RawEndpoint(RawEndpoint::RAW_UDP);
-      break;
+  case IPPROTO_UDP:
+    ret = new RawEndpoint(RawEndpoint::RAW_UDP);
+    break;
 
     // tcp
-    case IPPROTO_TCP:
-      ret = new RawEndpoint(RawEndpoint::RAW_TCP);
-      break;
+  case IPPROTO_TCP:
+    ret = new RawEndpoint(RawEndpoint::RAW_TCP);
+    break;
 
     // wire
-    default:
-      ret = new RawEndpoint(RawEndpoint::RAW_WIRE);
-      break;
+  default:
+    ret = new RawEndpoint(RawEndpoint::RAW_WIRE);
+    break;
   }
-  if(ret)
-  {
+  if(ret) {
     ret->setManager(this);
     m_Endpoints.pushBack(ret);
   }

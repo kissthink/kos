@@ -35,80 +35,84 @@
  */
 class UdpEndpoint : public ConnectionlessEndpoint
 {
-  public:
+public:
 
-    /** Constructors and destructors */
-    UdpEndpoint() :
-      ConnectionlessEndpoint(), m_DataQueue(), m_DataQueueSize(0),
-      m_bAcceptAll(false), m_bCanSend(true), m_bCanRecv(true)
+  /** Constructors and destructors */
+  UdpEndpoint() :
+    ConnectionlessEndpoint(), m_DataQueue(), m_DataQueueSize(0),
+    m_bAcceptAll(false), m_bCanSend(true), m_bCanRecv(true)
+  {};
+  UdpEndpoint(uint16_t local, uint16_t remote) :
+    ConnectionlessEndpoint(local, remote), m_DataQueue(),
+    m_DataQueueSize(0), m_bAcceptAll(false), m_bCanSend(true),
+    m_bCanRecv(true)
+  {};
+  UdpEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
+    ConnectionlessEndpoint(remoteIp, local, remote), m_DataQueue(),
+    m_DataQueueSize(0), m_bAcceptAll(false), m_bCanSend(true),
+    m_bCanRecv(true)
+  {};
+
+  virtual ~UdpEndpoint() {};
+
+  /** Application interface */
+  virtual int state() {
+    return 0xff; // 0xff signifies UDP
+  }
+  virtual int send(size_t nBytes, uintptr_t buffer, RemoteEndpoint remoteHost, bool broadcast, Network *pCard = 0);
+  virtual int recv(uintptr_t buffer, size_t maxSize, bool bBlock, RemoteEndpoint* remoteHost, int nTimeout = 30);
+  virtual bool dataReady(bool block = false, uint32_t tmout = 30);
+  virtual inline bool acceptAnyAddress() {
+    return m_bAcceptAll;
+  };
+  virtual inline void acceptAnyAddress(bool accept) {
+    m_bAcceptAll = accept;
+  };
+
+  /** UdpManager functionality - called to deposit data into our local buffer */
+  virtual size_t depositPayload(size_t nBytes, uintptr_t payload, RemoteEndpoint remoteHost);
+
+  /** Shutdown on a UDP endpoint merely disables via software the ability to send/recv */
+  virtual bool shutdown(ShutdownType what) {
+    if(what == ShutSending)
+      m_bCanSend = false;
+    else if(what == ShutReceiving)
+      m_bCanRecv = false;
+    else if(what == ShutBoth)
+      m_bCanRecv = m_bCanSend = false;
+    return true;
+  }
+
+private:
+
+  struct DataBlock {
+    DataBlock() :
+      magic(0xdeadbeef), size(0), offset(0), ptr(0), remoteHost()
     {};
-    UdpEndpoint(uint16_t local, uint16_t remote) :
-      ConnectionlessEndpoint(local, remote), m_DataQueue(),
-      m_DataQueueSize(0), m_bAcceptAll(false), m_bCanSend(true),
-      m_bCanRecv(true)
-    {};
-    UdpEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
-      ConnectionlessEndpoint(remoteIp, local, remote), m_DataQueue(),
-      m_DataQueueSize(0), m_bAcceptAll(false), m_bCanSend(true),
-      m_bCanRecv(true)
-    {};
 
-    virtual ~UdpEndpoint() {};
+    uint32_t magic; // 0xdeadbeef
 
-    /** Application interface */
-    virtual int state() {return 0xff;} // 0xff signifies UDP
-    virtual int send(size_t nBytes, uintptr_t buffer, RemoteEndpoint remoteHost, bool broadcast, Network *pCard = 0);
-    virtual int recv(uintptr_t buffer, size_t maxSize, bool bBlock, RemoteEndpoint* remoteHost, int nTimeout = 30);
-    virtual bool dataReady(bool block = false, uint32_t tmout = 30);
-    virtual inline bool acceptAnyAddress() { return m_bAcceptAll; };
-    virtual inline void acceptAnyAddress(bool accept) { m_bAcceptAll = accept; };
+    size_t size;
+    size_t offset; // if we only do a partial read, this is filled
+    uintptr_t ptr;
 
-    /** UdpManager functionality - called to deposit data into our local buffer */
-    virtual size_t depositPayload(size_t nBytes, uintptr_t payload, RemoteEndpoint remoteHost);
+    RemoteEndpoint remoteHost; // who sent it to us - needed for port info!
+  };
 
-    /** Shutdown on a UDP endpoint merely disables via software the ability to send/recv */
-    virtual bool shutdown(ShutdownType what)
-    {
-        if(what == ShutSending)
-            m_bCanSend = false;
-        else if(what == ShutReceiving)
-            m_bCanRecv = false;
-        else if(what == ShutBoth)
-            m_bCanRecv = m_bCanSend = false;
-        return true;
-    }
+  /** Incoming data queue */
+  List<DataBlock*> m_DataQueue;
 
-  private:
+  /** Data queue size */
+  Semaphore m_DataQueueSize;
 
-    struct DataBlock
-    {
-      DataBlock() :
-        magic(0xdeadbeef), size(0), offset(0), ptr(0), remoteHost()
-      {};
+  /** Accept any address? */
+  bool m_bAcceptAll;
 
-      uint32_t magic; // 0xdeadbeef
+  /** Can we send? */
+  bool m_bCanSend;
 
-      size_t size;
-      size_t offset; // if we only do a partial read, this is filled
-      uintptr_t ptr;
-
-      RemoteEndpoint remoteHost; // who sent it to us - needed for port info!
-    };
-
-    /** Incoming data queue */
-    List<DataBlock*> m_DataQueue;
-
-    /** Data queue size */
-    Semaphore m_DataQueueSize;
-
-    /** Accept any address? */
-    bool m_bAcceptAll;
-
-    /** Can we send? */
-    bool m_bCanSend;
-
-    /** Can we receive? */
-    bool m_bCanRecv;
+  /** Can we receive? */
+  bool m_bCanRecv;
 };
 
 /**
@@ -124,8 +128,7 @@ public:
   {};
 
   /** For access to the manager without declaring an instance of it */
-  static UdpManager& instance()
-  {
+  static UdpManager& instance() {
     return manager;
   }
 

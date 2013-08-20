@@ -51,8 +51,7 @@ public:
   virtual ~Ipv4();
 
   /** For access to the stack without declaring an instance of it */
-  static Ipv4& instance()
-  {
+  static Ipv4& instance() {
     return ipInstance;
   }
 
@@ -76,8 +75,7 @@ public:
    */
   virtual uint16_t ipChecksum(IpAddress &from, IpAddress &to, uint8_t proto, uintptr_t data, uint16_t length);
 
-  struct ipHeader
-  {
+  struct ipHeader {
     uint32_t header_len : 4;
     uint32_t ipver : 4;
 #if 0 // big-endian
@@ -96,9 +94,8 @@ public:
   } __attribute__ ((packed));
 
   /** Gets the next IP Packet ID */
-  uint16_t getNextId()
-  {
-    LockGuard<Spinlock> guard(m_NextIdLock);
+  uint16_t getNextId() {
+    ScopedLock<> guard(m_NextIdLock);
     return m_IpId++;
   }
 
@@ -107,8 +104,7 @@ private:
   static Ipv4 ipInstance;
 
   /// IPv4 psuedo-header for upper-layer checksums.
-  struct PsuedoHeader
-  {
+  struct PsuedoHeader {
     uint32_t  src_addr;
     uint32_t  dest_addr;
     uint8_t   zero;
@@ -117,73 +113,64 @@ private:
   } __attribute__ ((packed));
 
   /// An actual fragment
-  struct fragment
-  {
-      char *data;
-      size_t length;
+  struct fragment {
+    char *data;
+    size_t length;
   };
 
   /// Stores all the segments for an IPv4 fragmented packet.
   /// In its own type so that it can be extended in the future as needed.
-  struct fragmentWrapper
-  {
-      /// Original IPv4 header to be applied to the packet during reassembly
-      char *originalIpHeader;
+  struct fragmentWrapper {
+    /// Original IPv4 header to be applied to the packet during reassembly
+    char *originalIpHeader;
 
-      /// Original IPv4 header length
-      size_t originalIpHeaderLen;
+    /// Original IPv4 header length
+    size_t originalIpHeaderLen;
 
-      /// Map of offsets to actual buffers
-      Tree<size_t, fragment *> fragments;
+    /// Map of offsets to actual buffers
+    Tree<size_t, fragment *> fragments;
   };
 
   /// Identifies an IPv4 packet by linking the ID and IP together
   class Ipv4Identifier
   {
-    public:
-        Ipv4Identifier() : m_Id(0), m_Ip(IpAddress::IPv4)
-        {
-        }
+  public:
+    Ipv4Identifier() : m_Id(0), m_Ip(IpAddress::IPv4) {
+    }
 
-        Ipv4Identifier(uint16_t id, IpAddress ip) : m_Id(id), m_Ip(ip)
-        {
-        }
+    Ipv4Identifier(uint16_t id, IpAddress ip) : m_Id(id), m_Ip(ip) {
+    }
 
-        inline uint16_t getId()
-        {
-            return m_Id;
-        }
+    inline uint16_t getId() {
+      return m_Id;
+    }
 
-        inline IpAddress &getIp()
-        {
-            return m_Ip;
-        }
+    inline IpAddress &getIp() {
+      return m_Ip;
+    }
 
-        inline bool operator < (Ipv4Identifier &a)
-        {
-            return (m_Id < a.m_Id);
-        }
+    inline bool operator < (Ipv4Identifier &a) {
+      return (m_Id < a.m_Id);
+    }
 
-        inline bool operator > (Ipv4Identifier &a)
-        {
-            return (m_Id > a.m_Id);
-        }
+    inline bool operator > (Ipv4Identifier &a) {
+      return (m_Id > a.m_Id);
+    }
 
-        inline bool operator == (Ipv4Identifier &a)
-        {
-            return ((m_Id == a.m_Id) && (m_Ip == a.m_Ip));
-        }
+    inline bool operator == (Ipv4Identifier &a) {
+      return ((m_Id == a.m_Id) && (m_Ip == a.m_Ip));
+    }
 
-    private:
-        /// ID for all ipv4 packets in this identification block
-        uint16_t m_Id;
+  private:
+    /// ID for all ipv4 packets in this identification block
+    uint16_t m_Id;
 
-        /// The IP address the ID is linked to
-        IpAddress m_Ip;
+    /// The IP address the ID is linked to
+    IpAddress m_Ip;
   };
 
   /// Lock for the "Next ID" variable
-  Spinlock m_NextIdLock;
+  SpinLock m_NextIdLock;
 
   /// Next ID to use for an IPv4 packet
   uint16_t m_IpId;

@@ -46,6 +46,8 @@ void Scheduler::schedule(bool ei) {
   else DBG::outln(DBG::Scheduler, nextThread);
 
   enableInterrupts = ei;
+  prevThread->status = Thread::Sleeping;
+  nextThread->status = Thread::Running;
 
   if ( nextThread->getAddressSpace() != &kernelSpace
     && nextThread->getAddressSpace() != prevThread->getAddressSpace() ) {

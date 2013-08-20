@@ -38,12 +38,10 @@ void TcpManager::receive(IpAddress from, uint16_t sourcePort, uint16_t destPort,
   handle.remoteHost.ip = from;
   handle.listen = false; // DON'T look for listen sockets yet
   StateBlock* stateBlock;
-  if((stateBlock = m_StateBlocks.lookup(handle)) == 0)
-  {
+  if((stateBlock = m_StateBlocks.lookup(handle)) == 0) {
     // Check for a listen socket
     handle.listen = true;
-    if((stateBlock = m_ListeningStateBlocks.lookup(handle)) == 0)
-    {
+    if((stateBlock = m_ListeningStateBlocks.lookup(handle)) == 0) {
       // Port doesn't exist, so temporary stateBlock required for proper RST handle
       stateBlock = new StateBlock;
       if(stateBlock == 0)
@@ -80,602 +78,532 @@ void TcpManager::receive(IpAddress from, uint16_t sourcePort, uint16_t destPort,
   // dump some pretty information
   DBG::outln(DBG::Net, " + SEQ=", stateBlock->seg_seq, " ACK=", stateBlock->seg_ack, " LEN=", stateBlock->seg_len, " WND=", stateBlock->seg_wnd);
   DBG::outln(DBG::Net, " + FLAGS: ",
-                (header->flags & Tcp::FIN ? "FIN " : ""),
-                (header->flags & Tcp::SYN ? "SYN " : ""),
-                (header->flags & Tcp::RST ? "RST " : ""),
-                (header->flags & Tcp::PSH ? "PSH " : ""),
-                (header->flags & Tcp::ACK ? "ACK " : ""),
-                (header->flags & Tcp::URG ? "URG " : ""),
-                (header->flags & Tcp::ECE ? "ECE " : ""),
-                (header->flags & Tcp::CWR ? "CWR " : "")
-  );
+             (header->flags & Tcp::FIN ? "FIN " : ""),
+             (header->flags & Tcp::SYN ? "SYN " : ""),
+             (header->flags & Tcp::RST ? "RST " : ""),
+             (header->flags & Tcp::PSH ? "PSH " : ""),
+             (header->flags & Tcp::ACK ? "ACK " : ""),
+             (header->flags & Tcp::URG ? "URG " : ""),
+             (header->flags & Tcp::ECE ? "ECE " : ""),
+             (header->flags & Tcp::CWR ? "CWR " : "")
+            );
 #endif
 
-  switch(stateBlock->currentState)
-  {
+  switch(stateBlock->currentState) {
     /* Incoming segment while the state is CLOSED */
-    case Tcp::CLOSED:
+  case Tcp::CLOSED:
 
-      // If no RST, we need to send one
-      if(!(header->flags & Tcp::RST))
-      {
-        uint32_t seq = 0;
-        uint32_t ack = 0;
-        uint16_t window = 0;
+    // If no RST, we need to send one
+    if(!(header->flags & Tcp::RST)) {
+      uint32_t seq = 0;
+      uint32_t ack = 0;
+      uint16_t window = 0;
 
-        uint8_t flags = 0;
+      uint8_t flags = 0;
 
-        if(header->flags & Tcp::ACK)
-        {
-          seq = BIG_TO_HOST32(header->acknum);
-          flags = Tcp::RST;
-        }
-        else
-        {
-          ack = BIG_TO_HOST32(header->seqnum) + 1;
-          flags = Tcp::RST | Tcp::ACK;
-        }
-        if(!Tcp::send(from, handle.localPort, handle.remotePort, seq, ack, flags, window, 0, 0))
-          DBG::outln(DBG::Warning, "TCP: Sending RST due to incoming segment while in CLOSED state failed.");
+      if(header->flags & Tcp::ACK) {
+        seq = BIG_TO_HOST32(header->acknum);
+        flags = Tcp::RST;
+      } else {
+        ack = BIG_TO_HOST32(header->seqnum) + 1;
+        flags = Tcp::RST | Tcp::ACK;
       }
+      if(!Tcp::send(from, handle.localPort, handle.remotePort, seq, ack, flags, window, 0, 0))
+        DBG::outln(DBG::Warning, "TCP: Sending RST due to incoming segment while in CLOSED state failed.");
+    }
 
-      if(bDidAllocateStateBlock)
-          delete stateBlock;
+    if(bDidAllocateStateBlock)
+      delete stateBlock;
 
-      return;
+    return;
 
-      break;
+    break;
 
     /* Incoming segment while the state is LISTEN */
-    case Tcp::LISTEN:
+  case Tcp::LISTEN:
 
-      if(header->flags & Tcp::RST)
-      {
-        // RST on a listen state is invalid
-      }
-      else if(header->flags & Tcp::ACK)
-      {
-        // An ACK on a listen state is invalid
-        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
-          DBG::outln(DBG::Warning, "TCP: Sending RST due to ACK while in LISTEN state failed.");
-      }
-      else if(header->flags & Tcp::SYN)
-      {
-        // Create a new server state block for this incoming connection, and register the new client
-        // connection ID with the listening endpoint
+    if(header->flags & Tcp::RST) {
+      // RST on a listen state is invalid
+    } else if(header->flags & Tcp::ACK) {
+      // An ACK on a listen state is invalid
+      if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
+        DBG::outln(DBG::Warning, "TCP: Sending RST due to ACK while in LISTEN state failed.");
+    } else if(header->flags & Tcp::SYN) {
+      // Create a new server state block for this incoming connection, and register the new client
+      // connection ID with the listening endpoint
 
-        size_t connId = getConnId();
+      size_t connId = getConnId();
 
-        StateBlock* newStateBlock = new StateBlock;
-        if(!newStateBlock)
-        {
-          // If we don't get this new block, pretend we're not listening
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, 0, stateBlock->seg_ack, Tcp::RST | Tcp::ACK, 0, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Couldn't ACK a SYN because no memory was available for a state block.");
-          return;
-        }
-
-        newStateBlock->connId = connId;
-
-        newStateBlock->localPort = destPort;
-        newStateBlock->remoteHost.remotePort = sourcePort;
-        newStateBlock->remoteHost.ip = from;
-
-        newStateBlock->iss = getNextSequenceNumber();
-        newStateBlock->snd_nxt = newStateBlock->iss + 1;
-        newStateBlock->snd_una = newStateBlock->iss;
-        newStateBlock->snd_wnd = 16384;
-        newStateBlock->snd_up = 0;
-        newStateBlock->snd_wl1 = newStateBlock->snd_wl2 = 0;
-
-        newStateBlock->irs = stateBlock->seg_seq;
-        newStateBlock->rcv_nxt = stateBlock->seg_seq + 1;
-        newStateBlock->rcv_wnd = stateBlock->seg_wnd;
-        newStateBlock->rcv_up = 0;
-
-        newStateBlock->seg_seq = newStateBlock->rcv_nxt;
-
-        newStateBlock->currentState = Tcp::SYN_RECEIVED;
-
-        newStateBlock->endpoint = stateBlock->endpoint;
-
-        newStateBlock->numEndpointPackets = 0;
-
-        handle.listen = false;
-        handle.localPort = destPort;
-        handle.remotePort = sourcePort;
-        handle.remoteHost.ip = from;
-
-        StateBlockHandle* tmp = new StateBlockHandle;
-        if(!tmp)
-        {
-          delete newStateBlock;
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, 0, stateBlock->seg_ack, Tcp::RST | Tcp::ACK, 0, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Couldn't ACK a SYN because no memory was available for a state block handle.");
-          return;
-        }
-
-        *tmp = handle;
-
-        m_StateBlocks.insert(handle, newStateBlock);
-        m_CurrentConnections.insert(connId, tmp);
-
-        // ACK the SYN
-        IpAddress dest;
-        dest = newStateBlock->remoteHost.ip;
-        if(!Tcp::send(dest, newStateBlock->localPort, newStateBlock->remoteHost.remotePort, newStateBlock->iss, newStateBlock->rcv_nxt, Tcp::SYN | Tcp::ACK, newStateBlock->snd_wnd, 0, 0))
-          DBG::outln(DBG::Warning, "TCP: Sending SYN/ACK failed");
-      }
-      else
-      {
-        DBG::outln(DBG::Warning, "TCP Packet incoming on port ", handle.localPort, " during LISTEN without RST, ACK, or SYN set.");
+      StateBlock* newStateBlock = new StateBlock;
+      if(!newStateBlock) {
+        // If we don't get this new block, pretend we're not listening
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, 0, stateBlock->seg_ack, Tcp::RST | Tcp::ACK, 0, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Couldn't ACK a SYN because no memory was available for a state block.");
+        return;
       }
 
-      break;
+      newStateBlock->connId = connId;
+
+      newStateBlock->localPort = destPort;
+      newStateBlock->remoteHost.remotePort = sourcePort;
+      newStateBlock->remoteHost.ip = from;
+
+      newStateBlock->iss = getNextSequenceNumber();
+      newStateBlock->snd_nxt = newStateBlock->iss + 1;
+      newStateBlock->snd_una = newStateBlock->iss;
+      newStateBlock->snd_wnd = 16384;
+      newStateBlock->snd_up = 0;
+      newStateBlock->snd_wl1 = newStateBlock->snd_wl2 = 0;
+
+      newStateBlock->irs = stateBlock->seg_seq;
+      newStateBlock->rcv_nxt = stateBlock->seg_seq + 1;
+      newStateBlock->rcv_wnd = stateBlock->seg_wnd;
+      newStateBlock->rcv_up = 0;
+
+      newStateBlock->seg_seq = newStateBlock->rcv_nxt;
+
+      newStateBlock->currentState = Tcp::SYN_RECEIVED;
+
+      newStateBlock->endpoint = stateBlock->endpoint;
+
+      newStateBlock->numEndpointPackets = 0;
+
+      handle.listen = false;
+      handle.localPort = destPort;
+      handle.remotePort = sourcePort;
+      handle.remoteHost.ip = from;
+
+      StateBlockHandle* tmp = new StateBlockHandle;
+      if(!tmp) {
+        delete newStateBlock;
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, 0, stateBlock->seg_ack, Tcp::RST | Tcp::ACK, 0, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Couldn't ACK a SYN because no memory was available for a state block handle.");
+        return;
+      }
+
+      *tmp = handle;
+
+      m_StateBlocks.insert(handle, newStateBlock);
+      m_CurrentConnections.insert(connId, tmp);
+
+      // ACK the SYN
+      IpAddress dest;
+      dest = newStateBlock->remoteHost.ip;
+      if(!Tcp::send(dest, newStateBlock->localPort, newStateBlock->remoteHost.remotePort, newStateBlock->iss, newStateBlock->rcv_nxt, Tcp::SYN | Tcp::ACK, newStateBlock->snd_wnd, 0, 0))
+        DBG::outln(DBG::Warning, "TCP: Sending SYN/ACK failed");
+    } else {
+      DBG::outln(DBG::Warning, "TCP Packet incoming on port ", handle.localPort, " during LISTEN without RST, ACK, or SYN set.");
+    }
+
+    break;
 
     /* Incoming segment while the state is SYN_SENT */
-    case Tcp::SYN_SENT:
+  case Tcp::SYN_SENT:
 
-      // ACK verification
-      if(header->flags & Tcp::ACK)
-      {
-        if((stateBlock->seg_ack <= stateBlock->iss) || (stateBlock->seg_ack > stateBlock->snd_nxt))
-        {
-          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during SYN-SENT has unacceptable ACK 1.");
+    // ACK verification
+    if(header->flags & Tcp::ACK) {
+      if((stateBlock->seg_ack <= stateBlock->iss) || (stateBlock->seg_ack > stateBlock->snd_nxt)) {
+        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during SYN-SENT has unacceptable ACK 1.");
 
-          // RST required
-          if(!(header->flags & Tcp::RST))
-          {
-            if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
-              DBG::outln(DBG::Warning, "TCP: Sending RST due to invalid ACK while in SYN_SENT state failed.");
-            break;
-          }
-        }
-
-        if(!((stateBlock->snd_una <= stateBlock->seg_ack) && (stateBlock->seg_ack <= stateBlock->snd_nxt)))
-        {
-          // ACK unacceptable
-          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during SYN-SENT has unacceptable ACK 2.");
+        // RST required
+        if(!(header->flags & Tcp::RST)) {
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending RST due to invalid ACK while in SYN_SENT state failed.");
           break;
         }
       }
 
-      if(header->flags & Tcp::RST)
-      {
-        if(header->flags & Tcp::ACK)
-        {
-          // Drop segment, we're closing NOW!
-          stateBlock->currentState = Tcp::CLOSED;
-          break;
-        }
-      }
-
-      if(header->flags & Tcp::SYN)
-      {
-        if(header->flags & Tcp::ACK)
-        {
-          stateBlock->rcv_nxt = stateBlock->seg_seq + 1;
-          stateBlock->irs = stateBlock->seg_seq;
-          stateBlock->snd_una = stateBlock->seg_ack;
-
-          if(stateBlock->snd_una > stateBlock->iss)
-          {
-            stateBlock->currentState = Tcp::ESTABLISHED;
-
-            if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-              DBG::outln(DBG::Warning, "TCP: Sending ACK due to SYN/ACK while in SYN_SENT state failed.");
-
-            break;
-          }
-          else
-          {
-            stateBlock->currentState = Tcp::SYN_RECEIVED;
-
-            if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->iss, stateBlock->rcv_nxt, Tcp::SYN | Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-              DBG::outln(DBG::Warning, "TCP: Sending SYN/ACK due to incorrect SYN/ACK while in SYN_SENT state failed.");
-
-            break;
-          }
-        }
-      }
-
-      break;
-
-    /* These all have the same style of handling (with special handling as needed) */
-    case Tcp::SYN_RECEIVED:
-    case Tcp::ESTABLISHED:
-    case Tcp::FIN_WAIT_1:
-    case Tcp::FIN_WAIT_2:
-    case Tcp::CLOSE_WAIT:
-    case Tcp::CLOSING:
-    case Tcp::LAST_ACK:
-    case Tcp::TIME_WAIT:
-
-      // Is SYN set on the incoming packet?
-      if(header->flags & Tcp::SYN)
-      {
-        DBG::outln(DBG::Warning, "TCP: unexpected SYN!");
-        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK | Tcp::RST, stateBlock->snd_wnd, 0, 0))
-          DBG::outln(DBG::Warning, "TCP: Sending RST due to SYN during non-SYN phase failed.");
+      if(!((stateBlock->snd_una <= stateBlock->seg_ack) && (stateBlock->seg_ack <= stateBlock->snd_nxt))) {
+        // ACK unacceptable
+        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during SYN-SENT has unacceptable ACK 2.");
         break;
       }
+    }
 
-      if((stateBlock->seg_len == 0) && (stateBlock->rcv_wnd == 0))
-      {
-        // Unacceptable
-        if(!(stateBlock->seg_seq == stateBlock->rcv_nxt))
-        {
-          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 1.");
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (1) while in post-SYN_SENT state failed.");
-          break;
-        }
-      }
-
-      /*
-        (NN) TCP Packet arriving on port 1234 during SYN-RECEIVED is unacceptable 2.
-        (NN)     >> RCV_NXT = 0xd3c9b468
-        (NN)     >> SEG_SEQ = 0xd3c9b467
-        (NN)     >> RCV_NXT + RCV_WND = 0xd3c9cae8
-        */
-
-      if((stateBlock->seg_len == 0) && (stateBlock->rcv_wnd > 0))
-      {
-        // Unacceptable
-        if(!((stateBlock->rcv_nxt <= stateBlock->seg_seq) && (stateBlock->seg_seq < (stateBlock->rcv_nxt + stateBlock->rcv_wnd))))
-        {
-          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 2.");
-          DBG::outln(DBG::Warning, "    >> RCV_NXT = ", stateBlock->rcv_nxt);
-          DBG::outln(DBG::Warning, "    >> SEG_SEQ = ", stateBlock->seg_seq);
-          DBG::outln(DBG::Warning, "    >> RCV_NXT + RCV_WND = ", (stateBlock->rcv_nxt + stateBlock->rcv_wnd));
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (2) while in post-SYN_SENT state failed.");
-          break;
-        }
-      }
-
-      // Unacceptable
-      if((stateBlock->seg_len > 0) && (stateBlock->rcv_wnd == 0))
-      {
-        NOTICE("TCP Packet arriving on port " << Dec << handle.localPort << Hex << " during " << Tcp::stateString(stateBlock->currentState) << " is unacceptable 3.");
-        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-          DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (3) while in post-SYN_SENT state failed.");
-        break;
-      }
-
-      if((stateBlock->seg_len > 0) && (stateBlock->rcv_wnd > 0))
-      {
-        if(!(
-          ((stateBlock->rcv_nxt <= stateBlock->seg_seq) && (stateBlock->seg_seq < (stateBlock->rcv_nxt + stateBlock->rcv_wnd)))
-          ||
-          ((stateBlock->rcv_nxt <= (stateBlock->seg_seq + stateBlock->seg_len - 1)) && ((stateBlock->seg_seq + stateBlock->seg_len - 1) < (stateBlock->rcv_nxt + stateBlock->rcv_wnd)))))
-        {
-          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 4.");
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (4) while in post-SYN_SENT state failed.");
-          break;
-        }
-      }
-
-      if(header->flags & Tcp::RST)
-      {
-        switch(stateBlock->currentState)
-        {
-          case Tcp::SYN_RECEIVED:
-            /// \note LISTEN sockets never go into SYN_RECEIVED, so
-            ///       we don't handle a passive open case here
-            break;
-
-          case Tcp::ESTABLISHED:
-          case Tcp::FIN_WAIT_1:
-          case Tcp::FIN_WAIT_2:
-          case Tcp::CLOSE_WAIT:
-
-            /// \todo recv/send need to handle the connection being reset
-
-            stateBlock->currentState = Tcp::CLOSED;
-
-            break;
-
-          case Tcp::CLOSING:
-          case Tcp::LAST_ACK:
-          case Tcp::TIME_WAIT:
-
-            // Merely close (state change below)
-            break;
-
-          default:
-            break;
-        }
-
+    if(header->flags & Tcp::RST) {
+      if(header->flags & Tcp::ACK) {
+        // Drop segment, we're closing NOW!
         stateBlock->currentState = Tcp::CLOSED;
         break;
       }
+    }
 
-      /// \todo Check security and precedence (IP header)...
+    if(header->flags & Tcp::SYN) {
+      if(header->flags & Tcp::ACK) {
+        stateBlock->rcv_nxt = stateBlock->seg_seq + 1;
+        stateBlock->irs = stateBlock->seg_seq;
+        stateBlock->snd_una = stateBlock->seg_ack;
 
-      if(header->flags & Tcp::ACK)
-      {
-        // Remove all acked segments from the transmit queue
-        stateBlock->ackSegment();
+        if(stateBlock->snd_una > stateBlock->iss) {
+          stateBlock->currentState = Tcp::ESTABLISHED;
 
-        switch(stateBlock->currentState)
-        {
-          case Tcp::SYN_RECEIVED:
-          {
-            if(!(stateBlock->snd_una <= stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt))
-            {
-              DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is an unacceptable segment ACK.");
-              if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
-                DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable segment ACK while in post-SYN_SENT state failed.");
-              break;
-            }
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending ACK due to SYN/ACK while in SYN_SENT state failed.");
 
-            size_t connId = stateBlock->connId;
-            TcpEndpoint* parent = stateBlock->endpoint;
-            if(!parent)
-            {
-              DBG::outln(DBG::Warning, "TCP State Block is in SYN_RECEIVED but has no parent endpoint!");
-              return;
-            }
+          break;
+        } else {
+          stateBlock->currentState = Tcp::SYN_RECEIVED;
 
-            stateBlock->endpoint = new TcpEndpoint(connId, from, stateBlock->localPort, stateBlock->remoteHost.remotePort);
-            if(!stateBlock->endpoint)
-            {
-              removeConn(connId);
-              if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
-                DBG::outln(DBG::Warning, "TCP: Sending RST due to no memory for incoming connection's endpoint");
-              return;
-            }
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->iss, stateBlock->rcv_nxt, Tcp::SYN | Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending SYN/ACK due to incorrect SYN/ACK while in SYN_SENT state failed.");
 
-            // Fall through otherwise
-            stateBlock->currentState = Tcp::ESTABLISHED;
+          break;
+        }
+      }
+    }
 
-            // Ensure that the parent endpoint handles this properly
-            parent->addIncomingConnection(stateBlock->endpoint);
-          }
+    break;
 
-          case Tcp::ESTABLISHED:
-          case Tcp::FIN_WAIT_1:
-          case Tcp::FIN_WAIT_2:
-          case Tcp::CLOSE_WAIT:
-          case Tcp::CLOSING:
+    /* These all have the same style of handling (with special handling as needed) */
+  case Tcp::SYN_RECEIVED:
+  case Tcp::ESTABLISHED:
+  case Tcp::FIN_WAIT_1:
+  case Tcp::FIN_WAIT_2:
+  case Tcp::CLOSE_WAIT:
+  case Tcp::CLOSING:
+  case Tcp::LAST_ACK:
+  case Tcp::TIME_WAIT:
 
-            if(stateBlock->seg_ack < stateBlock->snd_una)
-              break; // Dupe ack, just skip it and continue
+    // Is SYN set on the incoming packet?
+    if(header->flags & Tcp::SYN) {
+      DBG::outln(DBG::Warning, "TCP: unexpected SYN!");
+      if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK | Tcp::RST, stateBlock->snd_wnd, 0, 0))
+        DBG::outln(DBG::Warning, "TCP: Sending RST due to SYN during non-SYN phase failed.");
+      break;
+    }
 
-            // Remove from retransmission queue any acknowledged packets...
-            //stateBlock->retransmitQueue.remove(stateBlock->snd_una - stateBlock->nRemovedFromRetransmit, stateBlock->seg_len);
-            //stateBlock->nRemovedFromRetransmit += (stateBlock->seg_ack - stateBlock->snd_una);
+    if((stateBlock->seg_len == 0) && (stateBlock->rcv_wnd == 0)) {
+      // Unacceptable
+      if(!(stateBlock->seg_seq == stateBlock->rcv_nxt)) {
+        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 1.");
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (1) while in post-SYN_SENT state failed.");
+        break;
+      }
+    }
 
-            // update the unack'd data information
-            if(stateBlock->snd_una < stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt)
-              stateBlock->snd_una = stateBlock->seg_ack;
+    /*
+      (NN) TCP Packet arriving on port 1234 during SYN-RECEIVED is unacceptable 2.
+      (NN)     >> RCV_NXT = 0xd3c9b468
+      (NN)     >> SEG_SEQ = 0xd3c9b467
+      (NN)     >> RCV_NXT + RCV_WND = 0xd3c9cae8
+      */
 
-            // Reset the retransmit timer
-            stateBlock->resetTimer();
+    if((stateBlock->seg_len == 0) && (stateBlock->rcv_wnd > 0)) {
+      // Unacceptable
+      if(!((stateBlock->rcv_nxt <= stateBlock->seg_seq) && (stateBlock->seg_seq < (stateBlock->rcv_nxt + stateBlock->rcv_wnd)))) {
+        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 2.");
+        DBG::outln(DBG::Warning, "    >> RCV_NXT = ", stateBlock->rcv_nxt);
+        DBG::outln(DBG::Warning, "    >> SEG_SEQ = ", stateBlock->seg_seq);
+        DBG::outln(DBG::Warning, "    >> RCV_NXT + RCV_WND = ", (stateBlock->rcv_nxt + stateBlock->rcv_wnd));
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (2) while in post-SYN_SENT state failed.");
+        break;
+      }
+    }
 
-            if(stateBlock->snd_una >= stateBlock->snd_nxt)
-              stateBlock->waitingForTimeout = false;
+    // Unacceptable
+    if((stateBlock->seg_len > 0) && (stateBlock->rcv_wnd == 0)) {
+      DBG::outln(DBG::Net, "TCP Packet arriving on port ", handle.localPort, " during ", FmtHex(Tcp::stateString(stateBlock->currentState)), " is unacceptable 3.");
+      if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+        DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (3) while in post-SYN_SENT state failed.");
+      break;
+    }
 
-            if(stateBlock->seg_ack > stateBlock->snd_nxt)
-            {
-              // Ack the ack with the proper sequence number, because the remote TCP has ack'd data that hasn't been sent
-              if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->seg_seq, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-                DBG::outln(DBG::Warning, "TCP: Sending ACK with proper sequence number (remote TCP ack'd data that we didn't send) failed.");
-              else
-                alreadyAck = true;
-              break;
-            }
+    if((stateBlock->seg_len > 0) && (stateBlock->rcv_wnd > 0)) {
+      if(!(
+           ((stateBlock->rcv_nxt <= stateBlock->seg_seq) && (stateBlock->seg_seq < (stateBlock->rcv_nxt + stateBlock->rcv_wnd)))
+           ||
+           ((stateBlock->rcv_nxt <= (stateBlock->seg_seq + stateBlock->seg_len - 1)) && ((stateBlock->seg_seq + stateBlock->seg_len - 1) < (stateBlock->rcv_nxt + stateBlock->rcv_wnd))))) {
+        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is unacceptable 4.");
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable ACK (4) while in post-SYN_SENT state failed.");
+        break;
+      }
+    }
 
-            if(stateBlock->snd_una < stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt)
-            {
-              if((stateBlock->snd_wl1 < stateBlock->seg_seq) || (stateBlock->snd_wl1 == stateBlock->seg_seq && stateBlock->snd_wl2 <= stateBlock->seg_ack))
-              {
-                stateBlock->snd_wnd = stateBlock->seg_wnd;
-                stateBlock->snd_wl1 = stateBlock->seg_seq;
-                stateBlock->snd_wl2 = stateBlock->seg_ack;
-              }
-            }
+    if(header->flags & Tcp::RST) {
+      switch(stateBlock->currentState) {
+      case Tcp::SYN_RECEIVED:
+        /// \note LISTEN sockets never go into SYN_RECEIVED, so
+        ///       we don't handle a passive open case here
+        break;
 
-            if(stateBlock->currentState == Tcp::FIN_WAIT_1)
-            {
-              if(stateBlock->fin_seq <= stateBlock->seg_ack)
-              {
-                stateBlock->currentState = Tcp::FIN_WAIT_2;
-                stateBlock->fin_ack = true; // FIN has been acked
-              }
-            }
-            else if(stateBlock->currentState == Tcp::FIN_WAIT_2)
-            {
-              // user's close can return now, but no deletion of the state block yet
+      case Tcp::ESTABLISHED:
+      case Tcp::FIN_WAIT_1:
+      case Tcp::FIN_WAIT_2:
+      case Tcp::CLOSE_WAIT:
 
-              if(stateBlock->fin_seq <= stateBlock->seg_ack)
-              {
-                stateBlock->currentState = Tcp::FIN_WAIT_2;
-                stateBlock->fin_ack = true; // FIN has been acked
-              }
-            }
-            else if(stateBlock->currentState == Tcp::CLOSING)
-            {
-              if(stateBlock->fin_seq <= stateBlock->seg_ack)
-              {
-                //stateBlock->currentState = Tcp::TIME_WAIT;
-                stateBlock->currentState = Tcp::CLOSED;
-                stateBlock->fin_ack = true; // FIN has been acked
-              }
-            }
+        /// \todo recv/send need to handle the connection being reset
 
-            break;
+        stateBlock->currentState = Tcp::CLOSED;
 
-          case Tcp::LAST_ACK:
+        break;
 
-            // only our FIN ack can come now, so close
-            if((stateBlock->fin_seq + 1) == stateBlock->seg_ack)
-            {
-              stateBlock->currentState = Tcp::CLOSED;
-              stateBlock->fin_ack = true; // FIN has been acked
-            }
-            break;
+      case Tcp::CLOSING:
+      case Tcp::LAST_ACK:
+      case Tcp::TIME_WAIT:
 
-          case Tcp::TIME_WAIT:
+        // Merely close (state change below)
+        break;
 
-            // only a FIN can come in during this state, ACK will be performed later on
-            stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
-            stateBlock->waitingForTimeout = true;
+      default:
+        break;
+      }
 
-            break;
+      stateBlock->currentState = Tcp::CLOSED;
+      break;
+    }
 
-          default:
-            break;
+    /// \todo Check security and precedence (IP header)...
+
+    if(header->flags & Tcp::ACK) {
+      // Remove all acked segments from the transmit queue
+      stateBlock->ackSegment();
+
+      switch(stateBlock->currentState) {
+      case Tcp::SYN_RECEIVED: {
+        if(!(stateBlock->snd_una <= stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt)) {
+          DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), " is an unacceptable segment ACK.");
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending ACK due to unacceptable segment ACK while in post-SYN_SENT state failed.");
+          break;
         }
 
-        if(stateBlock->currentState == Tcp::CLOSED)
+        size_t connId = stateBlock->connId;
+        TcpEndpoint* parent = stateBlock->endpoint;
+        if(!parent) {
+          DBG::outln(DBG::Warning, "TCP State Block is in SYN_RECEIVED but has no parent endpoint!");
+          return;
+        }
+
+        stateBlock->endpoint = new TcpEndpoint(connId, from, stateBlock->localPort, stateBlock->remoteHost.remotePort);
+        if(!stateBlock->endpoint) {
+          removeConn(connId);
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->seg_ack, 0, Tcp::RST, 0, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending RST due to no memory for incoming connection's endpoint");
+          return;
+        }
+
+        // Fall through otherwise
+        stateBlock->currentState = Tcp::ESTABLISHED;
+
+        // Ensure that the parent endpoint handles this properly
+        parent->addIncomingConnection(stateBlock->endpoint);
+      }
+
+      case Tcp::ESTABLISHED:
+      case Tcp::FIN_WAIT_1:
+      case Tcp::FIN_WAIT_2:
+      case Tcp::CLOSE_WAIT:
+      case Tcp::CLOSING:
+
+        if(stateBlock->seg_ack < stateBlock->snd_una)
+          break; // Dupe ack, just skip it and continue
+
+        // Remove from retransmission queue any acknowledged packets...
+        //stateBlock->retransmitQueue.remove(stateBlock->snd_una - stateBlock->nRemovedFromRetransmit, stateBlock->seg_len);
+        //stateBlock->nRemovedFromRetransmit += (stateBlock->seg_ack - stateBlock->snd_una);
+
+        // update the unack'd data information
+        if(stateBlock->snd_una < stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt)
+          stateBlock->snd_una = stateBlock->seg_ack;
+
+        // Reset the retransmit timer
+        stateBlock->resetTimer();
+
+        if(stateBlock->snd_una >= stateBlock->snd_nxt)
+          stateBlock->waitingForTimeout = false;
+
+        if(stateBlock->seg_ack > stateBlock->snd_nxt) {
+          // Ack the ack with the proper sequence number, because the remote TCP has ack'd data that hasn't been sent
+          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->seg_seq, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+            DBG::outln(DBG::Warning, "TCP: Sending ACK with proper sequence number (remote TCP ack'd data that we didn't send) failed.");
+          else
+            alreadyAck = true;
           break;
+        }
 
+        if(stateBlock->snd_una < stateBlock->seg_ack && stateBlock->seg_ack <= stateBlock->snd_nxt) {
+          if((stateBlock->snd_wl1 < stateBlock->seg_seq) || (stateBlock->snd_wl1 == stateBlock->seg_seq && stateBlock->snd_wl2 <= stateBlock->seg_ack)) {
+            stateBlock->snd_wnd = stateBlock->seg_wnd;
+            stateBlock->snd_wl1 = stateBlock->seg_seq;
+            stateBlock->snd_wl2 = stateBlock->seg_ack;
+          }
+        }
+
+        if(stateBlock->currentState == Tcp::FIN_WAIT_1) {
+          if(stateBlock->fin_seq <= stateBlock->seg_ack) {
+            stateBlock->currentState = Tcp::FIN_WAIT_2;
+            stateBlock->fin_ack = true; // FIN has been acked
+          }
+        } else if(stateBlock->currentState == Tcp::FIN_WAIT_2) {
+          // user's close can return now, but no deletion of the state block yet
+
+          if(stateBlock->fin_seq <= stateBlock->seg_ack) {
+            stateBlock->currentState = Tcp::FIN_WAIT_2;
+            stateBlock->fin_ack = true; // FIN has been acked
+          }
+        } else if(stateBlock->currentState == Tcp::CLOSING) {
+          if(stateBlock->fin_seq <= stateBlock->seg_ack) {
+            //stateBlock->currentState = Tcp::TIME_WAIT;
+            stateBlock->currentState = Tcp::CLOSED;
+            stateBlock->fin_ack = true; // FIN has been acked
+          }
+        }
+
+        break;
+
+      case Tcp::LAST_ACK:
+
+        // only our FIN ack can come now, so close
+        if((stateBlock->fin_seq + 1) == stateBlock->seg_ack) {
+          stateBlock->currentState = Tcp::CLOSED;
+          stateBlock->fin_ack = true; // FIN has been acked
+        }
+        break;
+
+      case Tcp::TIME_WAIT:
+
+        // only a FIN can come in during this state, ACK will be performed later on
+        stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
+        stateBlock->waitingForTimeout = true;
+
+        break;
+
+      default:
+        break;
       }
-      else
-        DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), "has no ACK.");
 
-      if(header->flags & Tcp::URG)
-      {
-        // handle urgent notification to the application
-      }
+      if(stateBlock->currentState == Tcp::CLOSED)
+        break;
 
-      /* Finally, process the actual segment payload */
-      if(stateBlock->currentState == Tcp::ESTABLISHED || stateBlock->currentState == Tcp::FIN_WAIT_1 || stateBlock->currentState == Tcp::FIN_WAIT_2)
-      {
-        // Is this a valid data segment?
-        if(stateBlock->seg_seq < stateBlock->rcv_nxt)
-        {
-          // Transmission of already-acked data. Resend an ACK.
-          DBG::outln(DBG::Warning, " + (sequence is already partially acked)");
+    } else
+      DBG::outln(DBG::Warning, "TCP Packet arriving on port ", handle.localPort, " during ", Tcp::stateString(stateBlock->currentState), "has no ACK.");
+
+    if(header->flags & Tcp::URG) {
+      // handle urgent notification to the application
+    }
+
+    /* Finally, process the actual segment payload */
+    if(stateBlock->currentState == Tcp::ESTABLISHED || stateBlock->currentState == Tcp::FIN_WAIT_1 || stateBlock->currentState == Tcp::FIN_WAIT_2) {
+      // Is this a valid data segment?
+      if(stateBlock->seg_seq < stateBlock->rcv_nxt) {
+        // Transmission of already-acked data. Resend an ACK.
+        DBG::outln(DBG::Warning, " + (sequence is already partially acked)");
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Sending ACK for incoming data failed!");
+        else
+          alreadyAck = true;
+      } else if(stateBlock->seg_seq > stateBlock->rcv_nxt) {
+        // Packet has come in out-of-order - drop on the floor.
+        DBG::outln(DBG::Warning, " + (sequence out of order)");
+        alreadyAck = true;
+      } else if(stateBlock->seg_len) {
+        DBG::outln(DBG::Warning, " + Payload: ", reinterpret_cast<const char*>(payload));
+        if(stateBlock->endpoint) {
+          size_t winChange = stateBlock->endpoint->depositPayload(stateBlock->seg_len, payload, stateBlock->seg_seq - stateBlock->irs - 1, (header->flags & Tcp::PSH) == Tcp::PSH);
+          stateBlock->rcv_nxt += winChange;
+          if(winChange > stateBlock->rcv_wnd) {
+            DBG::outln(DBG::Warning, "TCP: incoming data was larger than rcv_wind");
+            winChange = stateBlock->rcv_wnd;
+          }
+          stateBlock->snd_wnd -= winChange;
+
           if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
             DBG::outln(DBG::Warning, "TCP: Sending ACK for incoming data failed!");
           else
             alreadyAck = true;
         }
-        else if(stateBlock->seg_seq > stateBlock->rcv_nxt)
-        {
-          // Packet has come in out-of-order - drop on the floor.
-          DBG::outln(DBG::Warning, " + (sequence out of order)");
+
+        stateBlock->numEndpointPackets++;
+      }
+    }
+
+    if(header->flags & Tcp::FIN) {
+      if(stateBlock->currentState == Tcp::CLOSED || stateBlock->currentState == Tcp::LISTEN || stateBlock->currentState == Tcp::SYN_SENT)
+        break;
+
+      // FIN means the remote host has nothing more to send, so push any remaining data to the application
+      if(stateBlock->endpoint)
+        stateBlock->endpoint->depositPayload(0, 0, 0, true);
+
+      stateBlock->rcv_nxt = stateBlock->seg_seq + 1;
+
+      if(!alreadyAck) {
+        if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
+          DBG::outln(DBG::Warning, "TCP: Sending ACK to FIN failed.");
+        else
           alreadyAck = true;
-        }
-        else if(stateBlock->seg_len)
-        {
-          DBG::outln(DBG::Warning, " + Payload: ", reinterpret_cast<const char*>(payload));
-          if(stateBlock->endpoint)
-          {
-            size_t winChange = stateBlock->endpoint->depositPayload(stateBlock->seg_len, payload, stateBlock->seg_seq - stateBlock->irs - 1, (header->flags & Tcp::PSH) == Tcp::PSH);
-            stateBlock->rcv_nxt += winChange;
-            if(winChange > stateBlock->rcv_wnd)
-            {
-                DBG::outln(DBG::Warning, "TCP: incoming data was larger than rcv_wind");
-                winChange = stateBlock->rcv_wnd;
-            }
-            stateBlock->snd_wnd -= winChange;
-
-            if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-              DBG::outln(DBG::Warning, "TCP: Sending ACK for incoming data failed!");
-            else
-              alreadyAck = true;
-          }
-
-          stateBlock->numEndpointPackets++;
-        }
       }
 
-      if(header->flags & Tcp::FIN)
-      {
-        if(stateBlock->currentState == Tcp::CLOSED || stateBlock->currentState == Tcp::LISTEN || stateBlock->currentState == Tcp::SYN_SENT)
-          break;
+      switch(stateBlock->currentState) {
+      case Tcp::SYN_RECEIVED:
+      case Tcp::ESTABLISHED:
 
-        // FIN means the remote host has nothing more to send, so push any remaining data to the application
-        if(stateBlock->endpoint)
-          stateBlock->endpoint->depositPayload(0, 0, 0, true);
+        stateBlock->currentState = Tcp::CLOSE_WAIT;
 
-        stateBlock->rcv_nxt = stateBlock->seg_seq + 1;
+        break;
 
-        if(!alreadyAck)
-        {
-          if(!Tcp::send(from, handle.localPort, handle.remotePort, stateBlock->snd_nxt, stateBlock->rcv_nxt, Tcp::ACK, stateBlock->snd_wnd, 0, 0))
-            DBG::outln(DBG::Warning, "TCP: Sending ACK to FIN failed.");
-          else
-            alreadyAck = true;
-        }
+      case Tcp::FIN_WAIT_1:
 
-        switch(stateBlock->currentState)
-        {
-          case Tcp::SYN_RECEIVED:
-          case Tcp::ESTABLISHED:
+        // already been acked previously? if so this needs to go to TIME_WAIT
+        // if NOT, closing
+        if(stateBlock->fin_ack) {
+          stateBlock->currentState = Tcp::TIME_WAIT;
+          //stateBlock->currentState = Tcp::CLOSED;
 
-            stateBlock->currentState = Tcp::CLOSE_WAIT;
+          stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
+          stateBlock->waitingForTimeout = true;
+        } else
+          stateBlock->currentState = Tcp::CLOSING;
 
-            break;
+        break;
 
-          case Tcp::FIN_WAIT_1:
+      case Tcp::FIN_WAIT_2:
 
-            // already been acked previously? if so this needs to go to TIME_WAIT
-            // if NOT, closing
-            if(stateBlock->fin_ack)
-            {
-              stateBlock->currentState = Tcp::TIME_WAIT;
-              //stateBlock->currentState = Tcp::CLOSED;
+        stateBlock->currentState = Tcp::TIME_WAIT;
+        //stateBlock->currentState = Tcp::CLOSED;
 
-              stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
-              stateBlock->waitingForTimeout = true;
-            }
-            else
-              stateBlock->currentState = Tcp::CLOSING;
+        stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
+        stateBlock->waitingForTimeout = true;
 
-            break;
+        break;
 
-          case Tcp::FIN_WAIT_2:
+      case Tcp::CLOSE_WAIT:
+      case Tcp::CLOSING:
+      case Tcp::LAST_ACK:
 
-            stateBlock->currentState = Tcp::TIME_WAIT;
-            //stateBlock->currentState = Tcp::CLOSED;
+        // remain this state
 
-            stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
-            stateBlock->waitingForTimeout = true;
+        break;
 
-            break;
+      case Tcp::TIME_WAIT:
 
-          case Tcp::CLOSE_WAIT:
-          case Tcp::CLOSING:
-          case Tcp::LAST_ACK:
+        // reset the timer
+        stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
+        stateBlock->waitingForTimeout = true;
 
-            // remain this state
-
-            break;
-
-          case Tcp::TIME_WAIT:
-
-            // reset the timer
-            stateBlock->resetTimer(120); // 2 minute timeout for TIME_WAIT
-            stateBlock->waitingForTimeout = true;
-
-          default:
-            break;
-        }
+      default:
+        break;
       }
+    }
 
-      break;
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
 
-  if(oldState != stateBlock->currentState)
-  {
+  if(oldState != stateBlock->currentState) {
 #if TCP_DEBUG
     DBG::outln(DBG::Net, "TCP Packet arriving on port ", handle.localPort, " caused state change from ", Tcp::stateString(oldState), " to ", Tcp::stateString(stateBlock->currentState), ".");
 #endif
     stateBlock->endpoint->stateChanged(stateBlock->currentState);
-    stateBlock->waitState.release();
+    stateBlock->waitState.V();
   }
 
-  if(stateBlock->currentState == Tcp::CLOSED)
-  {
+  if(stateBlock->currentState == Tcp::CLOSED) {
 #if TCP_DEBUG
     DBG::outln(DBG::Net, "TCP Packet arriving on port ", handle.localPort, " caused connection to close.");
 #endif
@@ -683,8 +611,7 @@ void TcpManager::receive(IpAddress from, uint16_t sourcePort, uint16_t destPort,
     // If we are in a state that's not created by user intervention, we can safely remove and close the connection
     // both of these require the user to go through a close() operation, which inherently calls disconnect.
     /// \note If you're working in kernel space, and you close a connection, *DO NOT* return the endpoint
-    if(oldState == Tcp::LAST_ACK || oldState == Tcp::CLOSING)
-    {
+    if(oldState == Tcp::LAST_ACK || oldState == Tcp::CLOSING) {
       TcpManager::instance().returnEndpoint(stateBlock->endpoint);
       removeConn(stateBlock->connId);
     }

@@ -36,13 +36,13 @@ class Network;
 /// Base class for IPv4/IPv6, for generic checksums
 class IpBase
 {
-    public:
-        IpBase() {}
-        virtual ~IpBase() {}
+public:
+  IpBase() {}
+  virtual ~IpBase() {}
 
-        virtual bool send(IpAddress dest, IpAddress from, uint8_t type, size_t nBytes, uintptr_t packet, Network *pCard = 0) = 0;
+  virtual bool send(IpAddress dest, IpAddress from, uint8_t type, size_t nBytes, uintptr_t packet, Network *pCard = 0) = 0;
 
-        virtual uint16_t ipChecksum(IpAddress &from, IpAddress &to, uint8_t proto, uintptr_t data, uint16_t length) = 0;
+  virtual uint16_t ipChecksum(IpAddress &from, IpAddress &to, uint8_t proto, uintptr_t data, uint16_t length) = 0;
 };
 
 #endif /* _NetworkStack_IP_Common_h_ */

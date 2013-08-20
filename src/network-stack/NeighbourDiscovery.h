@@ -19,19 +19,18 @@
 /** NDP for IPv6 */
 class NeighbourDiscovery
 {
-    public:
-        NeighbourDiscovery()
-        {};
-        virtual ~NeighbourDiscovery()
-        {};
-        
-        static NeighbourDiscovery &instance()
-        {
-            return m_Instance;
-        }
-        
-    private:
-        static NeighbourDiscovery m_Instance;
+public:
+  NeighbourDiscovery()
+  {};
+  virtual ~NeighbourDiscovery()
+  {};
+
+  static NeighbourDiscovery &instance() {
+    return m_Instance;
+  }
+
+private:
+  static NeighbourDiscovery m_Instance;
 };
 
 #endif /* _NetworkStack_NeighbourDiscovery_h_ */

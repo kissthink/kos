@@ -36,8 +36,7 @@ public:
   virtual ~Ethernet();
 
   /** For access to the stack without declaring an instance of it */
-  static Ethernet& instance()
-  {
+  static Ethernet& instance() {
     return ethernetInstance;
   }
 
@@ -48,14 +47,13 @@ public:
   static void send(size_t nBytes, uintptr_t packet, Network* pCard, MacAddress dest, uint16_t type);
 
   /** Injects an Ethernet header into a given buffer and returns the size
-    * of the header. */ 
+    * of the header. */
   size_t injectHeader(uintptr_t packet, MacAddress destMac, MacAddress sourceMac, uint16_t type);
-  
+
   /** Gets the MAC address from a given packet */
   void getMacFromPacket(uintptr_t packet, MacAddress *mac);
 
-  inline size_t ethHeaderSize()
-  {
+  inline size_t ethHeaderSize() {
     return sizeof(ethernetHeader);
   }
 
@@ -63,8 +61,7 @@ private:
 
   static Ethernet ethernetInstance;
 
-  struct ethernetHeader
-  {
+  struct ethernetHeader {
     uint8_t   destMac[6];
     uint8_t   sourceMac[6];
     uint16_t  type;

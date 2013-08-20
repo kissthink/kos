@@ -2,7 +2,7 @@ SRCDIR:=$(CURDIR)
 include $(SRCDIR)/Makefile.config
 -include Makefile.state
 
-SOURCEDIRS=util dev vfs drivers mach kern gdb world
+SOURCEDIRS=util dev vfs net network-stack drivers mach kern gdb world
 SOURCES=$(wildcard $(addsuffix /*.cc,$(SOURCEDIRS)))
 BSOURCES=$(notdir $(SOURCES))
 OBJECTS=$(BSOURCES:%.cc=%.o)

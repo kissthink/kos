@@ -34,86 +34,82 @@
  */
 class RawEndpoint : public ConnectionlessEndpoint
 {
-  public:
+public:
 
-    /** What type is this Raw Endpoint? */
-    enum Type
-    {
-      RAW_WIRE = 0, // wire-level
-      RAW_ICMP, // IP levels
-      RAW_UDP,
-      RAW_TCP
-    };
+  /** What type is this Raw Endpoint? */
+  enum Type {
+    RAW_WIRE = 0, // wire-level
+    RAW_ICMP, // IP levels
+    RAW_UDP,
+    RAW_TCP
+  };
 
-    /** Constructors and destructors */
-    RawEndpoint() :
-      ConnectionlessEndpoint(), m_DataQueue(), m_DataQueueSize(0),
-      m_bAcceptAll(false), m_Type(RAW_WIRE)
+  /** Constructors and destructors */
+  RawEndpoint() :
+    ConnectionlessEndpoint(), m_DataQueue(), m_DataQueueSize(0),
+    m_bAcceptAll(false), m_Type(RAW_WIRE)
+  {};
+
+  /** These shouldn't be used - totally pointless */
+  RawEndpoint(uint16_t local, uint16_t remote) :
+    ConnectionlessEndpoint(local, remote), m_DataQueue(),
+    m_DataQueueSize(0), m_bAcceptAll(false), m_Type(RAW_WIRE)
+  {};
+  RawEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
+    ConnectionlessEndpoint(remoteIp, local, remote), m_DataQueue(),
+    m_DataQueueSize(0), m_bAcceptAll(false), m_Type(RAW_WIRE)
+  {};
+  RawEndpoint(Type type) :
+    ConnectionlessEndpoint(0, 0), m_DataQueue(), m_DataQueueSize(0),
+    m_bAcceptAll(false), m_Type(type)
+  {};
+  virtual ~RawEndpoint();
+
+  /** Injects the given buffer into the network stack */
+  virtual int send(size_t nBytes, uintptr_t buffer, Endpoint::RemoteEndpoint remoteHost, bool broadcast, Network *pCard = 0);
+
+  /** Reads from the front of the packet queue. Will return truncated packets if maxSize < packet size. */
+  virtual int recv(uintptr_t buffer, size_t maxSize, bool bBlock, Endpoint::RemoteEndpoint* remoteHost, int nTimeout = 30);
+
+  /** Are there packets to read? */
+  virtual bool dataReady(bool block = false, uint32_t tmout = 30);
+
+  /** Deposits a packet into this endpoint */
+  virtual size_t depositPacket(size_t nBytes, uintptr_t payload, Endpoint::RemoteEndpoint* remoteHost);
+
+  /** What type is this endpoint? */
+  inline Type getRawType() {
+    return m_Type;
+  }
+
+  /** Shutdown on a RAW endpoint does nothing */
+  virtual bool shutdown(ShutdownType what) {
+    return true;
+  }
+
+private:
+
+  struct DataBlock {
+    DataBlock() :
+      size(0), ptr(0), remoteHost()
     {};
 
-    /** These shouldn't be used - totally pointless */
-    RawEndpoint(uint16_t local, uint16_t remote) :
-      ConnectionlessEndpoint(local, remote), m_DataQueue(),
-          m_DataQueueSize(0), m_bAcceptAll(false), m_Type(RAW_WIRE)
-    {};
-    RawEndpoint(IpAddress remoteIp, uint16_t local = 0, uint16_t remote = 0) :
-      ConnectionlessEndpoint(remoteIp, local, remote), m_DataQueue(),
-      m_DataQueueSize(0), m_bAcceptAll(false), m_Type(RAW_WIRE)
-    {};
-    RawEndpoint(Type type) :
-      ConnectionlessEndpoint(0, 0), m_DataQueue(), m_DataQueueSize(0),
-      m_bAcceptAll(false), m_Type(type)
-    {};
-    virtual ~RawEndpoint();
+    size_t size;
+    uintptr_t ptr;
+    Endpoint::RemoteEndpoint remoteHost;
+  };
 
-    /** Injects the given buffer into the network stack */
-    virtual int send(size_t nBytes, uintptr_t buffer, Endpoint::RemoteEndpoint remoteHost, bool broadcast, Network *pCard = 0);
+  /** Incoming data queue */
+  List<DataBlock*> m_DataQueue;
 
-    /** Reads from the front of the packet queue. Will return truncated packets if maxSize < packet size. */
-    virtual int recv(uintptr_t buffer, size_t maxSize, bool bBlock, Endpoint::RemoteEndpoint* remoteHost, int nTimeout = 30);
+  /** Data queue size */
+  Semaphore m_DataQueueSize;
 
-    /** Are there packets to read? */
-    virtual bool dataReady(bool block = false, uint32_t tmout = 30);
+  /** Accept any address? */
+  bool m_bAcceptAll;
 
-    /** Deposits a packet into this endpoint */
-    virtual size_t depositPacket(size_t nBytes, uintptr_t payload, Endpoint::RemoteEndpoint* remoteHost);
-
-    /** What type is this endpoint? */
-    inline Type getRawType()
-    {
-        return m_Type;
-    }
-
-    /** Shutdown on a RAW endpoint does nothing */
-    virtual bool shutdown(ShutdownType what)
-    {
-        return true;
-    }
-
-  private:
-
-    struct DataBlock
-    {
-      DataBlock() :
-        size(0), ptr(0), remoteHost()
-      {};
-
-      size_t size;
-      uintptr_t ptr;
-      Endpoint::RemoteEndpoint remoteHost;
-    };
-
-    /** Incoming data queue */
-    List<DataBlock*> m_DataQueue;
-
-    /** Data queue size */
-    Semaphore m_DataQueueSize;
-
-    /** Accept any address? */
-    bool m_bAcceptAll;
-
-    /** Our type */
-    Type m_Type;
+  /** Our type */
+  Type m_Type;
 };
 
 /**
@@ -129,8 +125,7 @@ public:
   {};
 
   /** For access to the manager without declaring an instance of it */
-  static RawManager& instance()
-  {
+  static RawManager& instance() {
     return manager;
   }
 

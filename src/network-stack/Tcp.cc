@@ -56,8 +56,7 @@ bool Tcp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, uint32_t seq
   ///       NIC IP address for the checksum.
   IpAddress tmp = dest;
   Network *pCard = RoutingTable::instance().DetermineRoute(&tmp);
-  if(!pCard)
-  {
+  if(!pCard) {
     DBG::outln(DBG::Warning, "TCP: Couldn't find a route for destination '", dest.toString(), "'.");
     return false;
   }
@@ -67,11 +66,9 @@ bool Tcp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, uint32_t seq
 
   // Source address determination.
   IpAddress src = me.ipv4;
-  if(dest.getType() == IpAddress::IPv6)
-  {
+  if(dest.getType() == IpAddress::IPv6) {
     // Handle IPv6 source address determination.
-    if(!me.nIpv6Addresses)
-    {
+    if(!me.nIpv6Addresses) {
       DBG::outln(DBG::Warning, "TCP: can't send to an IPv6 host without an IPv6 address.");
       return false;
     }
@@ -80,18 +77,15 @@ bool Tcp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, uint32_t seq
     ///       choosing the right one.
     /// \bug Assumes any non-link-local address is fair game.
     size_t i;
-    for(i = 0; i < me.nIpv6Addresses; i++)
-    {
-        if(!me.ipv6[i].isLinkLocal())
-        {
-            src = me.ipv6[i];
-            break;
-        }
+    for(i = 0; i < me.nIpv6Addresses; i++) {
+      if(!me.ipv6[i].isLinkLocal()) {
+        src = me.ipv6[i];
+        break;
+      }
     }
-    if(i == me.nIpv6Addresses)
-    {
-        DBG::outln(DBG::Warning, "No IPv6 address available for TCP");
-        return false;
+    if(i == me.nIpv6Addresses) {
+      DBG::outln(DBG::Warning, "No IPv6 address available for TCP");
+      return false;
     }
   }
 
@@ -132,11 +126,10 @@ bool Tcp::send(IpAddress dest, uint16_t srcPort, uint16_t destPort, uint32_t seq
 void Tcp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes, IpBase *pIp, Network* pCard)
 {
   if(!packet || !nBytes)
-      return;
+    return;
 
   // Check for filtering
-  if(!NetworkFilter::instance().filter(3, packet, nBytes))
-  {
+  if(!NetworkFilter::instance().filter(3, packet, nBytes)) {
     pCard->droppedPacket();
     return;
   }
@@ -147,8 +140,7 @@ void Tcp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes,
   if(from.getType() == IpAddress::IPv4 &&
      cardInfo.ipv4 != to &&
      to.getIp() != 0xffffffff &&
-     cardInfo.broadcast != to)
-  {
+     cardInfo.broadcast != to) {
     // not for us (depending on future requirements, we may need to implement a "catch-all"
     // flag in the same way as UDP)
     return;
@@ -167,21 +159,17 @@ void Tcp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes,
   size_t payloadSize = nBytes - headerSize;
 
   // check the checksum, if it's not zero
-  if(header->checksum != 0)
-  {
+  if(header->checksum != 0) {
     uint16_t checksum = pIp->ipChecksum(from, to, IP_TCP, reinterpret_cast<uintptr_t>(header), nBytes);
-    if(checksum)
-    {
+    if(checksum) {
       DBG::outln(DBG::Warning, "TCP Checksum failed on incoming packet [dp=", BIG_TO_HOST16(header->dest_port), "]. Header checksum is ", FmtHex(header->checksum), ", calculated should be zero but is ", FmtHex(checksum), "!");
       pCard->badPacket();
       return;
     }
-  }
-  else
-  {
-      DBG::outln(DBG::Warning, "TCP Packet arrived on port ", BIG_TO_HOST16(header->dest_port), " without a checksum.");
-      pCard->badPacket();
-      return; // must have a checksum
+  } else {
+    DBG::outln(DBG::Warning, "TCP Packet arrived on port ", BIG_TO_HOST16(header->dest_port), " without a checksum.");
+    pCard->badPacket();
+    return; // must have a checksum
   }
 
   // NOTICE("TCP: Packet has arrived! Dest port is " << Dec << BIG_TO_HOST16(header->dest_port) << Hex << " and flags are " << header->flags << ".");

@@ -16,10 +16,12 @@
 
 #include "network-stack/Dns.h"
 #include "network-stack/Ethernet.h"
-#include "util/Module.h"
 #include "kern/Debug.h"
-#include "util/Output.h"
+#include "kern/Kernel.h"
+#include "kern/Thread.h"
 #include "util/endian.h"
+#include "util/Module.h"
+#include "util/Output.h"
 #include "network-stack/UdpManager.h"
 
 Dns Dns::dnsInstance;
@@ -27,84 +29,94 @@ uint16_t Dns::m_NextId = 0;
 
 String qnameLabelHelper(char *buff, size_t *len, uintptr_t buffLoc)
 {
-    String ret;
-    size_t retLen = 0;
-    char *locbuff = buff;
+  String ret;
+  size_t retLen = 0;
+  char *locbuff = buff;
 
-    // Current offset within this section
-    size_t currOffset = 0;
+  // Current offset within this section
+  size_t currOffset = 0;
 
-    // Current size of this section
-    size_t sectionSize = *locbuff++;
-    if(!sectionSize)
-    {
-      // Empty name.
-      *len = 1;
-      ret = ".";
-      return ret;
+  // Current size of this section
+  size_t sectionSize = *locbuff++;
+  if(!sectionSize) {
+    // Empty name.
+    *len = 1;
+    ret = ".";
+    return ret;
+  }
+
+  // Keep reading until we hit a zero-sized section
+  while(true) {
+    retLen++;
+
+    // Read in the character at this specific position
+    char c = *locbuff++;
+
+    // If it's null, then this is the beginning of a zero-sized section, so
+    // break from the loop: we're done.
+    if(!c)
+      break;
+    // If the top two bits are set, then it's an inline pointer (FUN)
+    else if((c & 0xC0) == 0xC0) {
+      // The rest of this read comes from *that* location!
+      char offset = *locbuff++;
+      locbuff = reinterpret_cast<char*>(buffLoc + offset);
+      ret += ".";
+
+      // Prepare to read the next part of the hostname
+      currOffset = 0;
+      sectionSize = *locbuff++;
+      continue;
     }
 
-    // Keep reading until we hit a zero-sized section
-    while(true)
-    {
-        retLen++;
+    // Otherwise, check to see if we're at the end of the section
+    if(currOffset++ == sectionSize) {
+      ret += ".";
+      sectionSize = c;
+      currOffset = 0;
+    } else {
+      char s[2] = {c, 0};
+      ret += s;
+    }
+  }
 
-        // Read in the character at this specific position
-        char c = *locbuff++;
+  // Count the last section size byte
+  retLen++;
 
-        // If it's null, then this is the beginning of a zero-sized section, so
-        // break from the loop: we're done.
-        if(!c)
-            break;
-        // If the top two bits are set, then it's an inline pointer (FUN)
-        else if((c & 0xC0) == 0xC0)
-        {
-            // The rest of this read comes from *that* location!
-            char offset = *locbuff++;
-            locbuff = reinterpret_cast<char*>(buffLoc + offset);
-            ret += ".";
-
-            // Prepare to read the next part of the hostname
-            currOffset = 0;
-            sectionSize = *locbuff++;
-            continue;
-        }
-
-        // Otherwise, check to see if we're at the end of the section
-        if(currOffset++ == sectionSize)
-        {
-            ret += ".";
-            sectionSize = c;
-            currOffset = 0;
-        }
-        else
-        {
-            char s[2] = {c, 0};
-            ret += s;
-        }
-      }
-
-      // Count the last section size byte
-      retLen++;
-
-      // All done!
-      *len = retLen;
-      return ret;
+  // All done!
+  *len = retLen;
+  return ret;
 }
 
-static int trampoline(void* p)
+Dns::Dns() :
+  m_DnsCache(), m_DnsRequests(), m_Endpoint(0)
 {
-  Dns *pDns = reinterpret_cast<Dns*>(p);
-  pDns->mainThread();
-  return 0;
 }
 
-void Dns::initialise() {
-    Endpoint *p = UdpManager::instance().getEndpoint(IpAddress(), 0, 53);
-    m_Endpoint = static_cast<ConnectionlessEndpoint *>(p);
-    m_Endpoint->acceptAnyAddress(true);
-    Thread* t = Thread::create(kernelSpace);
-    kernelScheduler.run(*t, trampoline, this);
+static void trampoline(ptr_t p)
+{
+  Dns *dns = reinterpret_cast<Dns*>(p);
+  dns->mainThread();
+}
+
+Dns::Dns(const Dns& ent) :
+  m_DnsCache(ent.m_DnsCache), m_DnsRequests(ent.m_DnsRequests), m_Endpoint(ent.m_Endpoint)
+{
+  Thread* t = Thread::create(kernelSpace);
+  kernelScheduler.run(*t, trampoline, reinterpret_cast<ptr_t>(this));
+}
+
+Dns::~Dns()
+{
+}
+
+void Dns::initialise()
+{
+  Endpoint *p = UdpManager::instance().getEndpoint(IpAddress(), 0, 53);
+  m_Endpoint = static_cast<ConnectionlessEndpoint *>(p);
+  m_Endpoint->acceptAnyAddress(true);
+  Thread* t = Thread::create(kernelSpace);
+  kernelScheduler.run(*t, trampoline, reinterpret_cast<ptr_t>(this));
 }
 
 void Dns::mainThread()
@@ -118,10 +130,8 @@ void Dns::mainThread()
 
   Endpoint::RemoteEndpoint remoteHost;
 
-  while(true)
-  {
-    if(e->dataReady(true))
-    {
+  while(true) {
+    if(e->dataReady(true)) {
       // Read the packet (Safe to block because we've already run dataReady)
       int n = e->recv(buffLoc, 1024, true, &remoteHost);
       if(n <= 0)
@@ -133,10 +143,8 @@ void Dns::mainThread()
       // look for the ID in our request list
       bool bFound = false;
       DnsRequest* req = 0;
-      for(Vector<DnsRequest*>::Iterator it = m_DnsRequests.begin(); it != m_DnsRequests.end(); it++)
-      {
-        if((*it)->id == head->id)
-        {
+      for(Vector<DnsRequest*>::Iterator it = m_DnsRequests.begin(); it != m_DnsRequests.end(); it++) {
+        if((*it)->id == head->id) {
           req = (*it);
           bFound = true;
 
@@ -154,158 +162,137 @@ void Dns::mainThread()
       uint16_t addCount = BIG_TO_HOST16(head->dCount);
 
       // If there were no answers, this is a "name not found" error.
-      if(!ansCount)
-      {
-          req->success = false;
-          req->waitSem.release();
-          continue;
+      if(!ansCount) {
+        req->success = false;
+        req->waitSem.V();
+        continue;
       }
 
       // Read in each question section
       size_t ansOffset = sizeof(DnsHeader);
-      for(uint16_t question = 0; question < qCount; question++)
-      {
-          // Read in the string (have to do this to get the size... bah). Note
-          // that the NAME field for a QUESTION section will never be a pointer,
-          // unlike the ANSWER section below.
-          size_t nameLength = 0;
-          String tmp = qnameLabelHelper(reinterpret_cast<char*>(buffLoc + ansOffset), &nameLength, buffLoc);
+      for(uint16_t question = 0; question < qCount; question++) {
+        // Read in the string (have to do this to get the size... bah). Note
+        // that the NAME field for a QUESTION section will never be a pointer,
+        // unlike the ANSWER section below.
+        size_t nameLength = 0;
+        String tmp = qnameLabelHelper(reinterpret_cast<char*>(buffLoc + ansOffset), &nameLength, buffLoc);
 
-          // Add to the offset. We don't really care about the suffix at the
-          // moment as we're mainly doing this to get to the answer section.
-          ansOffset += nameLength + sizeof(QuestionSecNameSuffix);
+        // Add to the offset. We don't really care about the suffix at the
+        // moment as we're mainly doing this to get to the answer section.
+        ansOffset += nameLength + sizeof(QuestionSecNameSuffix);
       }
 
       uintptr_t ansStart = buffLoc + ansOffset;
 
       // http://www.zytrax.com/books/dns/ch15/ for future reference
       bool hostnameFilled = false;
-      for(uint16_t answer = 0; answer < (ansCount + nameCount + addCount); answer++)
-      {
+      for(uint16_t answer = 0; answer < (ansCount + nameCount + addCount); answer++) {
         DnsAnswer* ans = reinterpret_cast<DnsAnswer*>(ansStart);
         String *qname = new String;
-        if(BIG_TO_HOST16(ans->name) & 0xC000)
-        {
+        if(BIG_TO_HOST16(ans->name) & 0xC000) {
           // This is an offset within the DNS packet to the string
           size_t len = 0;
           size_t offset = BIG_TO_HOST16(ans->name) - 0xC000;
           *qname = qnameLabelHelper(reinterpret_cast<char*>(buffLoc + offset), &len, buffLoc);
-          NOTICE("Got: " << *qname << ", len " << len << ".");
-        }
-        else
-        {
+          DBG::outln(DBG::Net, "Got: ", *qname, ", len ", len, ".");
+        } else {
           // This is a name component within the answer section
           /// \todo this code is pretty broken - needs to be rewritten.
           size_t len = 0;
           *qname = qnameLabelHelper(reinterpret_cast<char*>(ansStart), &len, buffLoc);
-          NOTICE("Got: " << *qname << ", len " << len << ".");
+          DBG::outln(DBG::Net, "Got: ", *qname, ", len ", len, ".");
 
           // Update the answer pointer so the rest of the structure comes across properly
           ans = reinterpret_cast<DnsAnswer*>((ansStart + len) - sizeof(ans->name));
         }
 
-        switch(BIG_TO_HOST16(ans->type))
-        {
+        switch(BIG_TO_HOST16(ans->type)) {
           /** A Record */
-          case 0x0001:
-            {
-              // Add the IP address for this entry to the list
-              if(BIG_TO_HOST16(ans->length) == 4)
-              {
-                uint32_t newIp = *reinterpret_cast<uint32_t*>(ansStart + sizeof(DnsAnswer));
-                IpAddress *ip = new IpAddress(newIp);
-                req->addresses.pushBack(ip);
-              }
+        case 0x0001: {
+          // Add the IP address for this entry to the list
+          if(BIG_TO_HOST16(ans->length) == 4) {
+            uint32_t newIp = *reinterpret_cast<uint32_t*>(ansStart + sizeof(DnsAnswer));
+            IpAddress *ip = new IpAddress(newIp);
+            req->addresses.pushBack(ip);
+          }
 
-              // Add the name to the aliases list
-              req->aliases.pushBack(qname);
-              qname = 0;
-            }
-            break;
-            /** NS */
-            case 0x0002:
-            {
-                WARNING("TODO: NS Records");
-            }
-            break;
-            /** CNAME */
-            case 0x0005:
-            {
-                // Set the CNAME
-                if(!hostnameFilled)
-                {
-                    req->hostname = *qname;
-                    hostnameFilled = true;
-                }
-            }
-            break;
-            /** SOA */
-            case 0x0006:
-            {
-                WARNING("TODO: SOA Records");
-            }
-            break;
-            /* WKS */
-            case 0x000B:
-            {
-                WARNING("TODO: WKS Records");
-            }
-            break;
-            /* PTR */
-            case 0x000C:
-            {
-                WARNING("TODO: PTR Records");
-            }
-            break;
-            /* MX */
-            case 0x000F:
-            {
-                WARNING("TODO: MX Records");
-            }
-            break;
-            /* SRV */
-            case 0x0021:
-            {
-                WARNING("TODO: SRV Records");
-            }
-            break;
-            /* A6 */
-            case 0x0026:
-            {
-                WARNING("TODO: A6 Records");
-            }
-            break;
-            default:
-            {
-                WARNING("Unknown record type '" << (BIG_TO_HOST16(ans->type)) << "' returned from DNS server");
-            }
-            break;
+          // Add the name to the aliases list
+          req->aliases.pushBack(qname);
+          qname = 0;
+        }
+        break;
+        /** NS */
+        case 0x0002: {
+          DBG::outln(DBG::Warning, "TODO: NS Records");
+        }
+        break;
+        /** CNAME */
+        case 0x0005: {
+          // Set the CNAME
+          if(!hostnameFilled) {
+            req->hostname = *qname;
+            hostnameFilled = true;
+          }
+        }
+        break;
+        /** SOA */
+        case 0x0006: {
+          DBG::outln(DBG::Warning, "TODO: SOA Records");
+        }
+        break;
+        /* WKS */
+        case 0x000B: {
+          DBG::outln(DBG::Warning, "TODO: WKS Records");
+        }
+        break;
+        /* PTR */
+        case 0x000C: {
+          DBG::outln(DBG::Warning, "TODO: PTR Records");
+        }
+        break;
+        /* MX */
+        case 0x000F: {
+          DBG::outln(DBG::Warning, "TODO: MX Records");
+        }
+        break;
+        /* SRV */
+        case 0x0021: {
+          DBG::outln(DBG::Warning, "TODO: SRV Records");
+        }
+        break;
+        /* A6 */
+        case 0x0026: {
+          DBG::outln(DBG::Warning, "TODO: A6 Records");
+        }
+        break;
+        default: {
+          DBG::outln(DBG::Warning, "Unknown record type '", FmtHex(BIG_TO_HOST16(ans->type)), "' returned from DNS server");
+        }
+        break;
         }
 
         // If the qname string wasn't used, delete it
         if(qname)
-            delete qname;
+          delete qname;
 
         ansStart += sizeof(DnsAnswer) + BIG_TO_HOST16(ans->length);
       }
 
       // If no hostname was filled, take one from the aliases (if possible)
-      if(!hostnameFilled)
-      {
-          if(req->aliases.count())
-              req->hostname = *(*(req->aliases.begin()));
+      if(!hostnameFilled) {
+        if(req->aliases.count())
+          req->hostname = *(*(req->aliases.begin()));
       }
 
       if(req->callerLeft)
-          delete req;
-      else
-      {
-          /// \todo Rewrite the DNS cache mechanism. For now, we'll just avoid
-          ///       caching. A proper DNS cache mechanism needs to handle the
-          ///       CNAMEs as well as the aliases
-          // m_DnsCache.pushBack(req->entry);
-          req->success = true;
-          req->waitSem.release();
+        delete req;
+      else {
+        /// \todo Rewrite the DNS cache mechanism. For now, we'll just avoid
+        ///       caching. A proper DNS cache mechanism needs to handle the
+        ///       CNAMEs as well as the aliases
+        // m_DnsCache.pushBack(req->entry);
+        req->success = true;
+        req->waitSem.V();
       }
     }
   }
@@ -313,107 +300,98 @@ void Dns::mainThread()
 
 int Dns::hostToIp(String hostname, HostInfo& ret, Network* pCard)
 {
-    if(!pCard || !pCard->isConnected())
-        return -1;
-
-    /// \todo Rewrite DNS cache mechanism
-    /*for(List<DnsEntry*>::Iterator it = m_DnsCache.begin(); it!= m_DnsCache.end(); it++)
-    {
-        if(!strcmp(static_cast<const char*>((*it)->hostname), static_cast<const char*>(hostname)))
-        {
-            nIps = (*it)->numIps;
-            return (*it)->ip;
-        }
-    }*/
-
-    // Grab the DNS server to use
-    StationInfo info = pCard->getStationInfo();
-    if(info.nDnsServers == 0)
-        return -1;
-
-    // Setup for our request
-    ConnectionlessEndpoint* e = m_Endpoint;
-
-    uint8_t* buff = new uint8_t[1024];
-    uintptr_t buffLoc = reinterpret_cast<uintptr_t>(buff);
-    memset(buff, 0, 1024);
-
-    // Setup the DNS message header
-    DnsHeader* head = reinterpret_cast<DnsHeader*>(buffLoc);
-    head->id = m_NextId++;
-    head->opAndParam = HOST_TO_BIG16(DNS_RECURSION);
-    head->qCount = HOST_TO_BIG16(1);
-
-    // Build the modified hostname
-    size_t len = hostname.length() + 1;
-    char* host = new char[len];
-    memset(host, 0, len);
-
-    size_t top = hostname.length();
-    size_t prevSize = 0;
-    for(ssize_t i = top - 1; i >= 0; i--)
-    {
-        if(hostname[i] == '.')
-        {
-            host[i+1] = prevSize;
-            prevSize = 0;
-        }
-        else
-        {
-            host[i+1] = hostname[i];
-            prevSize++;
-        }
-    }
-    host[0] = prevSize;
-
-    memcpy(reinterpret_cast<char*>(buffLoc + sizeof(DnsHeader)), host, len);
-
-    delete [] host;
-
-    // Request the host address
-    QuestionSecNameSuffix* q = reinterpret_cast<QuestionSecNameSuffix*>(buffLoc + sizeof(DnsHeader) + len + 1);
-    q->type = HOST_TO_BIG16(1);
-    q->cls = HOST_TO_BIG16(1);
-
-    // Shove all this into a DnsRequest ready for replies
-    DnsRequest* req = new DnsRequest;
-    req->id = head->id;
-
-    m_DnsRequests.pushBack(req);
-
-    // Try each DNS server until we actually get a successful query on one
-    for(size_t dnsServer = 0; dnsServer < info.nDnsServers; dnsServer++)
-    {
-        Endpoint::RemoteEndpoint remoteHost;
-        remoteHost.remotePort = 53;
-        remoteHost.ip = info.dnsServers[dnsServer];
-
-        req->success = false;
-        if(e->send(sizeof(DnsHeader) + sizeof(QuestionSecNameSuffix) + len + 1, buffLoc, remoteHost, false) < 0)
-            continue;
-
-        req->waitSem.acquire(1, 15);
-        if(Processor::information().getCurrentThread()->wasInterrupted())
-        {
-            req->callerLeft = true;
-            return -1;
-        }
-
-        if(!req->success)
-        {
-            delete req;
-        }
-        else
-        {
-
-            ret.addresses = req->addresses;
-            ret.aliases = req->aliases;
-            ret.hostname = req->hostname;
-
-            delete req;
-            return 0;
-        }
-    }
-
+  if(!pCard || !pCard->isConnected())
     return -1;
+
+  /// \todo Rewrite DNS cache mechanism
+  /*for(List<DnsEntry*>::Iterator it = m_DnsCache.begin(); it!= m_DnsCache.end(); it++)
+  {
+      if(!strcmp(static_cast<const char*>((*it)->hostname), static_cast<const char*>(hostname)))
+      {
+          nIps = (*it)->numIps;
+          return (*it)->ip;
+      }
+  }*/
+
+  // Grab the DNS server to use
+  StationInfo info = pCard->getStationInfo();
+  if(info.nDnsServers == 0)
+    return -1;
+
+  // Setup for our request
+  ConnectionlessEndpoint* e = m_Endpoint;
+
+  uint8_t* buff = new uint8_t[1024];
+  uintptr_t buffLoc = reinterpret_cast<uintptr_t>(buff);
+  memset(buff, 0, 1024);
+
+  // Setup the DNS message header
+  DnsHeader* head = reinterpret_cast<DnsHeader*>(buffLoc);
+  head->id = m_NextId++;
+  head->opAndParam = HOST_TO_BIG16(DNS_RECURSION);
+  head->qCount = HOST_TO_BIG16(1);
+
+  // Build the modified hostname
+  size_t len = hostname.length() + 1;
+  char* host = new char[len];
+  memset(host, 0, len);
+
+  size_t top = hostname.length();
+  size_t prevSize = 0;
+  for(ssize_t i = top - 1; i >= 0; i--) {
+    if(hostname[i] == '.') {
+      host[i+1] = prevSize;
+      prevSize = 0;
+    } else {
+      host[i+1] = hostname[i];
+      prevSize++;
+    }
+  }
+  host[0] = prevSize;
+
+  memcpy(reinterpret_cast<char*>(buffLoc + sizeof(DnsHeader)), host, len);
+
+  delete [] host;
+
+  // Request the host address
+  QuestionSecNameSuffix* q = reinterpret_cast<QuestionSecNameSuffix*>(buffLoc + sizeof(DnsHeader) + len + 1);
+  q->type = HOST_TO_BIG16(1);
+  q->cls = HOST_TO_BIG16(1);
+
+  // Shove all this into a DnsRequest ready for replies
+  DnsRequest* req = new DnsRequest;
+  req->id = head->id;
+
+  m_DnsRequests.pushBack(req);
+
+  // Try each DNS server until we actually get a successful query on one
+  for(size_t dnsServer = 0; dnsServer < info.nDnsServers; dnsServer++) {
+    Endpoint::RemoteEndpoint remoteHost;
+    remoteHost.remotePort = 53;
+    remoteHost.ip = info.dnsServers[dnsServer];
+
+    req->success = false;
+    if(e->send(sizeof(DnsHeader) + sizeof(QuestionSecNameSuffix) + len + 1, buffLoc, remoteHost, false) < 0)
+      continue;
+
+    req->waitSem.P(15000);  // about 15 sec
+    if(Processor::getCurrThread()->isInterrupted()) {
+      req->callerLeft = true;
+      return -1;
+    }
+
+    if(!req->success) {
+      delete req;
+    } else {
+
+      ret.addresses = req->addresses;
+      ret.aliases = req->aliases;
+      ret.hostname = req->hostname;
+
+      delete req;
+      return 0;
+    }
+  }
+
+  return -1;
 }

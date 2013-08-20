@@ -28,26 +28,24 @@
   */
 class ProtocolManager
 {
-    public:
-        ProtocolManager()
-        {};
-        virtual ~ProtocolManager()
-        {};
-        
-        /**
-         * The default implementation is quite simple. Individual managers may
-         * provide further functionality, they should override this function.
-         */
-        virtual void returnEndpoint(Endpoint *e)
-        {
-            e->shutdown(Endpoint::ShutBoth);
-            if(e->getType() == Endpoint::ConnectionBased)
-            {
-                ConnectionBasedEndpoint *ce = static_cast<ConnectionBasedEndpoint *>(e);
-                ce->close();
-            }
-            delete e;
-        }
+public:
+  ProtocolManager()
+  {};
+  virtual ~ProtocolManager()
+  {};
+
+  /**
+   * The default implementation is quite simple. Individual managers may
+   * provide further functionality, they should override this function.
+   */
+  virtual void returnEndpoint(Endpoint *e) {
+    e->shutdown(Endpoint::ShutBoth);
+    if(e->getType() == Endpoint::ConnectionBased) {
+      ConnectionBasedEndpoint *ce = static_cast<ConnectionBasedEndpoint *>(e);
+      ce->close();
+    }
+    delete e;
+  }
 };
 
 #endif /* _NetworkStack_Manager_h_ */

@@ -10,7 +10,7 @@
 
 //#include <stdlib.h>
 
-#include "drivers/Module.h"
+#include "util/Module.h"
 #include "mach/Device.h"
 
 #include "cdi.h"

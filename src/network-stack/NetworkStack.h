@@ -32,13 +32,12 @@ class NetworkStack : public RequestQueue
 public:
   NetworkStack();
   virtual ~NetworkStack();
-  
+
   /** For access to the stack without declaring an instance of it */
-  static NetworkStack& instance()
-  {
+  static NetworkStack& instance() {
     return stack;
   }
-  
+
   /** Called when a packet arrives */
   void receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t offset);
 
@@ -50,42 +49,38 @@ public:
 
   /** Returns the number of devices registered with the stack */
   size_t getNumDevices();
-  
+
   /** Unregisters a given network device from the stack */
   void deRegisterDevice(Network *pDevice);
 
   /** Sets the loopback device for the stack */
-  void setLoopback(Network *pCard)
-  {
+  void setLoopback(Network *pCard) {
     m_pLoopback = pCard;
   }
 
   /** Gets the loopback device for the stack */
-  inline Network *getLoopback()
-  {
+  inline Network *getLoopback() {
     return m_pLoopback;
   }
 
   /** Grabs the memory pool for networking use */
-  inline MemoryPool &getMemPool()
-  {
-      return m_MemPool;
+  inline MemoryPool &getMemPool() {
+    return m_MemPool;
   }
 
 private:
 
   static NetworkStack stack;
-  
-  static int packetThread(void *p);
-  
-  struct Packet
-  {
-      uintptr_t buffer;
-      size_t packetLength;
-      Network *pCard;
-      uint32_t offset;
+
+  static void packetThread(void *p);
+
+  struct Packet {
+    uintptr_t buffer;
+    size_t packetLength;
+    Network *pCard;
+    uint32_t offset;
   };
-  
+
   virtual uint64_t executeRequest(uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4, uint64_t p5,
                                   uint64_t p6, uint64_t p7, uint64_t p8);
 

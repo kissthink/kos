@@ -15,7 +15,7 @@
  */
 
 #include "network-stack/TcpManager.h"
-#include "Rnetwork-stack/outingTable.h"
+#include "network-stack/RoutingTable.h"
 
 TcpManager TcpManager::manager;
 
@@ -38,8 +38,7 @@ size_t TcpManager::Listen(Endpoint* e, uint16_t port, Network* pCard)
   StateBlock* stateBlock;
   {
     ScopedLock<Mutex> guard(m_TcpMutex);
-    if((stateBlock = m_StateBlocks.lookup(*handle)) != 0)
-    {
+    if((stateBlock = m_StateBlocks.lookup(*handle)) != 0) {
       delete handle;
       return 0;
     }
@@ -88,8 +87,7 @@ size_t TcpManager::Connect(Endpoint::RemoteEndpoint remoteHost, uint16_t localPo
   StateBlock* stateBlock;
   {
     ScopedLock<Mutex> guard(m_TcpMutex);
-    if((stateBlock = m_StateBlocks.lookup(*handle)) != 0)
-    {
+    if((stateBlock = m_StateBlocks.lookup(*handle)) != 0) {
       delete handle;
       return 0;
     }
@@ -99,8 +97,7 @@ size_t TcpManager::Connect(Endpoint::RemoteEndpoint remoteHost, uint16_t localPo
   size_t connId = getConnId();
 
   stateBlock = new StateBlock;
-  if(!stateBlock)
-  {
+  if(!stateBlock) {
     delete handle;
     return 0;
   }
@@ -135,8 +132,8 @@ size_t TcpManager::Connect(Endpoint::RemoteEndpoint remoteHost, uint16_t localPo
     return connId; // connection in progress - assume it works
 
   bool timedOut = false;
-  stateBlock->waitState.acquire(1, 15);
-  if(Processor::information().getCurrentThread()->wasInterrupted())
+  stateBlock->waitState.P(15000);
+  if(Processor::getCurrThread()->isInterrupted())
     timedOut = true;
 
   if((stateBlock->currentState != Tcp::ESTABLISHED) || timedOut)
@@ -156,9 +153,8 @@ void TcpManager::Shutdown(size_t connectionId, bool bOnlyStopReceive)
   StateBlock* stateBlock;
   if((stateBlock = m_StateBlocks.lookup(*handle)) == 0)
     return;
-    
-  if(bOnlyStopReceive)
-  {
+
+  if(bOnlyStopReceive) {
     return;
   }
 
@@ -168,8 +164,7 @@ void TcpManager::Shutdown(size_t connectionId, bool bOnlyStopReceive)
   // These two checks will end up closing our writing end of the connection
 
   /** ESTABLISHED: No FIN received - send our own **/
-  if(stateBlock->currentState == Tcp::ESTABLISHED)
-  {
+  if(stateBlock->currentState == Tcp::ESTABLISHED) {
     stateBlock->fin_seq = stateBlock->snd_nxt;
 
     stateBlock->currentState = Tcp::FIN_WAIT_1;
@@ -178,8 +173,7 @@ void TcpManager::Shutdown(size_t connectionId, bool bOnlyStopReceive)
     stateBlock->snd_nxt++;
   }
   /** CLOSE_WAIT: FIN received - reply **/
-  else if(stateBlock->currentState == Tcp::CLOSE_WAIT)
-  {
+  else if(stateBlock->currentState == Tcp::CLOSE_WAIT) {
     stateBlock->fin_seq = stateBlock->snd_nxt;
 
     stateBlock->currentState = Tcp::LAST_ACK;
@@ -205,8 +199,7 @@ void TcpManager::Disconnect(size_t connectionId)
   dest = stateBlock->remoteHost.ip;
 
   // no FIN received yet
-  if(stateBlock->currentState >= Tcp::ESTABLISHED && stateBlock->currentState <= Tcp::FIN_WAIT_2)
-  {
+  if(stateBlock->currentState >= Tcp::ESTABLISHED && stateBlock->currentState <= Tcp::FIN_WAIT_2) {
     stateBlock->fin_seq = stateBlock->snd_nxt;
 
     stateBlock->currentState = Tcp::FIN_WAIT_1;
@@ -216,8 +209,7 @@ void TcpManager::Disconnect(size_t connectionId)
     //Tcp::send(dest, stateBlock->localPort, stateBlock->remoteHost.remotePort, stateBlock->fin_seq, stateBlock->rcv_nxt, Tcp::FIN | Tcp::ACK, stateBlock->snd_wnd, 0, 0, stateBlock->pCard);
   }
   // received a FIN already
-  else if(stateBlock->currentState == Tcp::CLOSE_WAIT)
-  {
+  else if(stateBlock->currentState == Tcp::CLOSE_WAIT) {
     stateBlock->fin_seq = stateBlock->snd_nxt;
 
     stateBlock->currentState = Tcp::LAST_ACK;
@@ -227,15 +219,12 @@ void TcpManager::Disconnect(size_t connectionId)
     //Tcp::send(dest, stateBlock->localPort, stateBlock->remoteHost.remotePort, stateBlock->fin_seq, stateBlock->rcv_nxt, Tcp::FIN | Tcp::ACK, stateBlock->snd_wnd, 0, 0, stateBlock->pCard);
   }
   // LISTEN socket closing
-  else if(stateBlock->currentState == Tcp::LISTEN)
-  {
+  else if(stateBlock->currentState == Tcp::LISTEN) {
     DBG::outln(DBG::Net, "Disconnect called on a LISTEN socket\n");
     stateBlock->currentState = Tcp::CLOSED;
     removeConn(stateBlock->connId);
-  }
-  else
-  {
-      DBG::outln(DBG::Net, "Connection Id ", connectionId, " is trying to close but isn't valid state [", Tcp::stateString(stateBlock->currentState), "]!");
+  } else {
+    DBG::outln(DBG::Net, "Connection Id ", connectionId, " is trying to close but isn't valid state [", Tcp::stateString(stateBlock->currentState), "]!");
   }
 }
 
@@ -255,12 +244,12 @@ int TcpManager::send(size_t connId, uintptr_t payload, bool push, size_t nBytes,
     return -1;
 
   if(stateBlock->currentState != Tcp::ESTABLISHED &&
-        stateBlock->currentState != Tcp::CLOSE_WAIT)
-     /*
-     &&
-     stateBlock->currentState != Tcp::FIN_WAIT_1 &&
-     stateBlock->currentState != Tcp::FIN_WAIT_2
-     */
+     stateBlock->currentState != Tcp::CLOSE_WAIT)
+    /*
+    &&
+    stateBlock->currentState != Tcp::FIN_WAIT_1 &&
+    stateBlock->currentState != Tcp::FIN_WAIT_2
+    */
     return -1; // When we SHUT_WR, we send FIN meaning no more data from us.
 
   stateBlock->sendSegment(Tcp::ACK | (push ? Tcp::PSH : 0), nBytes, payload, addToRetransmitQueue);
@@ -287,8 +276,7 @@ void TcpManager::removeConn(size_t connId)
     return;
 
   // only remove closed connections!
-  if(stateBlock->currentState != Tcp::CLOSED)
-  {
+  if(stateBlock->currentState != Tcp::CLOSED) {
     return;
   }
 
@@ -300,7 +288,7 @@ void TcpManager::removeConn(size_t connId)
   m_CurrentConnections.remove(connId);
 
   // destroy the state block (and its internals)
-  stateBlock->waitState.release();
+  stateBlock->waitState.V();
   delete stateBlock;
 
   // stateBlock->endpoint is what applications are using right now, so
@@ -315,8 +303,7 @@ void TcpManager::returnEndpoint(Endpoint* e)
   return;
 
 #if 0
-  if(e)
-  {
+  if(e) {
     // remove from the endpoint list
     m_Endpoints.remove(e->getConnId());
 
@@ -332,24 +319,24 @@ void TcpManager::returnEndpoint(Endpoint* e)
 
 Endpoint* TcpManager::getEndpoint(uint16_t localPort, Network* pCard)
 {
-    if(!pCard)
-        pCard = RoutingTable::instance().DefaultRoute();
+  if(!pCard)
+    pCard = RoutingTable::instance().DefaultRoute();
 
-    Endpoint* e;
+  Endpoint* e;
 
   /// \todo FIXME: Don't let multiple connections use the same local port!
 
-    if(localPort == 0)
-      localPort = allocatePort();
+  if(localPort == 0)
+    localPort = allocatePort();
 
-    TcpEndpoint* tmp = new TcpEndpoint(localPort, 0);
-    if(!tmp)
-      return 0;
+  TcpEndpoint* tmp = new TcpEndpoint(localPort, 0);
+  if(!tmp)
+    return 0;
 
-    tmp->setCard(pCard);
-    tmp->setManager(this);
+  tmp->setCard(pCard);
+  tmp->setManager(this);
 
-    e = static_cast<Endpoint*>(tmp);
+  e = static_cast<Endpoint*>(tmp);
 
-    return e;
+  return e;
 }

@@ -28,13 +28,13 @@ Arp Arp::arpInstance;
 Arp::Arp() :
   RequestQueue(), m_ArpCache(), m_ArpRequests()
 {
-    // By now threading should be active, as we're a module.
-    initialise();
+  // By now threading should be active, as we're a module.
+  initialise();
 }
 
 Arp::~Arp()
 {
-    destroy();
+  destroy();
 }
 
 bool Arp::getFromCache(IpAddress ip, bool resolve, MacAddress* ent, Network* pCard)
@@ -47,8 +47,7 @@ bool Arp::getFromCache(IpAddress ip, bool resolve, MacAddress* ent, Network* pCa
 
   // do we have an entry for it yet?
   arpEntry* arpEnt;
-  if((arpEnt = m_ArpCache.lookup(static_cast<uintptr_t>(ip.getIp()))) != 0)
-  {
+  if((arpEnt = m_ArpCache.lookup(static_cast<uintptr_t>(ip.getIp()))) != 0) {
     *ent = arpEnt->mac;
     return true;
   }
@@ -122,41 +121,40 @@ uint64_t Arp::executeRequest(uint64_t p1, uint64_t p2, uint64_t p3, uint64_t p4,
   send(req->destIp, pCard);
 
   // Wait for the reply
-  req->waitSem.acquire(1, 15);
+  req->waitSem.P(15000);  // approx 15 sec
   return req->success ? 1 : 0;
 }
 
 bool Arp::isInCache(IpAddress ip)
 {
-    return m_ArpCache.lookup(ip.getIp()) != 0;
+  return m_ArpCache.lookup(ip.getIp()) != 0;
 }
 
 void Arp::insertToCache(IpAddress ip, MacAddress mac)
 {
-    if(isInCache(ip))
-        return;
+  if(isInCache(ip))
+    return;
 
-    arpEntry* ent = new arpEntry;
-    ent->valid = true;
-    ent->mac = mac;
-    ent->ip = ip;
-    m_ArpCache.insert(ip.getIp(), ent);
+  arpEntry* ent = new arpEntry;
+  ent->valid = true;
+  ent->mac = mac;
+  ent->ip = ip;
+  m_ArpCache.insert(ip.getIp(), ent);
 }
 
 void Arp::removeFromCache(IpAddress ip)
 {
-    /// \todo Implement
-    ABORT1("ARP: implement removeFromCache");
+  /// \todo Implement
+  ABORT1("ARP: implement removeFromCache");
 }
 
 void Arp::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t offset)
 {
   if(!packet || !nBytes)
-      return;
+    return;
 
   // Check for filtering
-  if(!NetworkFilter::instance().filter(2, packet + offset, nBytes - offset))
-  {
+  if(!NetworkFilter::instance().filter(2, packet + offset, nBytes - offset)) {
     pCard->droppedPacket();
     return;
   }
@@ -165,73 +163,65 @@ void Arp::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t offs
   arpHeader* header = reinterpret_cast<arpHeader*>(packet + offset);
 
   // sanity checking
-  if(header->hwSize != 6 || header->protocolSize != 4)
-  {
+  if(header->hwSize != 6 || header->protocolSize != 4) {
     DBG::outln(DBG::Warning, "Arp: Request for either unknown MAC format or non-IPv4 address");
     return;
   }
 
   StationInfo cardInfo = pCard->getStationInfo();
 
-    // grab the source MAC
-    MacAddress sourceMac;
-    sourceMac = header->hwSrc;
+  // grab the source MAC
+  MacAddress sourceMac;
+  sourceMac = header->hwSrc;
 
-    // request?
-    if(BIG_TO_HOST16(header->opcode) == ARP_OP_REQUEST)
-    {
-      // Add to local cache even if the request isn't for us
-      MacAddress myMac = cardInfo.mac;
-      insertToCache(IpAddress(header->ipSrc), sourceMac);
+  // request?
+  if(BIG_TO_HOST16(header->opcode) == ARP_OP_REQUEST) {
+    // Add to local cache even if the request isn't for us
+    MacAddress myMac = cardInfo.mac;
+    insertToCache(IpAddress(header->ipSrc), sourceMac);
 
-      // We can glean information from ARP requests, but unless they're for us
-      // we can't really respond.
-      if((cardInfo.ipv4 == header->ipDest))
-      {
-          // allocate the reply
-          uintptr_t packet = NetworkStack::instance().getMemPool().allocate();
-          arpHeader* reply = reinterpret_cast<arpHeader*>(packet);
-          memcpy(reply, header, sizeof(arpHeader));
-          reply->opcode = HOST_TO_BIG16(ARP_OP_REPLY);
-          reply->ipSrc = cardInfo.ipv4.getIp();
-          reply->ipDest = header->ipSrc;
-          memcpy(reply->hwSrc, cardInfo.mac, 6);
-          memcpy(reply->hwDest, header->hwSrc, 6);
+    // We can glean information from ARP requests, but unless they're for us
+    // we can't really respond.
+    if((cardInfo.ipv4 == header->ipDest)) {
+      // allocate the reply
+      uintptr_t packet = NetworkStack::instance().getMemPool().allocate();
+      arpHeader* reply = reinterpret_cast<arpHeader*>(packet);
+      memcpy(reply, header, sizeof(arpHeader));
+      reply->opcode = HOST_TO_BIG16(ARP_OP_REPLY);
+      reply->ipSrc = cardInfo.ipv4.getIp();
+      reply->ipDest = header->ipSrc;
+      memcpy(reply->hwSrc, cardInfo.mac, 6);
+      memcpy(reply->hwDest, header->hwSrc, 6);
 
-          // send it out
-          Ethernet::send(sizeof(arpHeader), packet, pCard, sourceMac, ETH_ARP);
+      // send it out
+      Ethernet::send(sizeof(arpHeader), packet, pCard, sourceMac, ETH_ARP);
 
-          // and now that it's sent, destroy the reply
-          NetworkStack::instance().getMemPool().free(packet);
+      // and now that it's sent, destroy the reply
+      NetworkStack::instance().getMemPool().free(packet);
+    }
+  }
+  // reply
+  else if(BIG_TO_HOST16(header->opcode) == ARP_OP_REPLY) {
+    DBG::outln(DBG::Net, "arp ", IpAddress(header->ipSrc).toString(), " is at ", sourceMac.toString());
+
+    // add to our local cache, if needed
+    insertToCache(IpAddress(header->ipSrc), sourceMac);
+
+    // search all the requests we've made, trigger the first we find
+    for(Vector<ArpRequest*>::Iterator it = m_ArpRequests.begin();
+        it != m_ArpRequests.end();
+        it++) {
+      ArpRequest* p = *it;
+      if(p->destIp.getIp() == header->ipSrc) {
+        p->mac = header->hwSrc;
+        p->waitSem.V();
+        p->success = true;
+        m_ArpRequests.erase(it);
+        break;
       }
     }
-    // reply
-    else if(BIG_TO_HOST16(header->opcode) == ARP_OP_REPLY)
-    {
-      DBG::outln(DBG::Net, "arp ", IpAddress(header->ipSrc).toString(), " is at ", sourceMac.toString());
-
-      // add to our local cache, if needed
-      insertToCache(IpAddress(header->ipSrc), sourceMac);
-
-      // search all the requests we've made, trigger the first we find
-      for(Vector<ArpRequest*>::Iterator it = m_ArpRequests.begin();
-          it != m_ArpRequests.end();
-          it++)
-      {
-        ArpRequest* p = *it;
-        if(p->destIp.getIp() == header->ipSrc)
-        {
-          p->mac = header->hwSrc;
-          p->waitSem.release();
-          p->success = true;
-          m_ArpRequests.erase(it);
-          break;
-        }
-      }
-    }
-    else
-    {
-      DBG::outln(DBG::Net, "Arp: Unknown ARP opcode: ", BIG_TO_HOST16(header->opcode));
-      pCard->badPacket();
-    }
+  } else {
+    DBG::outln(DBG::Net, "Arp: Unknown ARP opcode: ", BIG_TO_HOST16(header->opcode));
+    pCard->badPacket();
+  }
 }

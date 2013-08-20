@@ -48,8 +48,7 @@ public:
   {};
 
   /** For access to the manager without declaring an instance of it */
-  static TcpManager& instance()
-  {
+  static TcpManager& instance() {
     return manager;
   }
 
@@ -83,8 +82,7 @@ public:
   void removeConn(size_t connId);
 
   /** Grabs the current state of a given connection */
-  Tcp::TcpState getState(size_t connId)
-  {
+  Tcp::TcpState getState(size_t connId) {
     ScopedLock<Mutex> guard(m_TcpMutex);
 
     StateBlockHandle* handle;
@@ -99,8 +97,7 @@ public:
   }
 
   /** Gets the next sequence number to use */
-  uint32_t getNextSequenceNumber()
-  {
+  uint32_t getNextSequenceNumber() {
     /// \todo Need recursive mutexes!
 
     /// \todo These need to be randomised to avoid sequence attacks
@@ -109,8 +106,7 @@ public:
   }
 
   /** Gets a unique connection ID */
-  size_t getConnId()
-  {
+  size_t getConnId() {
     /// \todo Need recursive mutexes!
 
     size_t ret = m_NextConnId;
@@ -121,8 +117,7 @@ public:
   }
 
   /** Grabs the number of packets that have been queued for a given connection */
-  uint32_t getNumQueuedPackets(size_t connId)
-  {
+  uint32_t getNumQueuedPackets(size_t connId) {
     ScopedLock<Mutex> guard(m_TcpMutex);
 
     StateBlockHandle* handle;
@@ -137,8 +132,7 @@ public:
   }
 
   /** Reduces the number of queued packets by the specified amount */
-  void removeQueuedPackets(size_t connId, uint32_t n = 1)
-  {
+  void removeQueuedPackets(size_t connId, uint32_t n = 1) {
     ScopedLock<Mutex> guard(m_TcpMutex);
 
     StateBlockHandle* handle;
@@ -153,8 +147,7 @@ public:
   }
 
   /** Allocates a unique local port for a connection with a server */
-  uint16_t allocatePort()
-  {
+  uint16_t allocatePort() {
     ScopedLock<Mutex> guard(m_TcpMutex);
 
     static uint16_t lastPort = 32768;
@@ -163,24 +156,19 @@ public:
     // default behaviour: start at 32768
     /// \todo Meant to be randomised, and this isn't ideal
     size_t i;
-    for(i = 32768; i <= 0xFFFF; i++)
-    {
+    for(i = 32768; i <= 0xFFFF; i++) {
       bool* used;
-      if(m_PortsAvailable.lookup(i) == 0)
-      {
+      if(m_PortsAvailable.lookup(i) == 0) {
         used = new bool;
-        if(used)
-        {
+        if(used) {
           *used = true;
           m_PortsAvailable.insert(i, used);
           return static_cast<uint16_t>(i);
         }
       }
       used = m_PortsAvailable.lookup(i);
-      if(used)
-      {
-        if(!*used)
-        {
+      if(used) {
+        if(!*used) {
           *used = true;
           return static_cast<uint16_t>(i);
         }

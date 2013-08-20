@@ -49,10 +49,11 @@ private:
     Zombie
   };
   Status status;
+  bool interrupted;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
     : name(n), addressSpace(&as), stackSize(s), stackPointer(sp),
-      timeout(0), priority(0) {}
+      timeout(0), priority(0), status(Ready), interrupted(false) {}
   ~Thread() = delete;
 
   void destroy();
@@ -74,6 +75,12 @@ public:
   }
   void setErrno(int err) {
     errorNo = err;
+  }
+  void setInterrupted(bool val) {
+    interrupted = val;
+  }
+  bool isInterrupted() {
+    return interrupted;
   }
 } __packed;
 

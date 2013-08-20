@@ -30,9 +30,11 @@ void DynamicTimer::run(mword currTick) {
     bool ran = (*it)->run(currTick);
     if (ran) {
       if ((*it)->isOneShot()) {
-        events.erase(it++);
-        DBG::outln(DBG::Basic, "event removed");
-        continue;
+        if ((*it)->timedout()) {
+          events.erase(it++);
+          DBG::outln(DBG::Basic, "event removed");
+          continue;
+        } // else oneshot mode but resetted to new timeout
       } else {
         (*it)->reset();
       }

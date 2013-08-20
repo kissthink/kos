@@ -21,51 +21,50 @@
 #include "mach/Device.h"
 #include "net/IpAddress.h"
 #include "net/MacAddress.h"
-#include "net/NetworkBlockTimeout.h"
+//#include "net/NetworkBlockTimeout.h"
 
 /** Station information - basically information about this station, per NIC */
 class StationInfo
 {
-  public:
-    // Broadcast address defaults to 255.255.255.255, as we may need to
-    // broadcast without a known IPv4 address (and therefore no known network
-    // or broadcast address).
-    StationInfo() :
-      ipv4(), ipv6(0), nIpv6Addresses(0), subnetMask(), broadcast(0xFFFFFFFF),
-      gateway(), gatewayIpv6(IpAddress::IPv6), dnsServers(0), nDnsServers(0),
-      mac(), nPackets(0), nDropped(0), nBad(0)
-    {};
-    StationInfo(const StationInfo& info) :
-      ipv4(info.ipv4), ipv6(info.ipv6), nIpv6Addresses(info.nIpv6Addresses), subnetMask(info.subnetMask),
-      broadcast(info.broadcast), gateway(info.gateway), gatewayIpv6(info.gatewayIpv6),
-      dnsServers(info.dnsServers), nDnsServers(info.nDnsServers), mac(info.mac),
-      nPackets(info.nPackets), nDropped(info.nDropped), nBad(info.nBad)
-    {};
-    virtual ~StationInfo() {};
+public:
+  // Broadcast address defaults to 255.255.255.255, as we may need to
+  // broadcast without a known IPv4 address (and therefore no known network
+  // or broadcast address).
+  StationInfo() :
+    ipv4(), ipv6(0), nIpv6Addresses(0), subnetMask(), broadcast(0xFFFFFFFF),
+    gateway(), gatewayIpv6(IpAddress::IPv6), dnsServers(0), nDnsServers(0),
+    mac(), nPackets(0), nDropped(0), nBad(0)
+  {};
+  StationInfo(const StationInfo& info) :
+    ipv4(info.ipv4), ipv6(info.ipv6), nIpv6Addresses(info.nIpv6Addresses), subnetMask(info.subnetMask),
+    broadcast(info.broadcast), gateway(info.gateway), gatewayIpv6(info.gatewayIpv6),
+    dnsServers(info.dnsServers), nDnsServers(info.nDnsServers), mac(info.mac),
+    nPackets(info.nPackets), nDropped(info.nDropped), nBad(info.nBad)
+  {};
+  virtual ~StationInfo() {};
 
-    IpAddress   ipv4;
-    IpAddress   *ipv6; // Not compulsory
-    size_t nIpv6Addresses;
+  IpAddress   ipv4;
+  IpAddress   *ipv6; // Not compulsory
+  size_t nIpv6Addresses;
 
-    IpAddress   subnetMask;
-    IpAddress   broadcast; /// Automatically calculated?
-    IpAddress   gateway;
-    IpAddress   gatewayIpv6;
+  IpAddress   subnetMask;
+  IpAddress   broadcast; /// Automatically calculated?
+  IpAddress   gateway;
+  IpAddress   gatewayIpv6;
 
-    IpAddress*  dnsServers; /// Can contain IPv6 addresses.
-    size_t      nDnsServers;
+  IpAddress*  dnsServers; /// Can contain IPv6 addresses.
+  size_t      nDnsServers;
 
-    MacAddress  mac; // MAC address
+  MacAddress  mac; // MAC address
 
-    size_t nPackets;    /// Number of packets passed through the interface
-    size_t nDropped;    /// Number of packets dropped by the filter
-    size_t nBad;        /// Number of packets dropped because they were invalid
+  size_t nPackets;    /// Number of packets passed through the interface
+  size_t nDropped;    /// Number of packets dropped by the filter
+  size_t nBad;        /// Number of packets dropped because they were invalid
 
-    StationInfo& operator = (const StationInfo& info)
-    {
-      WARNING("StationInfo::operator = (const StationInfo&) called");
-      return *this;
-    }
+  StationInfo& operator = (const StationInfo& info) {
+    DBG::outln(DBG::Warning, "StationInfo::operator = (const StationInfo&) called");
+    return *this;
+  }
 };
 
 /**
@@ -74,30 +73,24 @@ class StationInfo
 class Network : public Device
 {
 public:
-  Network() : m_StationInfo()
-  {
-    m_SpecificType = "Generic Network Device";
+  Network() : m_StationInfo() {
+    specificType = "Generic Network Device";
   }
   Network(Network *pDev) :
-    Device(pDev), m_StationInfo()
-  {
+    Device(pDev), m_StationInfo() {
   }
-  virtual ~Network()
-  {
+  virtual ~Network() {
   }
 
-  virtual Type getType()
-  {
+  virtual Type getType() {
     return Device::Network;
   }
 
-  virtual void getName(String &str)
-  {
+  virtual void getName(String &str) {
     str = "Generic Network Device";
   }
 
-  virtual void dump(String &str)
-  {
+  virtual void dump(String &str) {
     str = "Generic Network Device";
   }
 
@@ -108,22 +101,19 @@ public:
 
   /** Sets station information (such as IP addresses)
    * \param info The information to set as the station info */
-  virtual bool setStationInfo(StationInfo info)
-  {
+  virtual bool setStationInfo(StationInfo info) {
     return false; // failed by default
   }
 
   /** Gets station information (such as IP addresses) */
-  virtual StationInfo getStationInfo()
-  {
+  virtual StationInfo getStationInfo() {
     static StationInfo info;
     return info; // not to be trusted
   }
 
   /** Is this device actually connected to a network? */
-  virtual bool isConnected()
-  {
-      return true;
+  virtual bool isConnected() {
+    return true;
   }
 
   /** Converts an IPv4 address into an integer */
@@ -131,14 +121,14 @@ public:
 
   /** Converts an IPv6 address into an IpAddress object */
   static IpAddress convertToIpv6(
-                                    uint8_t a, uint8_t b = 0,
-                                    uint8_t c = 0, uint8_t d = 0,
-                                    uint8_t e = 0, uint8_t f = 0,
-                                    uint8_t g = 0, uint8_t h = 0,
-                                    uint8_t i = 0, uint8_t j = 0,
-                                    uint8_t k = 0, uint8_t l = 0,
-                                    uint8_t m = 0, uint8_t n = 0,
-                                    uint8_t o = 0, uint8_t p = 0
+    uint8_t a, uint8_t b = 0,
+    uint8_t c = 0, uint8_t d = 0,
+    uint8_t e = 0, uint8_t f = 0,
+    uint8_t g = 0, uint8_t h = 0,
+    uint8_t i = 0, uint8_t j = 0,
+    uint8_t k = 0, uint8_t l = 0,
+    uint8_t m = 0, uint8_t n = 0,
+    uint8_t o = 0, uint8_t p = 0
   );
 
   /** Calculates a checksum */
@@ -148,21 +138,18 @@ public:
 
   /// Called when a packet is picked up by the system, regardless of if it's
   /// eventually bad or dropped
-  virtual void gotPacket()
-  {
+  virtual void gotPacket() {
     m_StationInfo.nPackets++;
   }
 
   /// Called when a packet is dropped by the system
-  virtual void droppedPacket()
-  {
+  virtual void droppedPacket() {
     m_StationInfo.nDropped++;
   }
 
   /// Called when a packet is determined to be "bad" by the system (ie, invalid
   /// checksum).
-  virtual void badPacket()
-  {
+  virtual void badPacket() {
     m_StationInfo.nBad++;
   }
 

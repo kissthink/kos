@@ -19,9 +19,11 @@
 
 #include "extern/stl/mod_list"
 #include "mach/Processor.h"
+#include "kern/DynamicTimer.h"
 #include "kern/Kernel.h"
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
+#include "kern/TimerEvent.h"
 #include "ipc/SpinLock.h"
 
 class BlockingSync {
@@ -47,6 +49,20 @@ protected:
   }
 };
 
+class TimedBlock : public TimerEvent {
+  Thread* t;
+public:
+  TimedBlock(mword tick) : TimerEvent(tick, true), t(Processor::getCurrThread()) {}
+  bool run(mword currTick) {
+    if (timedout()) {
+      t->setInterrupted(true);  // interrupt even if thread is running; it should have cancelled me
+      kernelScheduler.start(*t);
+      return true;
+    }
+    return false;
+  }
+};
+
 class Semaphore : public BlockingSync {
   mword counter;
 public:
@@ -61,6 +77,21 @@ public:
     ScopedLock<> sl(lock);
     if likely(counter < 1) return false;
     counter -= 1;
+    return true;
+  }
+  bool P(mword tick) {
+    ScopedLock<> sl(lock);
+    if likely(counter < 1) {
+      TimerEvent* ev = new TimedBlock(tick);
+      DynamicTimer::registerEvent(ev);
+      suspend();
+      if (Processor::getCurrThread()->isInterrupted()) {
+        Processor::getCurrThread()->setInterrupted(false);
+        return false;
+      } else {
+        DynamicTimer::unregisterEvent(ev);
+      }
+    } else counter -= 1;
     return true;
   }
   void V() {
@@ -82,7 +113,11 @@ class Mutex : public BlockingSync {
 protected:
   Thread* owner;
 public:
-  Mutex() : owner(nullptr) {}
+  Mutex(bool locked=false) : owner(nullptr) {
+    if (locked) {
+      owner = Processor::getCurrThread();
+    }
+  }
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Mutex)); }
   void acquire() {
     ScopedLock<> sl(lock);

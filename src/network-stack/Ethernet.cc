@@ -41,11 +41,10 @@ Ethernet::~Ethernet()
 void Ethernet::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t offset)
 {
   if(!packet || !nBytes || !pCard)
-      return;
+    return;
 
   // Check for filtering
-  if(!NetworkFilter::instance().filter(1, packet, nBytes))
-  {
+  if(!NetworkFilter::instance().filter(1, packet, nBytes)) {
     pCard->droppedPacket();
     return; // Drop the packet.
   }
@@ -57,64 +56,62 @@ void Ethernet::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t
   RawManager::instance().receive(packet, nBytes, 0, -1, pCard);
 
   // what type is the packet?
-  switch(BIG_TO_HOST16(ethHeader->type))
-  {
-    case ETH_ARP:
-      // NOTICE("ARP packet!");
+  switch(BIG_TO_HOST16(ethHeader->type)) {
+  case ETH_ARP:
+    // NOTICE("ARP packet!");
 
-      Arp::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
+    Arp::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
 
-      break;
+    break;
 
-    case ETH_RARP:
-      NOTICE("RARP packet!");
-      break;
+  case ETH_RARP:
+    DBG::outln(DBG::Net, "RARP packet!");
+    break;
 
-    case ETH_IPV4:
-      // NOTICE("IPv4 packet!");
+  case ETH_IPV4:
+    // NOTICE("IPv4 packet!");
 
-      Ipv4::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
+    Ipv4::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
 
-      break;
+    break;
 
-    case ETH_IPV6:
-      // NOTICE("IPv6 packet!");
+  case ETH_IPV6:
+    // NOTICE("IPv6 packet!");
 
-      Ipv6::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
+    Ipv6::instance().receive(nBytes, packet, pCard, sizeof(ethernetHeader));
 
-      break;
+    break;
 
-    default:
-      NOTICE("Unknown ethernet packet - type is " << BIG_TO_HOST16(ethHeader->type) << "!");
-      pCard->badPacket();
-      break;
+  default:
+    DBG::outln(DBG::Net, "Unknown ethernet packet - type is ", FmtHex(BIG_TO_HOST16(ethHeader->type)), "!");
+    pCard->badPacket();
+    break;
   }
 }
 
 size_t Ethernet::injectHeader(uintptr_t packet, MacAddress destMac, MacAddress sourceMac, uint16_t type)
 {
-    // Basic checks for valid input
-    if(!packet || !type)
-        return 0;
+  // Basic checks for valid input
+  if(!packet || !type)
+    return 0;
 
-    // Set up an Ethernet header
-    ethernetHeader *pHeader = reinterpret_cast<ethernetHeader*>(packet);
+  // Set up an Ethernet header
+  ethernetHeader *pHeader = reinterpret_cast<ethernetHeader*>(packet);
 
-    // Copy in the two MAC addresses
-    memcpy(pHeader->destMac, destMac.getMac(), 6);
-    memcpy(pHeader->sourceMac, sourceMac.getMac(), 6);
+  // Copy in the two MAC addresses
+  memcpy(pHeader->destMac, destMac.getMac(), 6);
+  memcpy(pHeader->sourceMac, sourceMac.getMac(), 6);
 
-    // Set the packet type
-    pHeader->type = HOST_TO_BIG16(type);
+  // Set the packet type
+  pHeader->type = HOST_TO_BIG16(type);
 
-    // All done.
-    return sizeof(ethernetHeader);
+  // All done.
+  return sizeof(ethernetHeader);
 }
 
 void Ethernet::getMacFromPacket(uintptr_t packet, MacAddress *mac)
 {
-  if(packet && mac)
-  {
+  if(packet && mac) {
     // grab the header
     ethernetHeader* ethHeader = reinterpret_cast<ethernetHeader*>(packet);
     *mac = ethHeader->sourceMac;

@@ -36,6 +36,7 @@ Thread* Thread::create(AddressSpace& as, const char *n, size_t stackSize) {
 
 void Thread::runDirect(funcvoid_t func) {
   stackPointer = stackInitSimple(stackPointer, func);
+  status = Running;
   stackStart(stackPointer);
 }
 

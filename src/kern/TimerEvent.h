@@ -21,8 +21,9 @@ public:
   bool timedout() const {
     return Machine::now() >= nextTimeout;
   }
-  void reset() {
-    nextTimeout = Machine::now() + timeoutPeriod;
+  void reset(mword newTimeoutPeriod = 0) {
+    if (newTimeoutPeriod) timeoutPeriod = newTimeoutPeriod;
+    nextTimeout = Machine::now() + newTimeoutPeriod;
   }
   void setMode(TimerEventMode m) {
     mode = m;

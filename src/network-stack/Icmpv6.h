@@ -28,32 +28,30 @@ class IpBase;
  */
 class Icmpv6
 {
-    public:
-        Icmpv6();
-        virtual ~Icmpv6();
+public:
+  Icmpv6();
+  virtual ~Icmpv6();
 
-        /** For access to the stack without declaring an instance of it */
-        static Icmpv6& instance()
-        {
-            return icmpInstance;
-        }
+  /** For access to the stack without declaring an instance of it */
+  static Icmpv6& instance() {
+    return icmpInstance;
+  }
 
-        /** Packet arrival callback */
-        void receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes, IpBase *pIp, Network* pCard);
+  /** Packet arrival callback */
+  void receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes, IpBase *pIp, Network* pCard);
 
-        /** Sends an ICMP packet */
-        static void send(IpAddress dest, IpAddress from, uint8_t type, uint8_t code, uintptr_t payload, size_t nBytes, Network *pCard = 0);
+  /** Sends an ICMP packet */
+  static void send(IpAddress dest, IpAddress from, uint8_t type, uint8_t code, uintptr_t payload, size_t nBytes, Network *pCard = 0);
 
-    private:
+private:
 
-        static Icmpv6 icmpInstance;
+  static Icmpv6 icmpInstance;
 
-        struct icmpv6Header
-        {
-            uint8_t type;
-            uint8_t code;
-            uint16_t checksum;
-        } __attribute__ ((packed));
+  struct icmpv6Header {
+    uint8_t type;
+    uint8_t code;
+    uint16_t checksum;
+  } __attribute__ ((packed));
 };
 
 #endif /* _NetworkStack_ICMPV6_h_ */

@@ -22,7 +22,7 @@
 #include "util/RadixTree.h"
 #include "ipc/BlockingSync.h"
 #include "mach/Network.h"
-#include "util/Config.h"
+#include "config/Config.h"
 
 /**
  * The Pedigree routing table supports three different ways to route packets:
@@ -52,72 +52,69 @@
 /** Routing table implementation */
 class RoutingTable
 {
-    public:
+public:
 
-        enum Type
-        {
-            DestIp = 0,
-            DestIpSub,
-            DestSubnet,
-            DestSubnetComplement,
-            DestIpv6,
-            DestIpv6Sub,
-            DestPrefix,
-            DestPrefixComplement,
-            Named,
-            NamedV6
-        };
+  enum Type {
+    DestIp = 0,
+    DestIpSub,
+    DestSubnet,
+    DestSubnetComplement,
+    DestIpv6,
+    DestIpv6Sub,
+    DestPrefix,
+    DestPrefixComplement,
+    Named,
+    NamedV6
+  };
 
-        RoutingTable();
-        virtual ~RoutingTable();
+  RoutingTable();
+  virtual ~RoutingTable();
 
-        static RoutingTable& instance()
-        {
-            return m_Instance;
-        }
+  static RoutingTable& instance() {
+    return m_Instance;
+  }
 
-        inline bool hasRoutes()
-        {
-            return m_bHasRoutes;
-        }
+  inline bool hasRoutes() {
+    return m_bHasRoutes;
+  }
 
-        /** Adds a route to the table */
-        void Add(Type type, IpAddress dest, IpAddress subIp, String meta, Network *card);
+  /** Adds a route to the table */
+  void Add(Type type, IpAddress dest, IpAddress subIp, String meta, Network *card);
 
-        /** Adds a subnet-based route to the table */
-        void Add(Type type, IpAddress dest, IpAddress subnet, IpAddress subIp, String meta, Network *card);
+  /** Adds a subnet-based route to the table */
+  void Add(Type type, IpAddress dest, IpAddress subnet, IpAddress subIp, String meta, Network *card);
 
-        /// \todo Functions to remove routes
+  /// \todo Functions to remove routes
 
-        /**
-         * Determines the routing for a specific IP
-         * \param ip A pointer to the IP to look for. A potential side effect
-         *           of this function is for this IP address to be overwritten.
-         * \param bGiveDefault If no match is found, return the default route.
-         * \return A pointer to the Network device to be used to transmit the
-         *         packet.
-         */
-        Network *DetermineRoute(IpAddress *ip, bool bGiveDefault = true);
+  /**
+   * Determines the routing for a specific IP
+   * \param ip A pointer to the IP to look for. A potential side effect
+   *           of this function is for this IP address to be overwritten.
+   * \param bGiveDefault If no match is found, return the default route.
+   * \return A pointer to the Network device to be used to transmit the
+   *         packet.
+   */
+  Network *DetermineRoute(IpAddress *ip, bool bGiveDefault = true);
 
-        /** Obtains a route by name rather than by address (assuming it has one) */
-        Network *DetermineRoute(String name, bool bGiveDefault = true);
+  /** Obtains a route by name rather than by address (assuming it has one) */
+  Network *DetermineRoute(String name, bool bGiveDefault = true);
 
-        /** Grabs the default route */
-        Network *DefaultRoute();
+  /** Grabs the default route */
+  Network *DefaultRoute();
 
-        /** Grabs the default route for IPv6 */
-        Network *DefaultRouteV6();
+  /** Grabs the default route for IPv6 */
+  Network *DefaultRouteV6();
 
-    private:
+private:
 
-        static RoutingTable m_Instance;
+  static RoutingTable m_Instance;
 
-        bool m_bHasRoutes;
+  bool m_bHasRoutes;
 
-        Mutex m_TableLock;
+  Mutex m_TableLock;
 
-        /** Used to finalise the determined route */
-        Network *route(IpAddress *ip, Config::Result *pResult);
+  /** Used to finalise the determined route */
+  Network *route(IpAddress *ip, Config::Result *pResult);
 };
 
 #endif /* _NetworkStack_RoutingTable_h_ */

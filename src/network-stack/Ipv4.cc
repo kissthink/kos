@@ -50,49 +50,49 @@ Ipv4::~Ipv4()
 
 size_t Ipv4::injectHeader(uintptr_t packet, IpAddress dest, IpAddress from, uint8_t type)
 {
-    // Basic validation
-    if(!packet)
-        return 0;
+  // Basic validation
+  if(!packet)
+    return 0;
 
-    // Set up the IPv4 header
-    ipHeader *pHeader = reinterpret_cast<ipHeader*>(packet);
-    memset(pHeader, 0, sizeof(ipHeader));
+  // Set up the IPv4 header
+  ipHeader *pHeader = reinterpret_cast<ipHeader*>(packet);
+  memset(pHeader, 0, sizeof(ipHeader));
 
-    // Configure destination and source addresses
-    pHeader->ipDest = dest.getIp();
-    pHeader->ipSrc = from.getIp();
+  // Configure destination and source addresses
+  pHeader->ipDest = dest.getIp();
+  pHeader->ipSrc = from.getIp();
 
-    // Configure the IPv4 ID for this packet
-    /// \todo Use a RNG for this
-    pHeader->id = getNextId();
+  // Configure the IPv4 ID for this packet
+  /// \todo Use a RNG for this
+  pHeader->id = getNextId();
 
-    // Setup the Time To Live, IP version, and IP type fields
-    pHeader->ttl = 128; /// \todo Make configurable
-    pHeader->ipver = 4;
-    pHeader->type = type;
+  // Setup the Time To Live, IP version, and IP type fields
+  pHeader->ttl = 128; /// \todo Make configurable
+  pHeader->ipver = 4;
+  pHeader->type = type;
 
-    // We don't use IPv4 options at all yet
-    pHeader->header_len = 5;
+  // We don't use IPv4 options at all yet
+  pHeader->header_len = 5;
 
-    // We've configured what we can for now, return.
-    return pHeader->header_len * 4;
+  // We've configured what we can for now, return.
+  return pHeader->header_len * 4;
 }
 
 void Ipv4::injectChecksumAndDataFields(uintptr_t ipv4HeaderStart, size_t payloadSize)
 {
-    // Basic validation
-    if(!ipv4HeaderStart || !payloadSize)
-        return;
+  // Basic validation
+  if(!ipv4HeaderStart || !payloadSize)
+    return;
 
-    // Grab the IPv4 header
-    ipHeader *pHeader = reinterpret_cast<ipHeader*>(ipv4HeaderStart);
+  // Grab the IPv4 header
+  ipHeader *pHeader = reinterpret_cast<ipHeader*>(ipv4HeaderStart);
 
-    // Set the payload size
-    pHeader->len = HOST_TO_BIG16(payloadSize + (pHeader->header_len * 4));
+  // Set the payload size
+  pHeader->len = HOST_TO_BIG16(payloadSize + (pHeader->header_len * 4));
 
-    // Setup the checksum
-    pHeader->checksum = 0;
-    pHeader->checksum = Network::calculateChecksum(ipv4HeaderStart, pHeader->header_len * 4);
+  // Setup the checksum
+  pHeader->checksum = 0;
+  pHeader->checksum = Network::calculateChecksum(ipv4HeaderStart, pHeader->header_len * 4);
 }
 
 uint16_t Ipv4::ipChecksum(IpAddress &from, IpAddress &to, uint8_t proto, uintptr_t data, uint16_t length)
@@ -129,11 +129,9 @@ bool Ipv4::send(IpAddress dest, IpAddress from, uint8_t type, size_t nBytes, uin
 
   // Grab the address to send to (as well as the NIC to send with)
   Network *pSubCard = RoutingTable::instance().DetermineRoute(&realDest);
-  if(!pCard)
-  {
+  if(!pCard) {
     pCard = pSubCard;
-    if(!pSubCard)
-    {
+    if(!pSubCard) {
       DBG::outln(DBG::Warning, "IPv4: Couldn't find a route for destination '", dest.toString(), "'.");
       return false;
     }
@@ -193,12 +191,11 @@ void Ipv4::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t off
   // Verify the inputs. Drivers may directly dump this information on us so
   // we cannot ever be too sure.
   if(!packet || !nBytes || !pCard)
-      return;
+    return;
 
   // Check for filtering
   /// \todo Add statistics to NICs
-  if(!NetworkFilter::instance().filter(2, packet + offset, nBytes - offset))
-  {
+  if(!NetworkFilter::instance().filter(2, packet + offset, nBytes - offset)) {
     pCard->droppedPacket();
     return;
   }
@@ -216,46 +213,42 @@ void Ipv4::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t off
   header->checksum = 0;
   uint16_t calcChecksum = Network::calculateChecksum(reinterpret_cast<uintptr_t>(header), sizeof(ipHeader));
   header->checksum = checksum;
-  if(checksum == calcChecksum)
-  {
+  if(checksum == calcChecksum) {
     IpAddress from(header->ipSrc);
     IpAddress to(header->ipDest);
     Endpoint::RemoteEndpoint remoteHost;
     remoteHost.ip = from;
 
     StationInfo me = pCard->getStationInfo();
-    if((!me.ipv4.getIp()) && (!Arp::instance().isInCache(from))) // Not configured yet?
-    {
-        // Poison the ARP cache with this packet, as we won't be able to do
-        // ARP for link-layer address determination yet.
-        MacAddress e;
-        Ethernet::instance().getMacFromPacket(packet, &e);
-        Arp::instance().insertToCache(from, e);
+    if((!me.ipv4.getIp()) && (!Arp::instance().isInCache(from))) { // Not configured yet?
+      // Poison the ARP cache with this packet, as we won't be able to do
+      // ARP for link-layer address determination yet.
+      MacAddress e;
+      Ethernet::instance().getMacFromPacket(packet, &e);
+      Arp::instance().insertToCache(from, e);
     }
 
 #ifdef IPV4_FORWARDING
     // Is the incoming IP address unicast, and not ours?
-    if(to.isUnicast() && (to != me.ipv4) && (me.ipv4.getIp() != 0) && (to != me.broadcast))
-    {
-        // Not for us!
-        MacAddress e;
-        DBG::outln(DBG::Net, "IPv4: forwarding packet from ", from.toString(), " to ", to.toString());
+    if(to.isUnicast() && (to != me.ipv4) && (me.ipv4.getIp() != 0) && (to != me.broadcast)) {
+      // Not for us!
+      MacAddress e;
+      DBG::outln(DBG::Net, "IPv4: forwarding packet from ", from.toString(), " to ", to.toString());
 
-        IpAddress realDest;
-        pCard = RoutingTable::instance().DetermineRoute(&realDest);
-        if(!pCard)
-        {
-            DBG::outln(DBG::Net, "IPv4: no route to forwarding destination ", to.toString());
-            pCard->droppedPacket();
-            return;
-        }
-
-        bool macValid = Arp::instance().getFromCache(realDest, true, &e, pCard);
-        if(macValid)
-            Ethernet::send(nBytes - Ethernet::instance().ethHeaderSize(), packet + Ethernet::instance().ethHeaderSize(), pCard, e, to.getType());
-        else
-            pCard->droppedPacket();
+      IpAddress realDest;
+      pCard = RoutingTable::instance().DetermineRoute(&realDest);
+      if(!pCard) {
+        DBG::outln(DBG::Net, "IPv4: no route to forwarding destination ", to.toString());
+        pCard->droppedPacket();
         return;
+      }
+
+      bool macValid = Arp::instance().getFromCache(realDest, true, &e, pCard);
+      if(macValid)
+        Ethernet::send(nBytes - Ethernet::instance().ethHeaderSize(), packet + Ethernet::instance().ethHeaderSize(), pCard, e, to.getType());
+      else
+        pCard->droppedPacket();
+      return;
     }
 #endif
 
@@ -268,152 +261,137 @@ void Ipv4::receive(size_t nBytes, uintptr_t packet, Network* pCard, uint32_t off
     ///       packet will not be reassembled properly.
 
     // Determine if the packet is part of a fragment
-    if((frag_offset != 0) || (flags & IP_FLAG_MF))
-    {
-        DBG::outln(DBG::Warning, "IPv4: An incoming packet was part of a fragment. If this");
-        DBG::outln(DBG::Warning, "message shows up repeatedly you may have a network link");
-        DBG::outln(DBG::Warning, "with an inappropriate MTU.");
+    if((frag_offset != 0) || (flags & IP_FLAG_MF)) {
+      DBG::outln(DBG::Warning, "IPv4: An incoming packet was part of a fragment. If this");
+      DBG::outln(DBG::Warning, "message shows up repeatedly you may have a network link");
+      DBG::outln(DBG::Warning, "with an inappropriate MTU.");
 
-        // Find the size of the data section of this packet
-        size_t dataLength = BIG_TO_HOST16(header->len);
-        dataLength -= header->header_len * 4;
+      // Find the size of the data section of this packet
+      size_t dataLength = BIG_TO_HOST16(header->len);
+      dataLength -= header->header_len * 4;
 
-        // Find the offset of the data section of this packet
-        size_t dataOffset = offset;
-        dataOffset += header->header_len * 4;
+      // Find the offset of the data section of this packet
+      size_t dataOffset = offset;
+      dataOffset += header->header_len * 4;
 
-        // Grab the fragment block for this combination of IP and ID
-        Ipv4Identifier id(BIG_TO_HOST16(header->id), from);
-        fragmentWrapper *p = m_Fragments.lookup(id);
+      // Grab the fragment block for this combination of IP and ID
+      Ipv4Identifier id(BIG_TO_HOST16(header->id), from);
+      fragmentWrapper *p = m_Fragments.lookup(id);
 
-        // Do we need to create a new wrapper?
-        if(!p)
-        {
-            p = new fragmentWrapper;
-            m_Fragments.insert(id, p);
+      // Do we need to create a new wrapper?
+      if(!p) {
+        p = new fragmentWrapper;
+        m_Fragments.insert(id, p);
 
-            size_t headerLen = header->header_len * 4;
-            char *buff = new char[headerLen];
-            memcpy(buff, header, headerLen);
-            p->originalIpHeader = buff;
-            p->originalIpHeaderLen = headerLen;
-        }
+        size_t headerLen = header->header_len * 4;
+        char *buff = new char[headerLen];
+        memcpy(buff, header, headerLen);
+        p->originalIpHeader = buff;
+        p->originalIpHeaderLen = headerLen;
+      }
 
-        // Insert this fragment to the list
-        if(dataLength)
-        {
-            char *buff = new char[dataLength];
-            memcpy(buff, reinterpret_cast<void*>(packet + dataOffset), dataLength);
+      // Insert this fragment to the list
+      if(dataLength) {
+        char *buff = new char[dataLength];
+        memcpy(buff, reinterpret_cast<void*>(packet + dataOffset), dataLength);
 
-            fragment *f = new fragment;
-            f->data = buff;
-            f->length = dataLength;
-            p->fragments.insert(frag_offset, f);
-        }
+        fragment *f = new fragment;
+        f->data = buff;
+        f->length = dataLength;
+        p->fragments.insert(frag_offset, f);
+      }
 
-        // Was this the last one?
-        if(header->frag_offset && !(flags & IP_FLAG_MF))
-        {
-            // Yes, collate the fragments and send to the upper layers
-            size_t copyOffset = p->originalIpHeaderLen;
-            size_t fullLength = frag_offset + dataLength + copyOffset;
-            char *buff = new char[fullLength];
+      // Was this the last one?
+      if(header->frag_offset && !(flags & IP_FLAG_MF)) {
+        // Yes, collate the fragments and send to the upper layers
+        size_t copyOffset = p->originalIpHeaderLen;
+        size_t fullLength = frag_offset + dataLength + copyOffset;
+        char *buff = new char[fullLength];
 
-            // Iterate through the fragment list, copying data into the buffer as we go
-            for(Tree<size_t, fragment*>::Iterator it = p->fragments.begin();
-                it!= p->fragments.end();
-                it++)
-            {
-                // Copy this one in
-                size_t fragment_offset = it.key();
-                fragment *f = it.value();
-                if(f)
-                {
-                    char *data = f->data;
-                    if(data && fragment_offset < fullLength)
-                    {
-                        memcpy(buff + (copyOffset + fragment_offset), data, f->length);
-                        delete data;
-                    }
-                    delete f;
-                }
+        // Iterate through the fragment list, copying data into the buffer as we go
+        for(Tree<size_t, fragment*>::Iterator it = p->fragments.begin();
+            it!= p->fragments.end();
+            it++) {
+          // Copy this one in
+          size_t fragment_offset = it.key();
+          fragment *f = it.value();
+          if(f) {
+            char *data = f->data;
+            if(data && fragment_offset < fullLength) {
+              memcpy(buff + (copyOffset + fragment_offset), data, f->length);
+              delete data;
             }
-
-            // Dump the header into the packet now
-            /// \todo Verify the buffer and length
-            memcpy(buff, p->originalIpHeader, p->originalIpHeaderLen);
-
-            // Adjust the IP header a bit
-            ipHeader *iphdr = reinterpret_cast<ipHeader*>(buff);
-            iphdr->len = HOST_TO_BIG16(frag_offset + dataLength);
-
-            // Clean up now that we're done
-            delete p;
-            m_Fragments.remove(id);
-
-            // Fall through to the handling of a conventional packet
-            packetAddress = reinterpret_cast<uintptr_t>(buff);
-            packetSize = fullLength;
-            wasFragment = true;
+            delete f;
+          }
         }
-        else
-        {
-            // Do not handle an incomplete packet, wait for another one to arrive
-            return;
-        }
-    }
-    else
-    {
-        wasFragment = false;
+
+        // Dump the header into the packet now
+        /// \todo Verify the buffer and length
+        memcpy(buff, p->originalIpHeader, p->originalIpHeaderLen);
+
+        // Adjust the IP header a bit
+        ipHeader *iphdr = reinterpret_cast<ipHeader*>(buff);
+        iphdr->len = HOST_TO_BIG16(frag_offset + dataLength);
+
+        // Clean up now that we're done
+        delete p;
+        m_Fragments.remove(id);
+
+        // Fall through to the handling of a conventional packet
+        packetAddress = reinterpret_cast<uintptr_t>(buff);
+        packetSize = fullLength;
+        wasFragment = true;
+      } else {
+        // Do not handle an incomplete packet, wait for another one to arrive
+        return;
+      }
+    } else {
+      wasFragment = false;
     }
 
     size_t headerLen = (header->header_len * 4);
     size_t payloadSize = BIG_TO_HOST16(header->len) - headerLen;
     uintptr_t dataAddress = packetAddress + headerLen;
 
-    switch(header->type)
-    {
-      case IP_ICMP:
-        // NOTICE("IP: ICMP packet");
+    switch(header->type) {
+    case IP_ICMP:
+      // NOTICE("IP: ICMP packet");
 
-        RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_ICMP, pCard);
+      RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_ICMP, pCard);
 
-        // icmp needs the ip header as well
-        Icmp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
-        break;
+      // icmp needs the ip header as well
+      Icmp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
+      break;
 
-      case IP_UDP:
-        // NOTICE("IPv4: UDP packet");
+    case IP_UDP:
+      // NOTICE("IPv4: UDP packet");
 
-        RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_UDP, pCard);
+      RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_UDP, pCard);
 
-        // udp needs the ip header as well
-        Udp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
-        break;
+      // udp needs the ip header as well
+      Udp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
+      break;
 
-      case IP_TCP:
-        // NOTICE("IPv4: TCP packet");
+    case IP_TCP:
+      // NOTICE("IPv4: TCP packet");
 
-        RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_TCP, pCard);
+      RawManager::instance().receive(packetAddress, nBytes - offset, &remoteHost, IPPROTO_TCP, pCard);
 
-        // tcp needs the ip header as well
-        Tcp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
-        break;
+      // tcp needs the ip header as well
+      Tcp::instance().receive(from, to, dataAddress, payloadSize, this, pCard);
+      break;
 
-      default:
-        DBG::outln(DBG::Net, "IP: Unknown packet type");
-        pCard->badPacket();
-        break;
+    default:
+      DBG::outln(DBG::Net, "IP: Unknown packet type");
+      pCard->badPacket();
+      break;
     }
 
 
-    if(wasFragment)
-    {
-        delete reinterpret_cast<char*>(packetAddress);
+    if(wasFragment) {
+      delete reinterpret_cast<char*>(packetAddress);
     }
-  }
-  else
-  {
+  } else {
     DBG::outln(DBG::Net, "IP: Checksum invalid!");
     pCard->badPacket();
   }

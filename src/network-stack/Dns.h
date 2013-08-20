@@ -19,6 +19,7 @@
 #include "util/String.h"
 #include "util/Vector.h"
 #include "util/Tree.h"
+#include "util/basics.h"
 #include "ipc/BlockingSync.h"
 #include "mach/Network.h"
 #include "mach/Machine.h"
@@ -41,50 +42,47 @@
 #define DNSQUERY_HOSTADDR     1
 
 /**
- * The KOS network stack - DNS implementation
+ * The Pedigree network stack - DNS implementation
  */
 class Dns {
-  Dns() = delete;
-  Dns(const Dns& ent) = delete;
   Dns& operator=(const Dns&) = delete;
-
 public:
+  Dns();
+  Dns(const Dns& ent);
+  virtual ~Dns();
+
   /** Information about a host (based on a specific hostname) */
-  struct HostInfo
-  {
-      /// Hostname for this host, based on our request (probably a CNAME)
-      String hostname;
+  struct HostInfo {
+    /// Hostname for this host, based on our request (probably a CNAME)
+    String hostname;
 
-      /// Aliases for this host (A records)
-      List<String*> aliases;
+    /// Aliases for this host (A records)
+    List<String*> aliases;
 
-      /// IP addresses for this host
-      List<IpAddress*> addresses;
+    /// IP addresses for this host
+    List<IpAddress*> addresses;
   };
-  
+
+  /** For access to the stack without declaring an instance of it */
+  static Dns& instance() {
+    return dnsInstance;
+  }
+
   /** Main daemon thread */
-  static void mainThread();
+  void mainThread();
 
   /** Initialises the Endpoint and begins running the worker thread */
-  static void initialise();
-  
+  void initialise();
+
   /** Requests a lookup for a hostname */
-  static int hostToIp(String hostname, HostInfo& ret, Network* pCard = 0);
-  
-  /** Operator = is invalid */
-  Dns& operator = (const Dns& ent)
-  {
-    DBG::outln(DBG::Net, "Dns::operator = called!");
-    return *this;
-  }
+  int hostToIp(String hostname, HostInfo& ret, Network* pCard = 0);
 
 private:
 
   static Dns dnsInstance;
   static uint16_t m_NextId;
 
-  struct DnsHeader
-  {
+  struct DnsHeader {
     uint16_t  id;
     uint16_t  opAndParam;
     uint16_t  qCount; // question entry count
@@ -92,104 +90,100 @@ private:
     uint16_t  nCount; // nameserver count
     uint16_t  dCount; // additional data count
   } __attribute__ ((packed));
-  
-  struct QuestionSecNameSuffix
-  {
+
+  struct QuestionSecNameSuffix {
     uint16_t  type;
     uint16_t  cls;
   } __attribute__ ((packed));
-  
-  struct DnsAnswer
-  {
+
+  struct DnsAnswer {
     uint16_t  name;
     uint16_t  type;
     uint16_t  cls;
     uint32_t  ttl;
     uint16_t  length;
   } __attribute__ ((packed));
-  
+
   /** An entry in the DNS cache */
   class DnsEntry
   {
-    public:
-      DnsEntry() : ip(0), numIps(0), hostname()
-      {};
-      DnsEntry(const DnsEntry& ent) : ip(ent.ip), numIps(ent.numIps), hostname(ent.hostname)
-      {};
-      
-      /// Multiple IP addresses are possible
-      IpAddress* ip;
-      size_t numIps;
-      
-      /// Hostname
-      String hostname;
-      
-      DnsEntry& operator = (const DnsEntry& ent)
-      {
-        ip = ent.ip;
-        numIps = ent.numIps;
-        hostname = ent.hostname;
-        return *this;
-      }
+  public:
+    DnsEntry() : ip(0), numIps(0), hostname()
+    {};
+    DnsEntry(const DnsEntry& ent) : ip(ent.ip), numIps(ent.numIps), hostname(ent.hostname)
+    {};
+
+    /// Multiple IP addresses are possible
+    IpAddress* ip;
+    size_t numIps;
+
+    /// Hostname
+    String hostname;
+
+    DnsEntry& operator = (const DnsEntry& ent) {
+      ip = ent.ip;
+      numIps = ent.numIps;
+      hostname = ent.hostname;
+      return *this;
+    }
   };
-  
+
   /// a DNS request we've sent
   class DnsRequest
   {
-    public:
-      DnsRequest() :
-        hostname(), aliases(), addresses(), id(0), waitSem(0),
-        success(false), callerLeft(false)
-      {};
-      DnsRequest(const DnsRequest& ent) :
-        hostname(ent.hostname), aliases(ent.aliases), addresses(ent.addresses), id(ent.id),
-        waitSem(0), success(ent.success), callerLeft(ent.callerLeft)
-      {};
-      
-      /// Hostname for this host, based on our request (probably a CNAME)
-      String hostname;
+  public:
+    DnsRequest() :
+      hostname(), aliases(), addresses(), id(0), waitSem(0),
+      success(false), callerLeft(false)
+    {};
+    DnsRequest(const DnsRequest& ent) :
+      hostname(ent.hostname), aliases(ent.aliases), addresses(ent.addresses), id(ent.id),
+      waitSem(0), success(ent.success), callerLeft(ent.callerLeft)
+    {};
 
-      /// Aliases for this host (A records)
-      List<String*> aliases;
+    /// Hostname for this host, based on our request (probably a CNAME)
+    String hostname;
 
-      /// IP addresses for this host
-      List<IpAddress*> addresses;
+    /// Aliases for this host (A records)
+    List<String*> aliases;
 
-      /// DNS request ID
-      uint16_t id;
-      
-      /// Semaphore used to wake up the caller thread when this request completes
-      Semaphore waitSem;
-      
-      /// Whether or not the request succeeded (possibly redundant now)
-      bool success;
+    /// IP addresses for this host
+    List<IpAddress*> addresses;
 
-      // Whether or not the caller left. If true, the request handler needs to
-      // free the request rather than waking up the calling thread.
-      bool callerLeft;
-      
-      DnsRequest& operator = (const DnsRequest& ent)
-      {
-        hostname = ent.hostname;
-        aliases = ent.aliases;
-        addresses = ent.addresses;
-        id = ent.id;
-        success = ent.success;
-        callerLeft = ent.callerLeft;
-        return *this;
-      }
-      
-    private:
+    /// DNS request ID
+    uint16_t id;
+
+    /// Semaphore used to wake up the caller thread when this request completes
+    Semaphore waitSem;
+
+    /// Whether or not the request succeeded (possibly redundant now)
+    bool success;
+
+    // Whether or not the caller left. If true, the request handler needs to
+    // free the request rather than waking up the calling thread.
+    bool callerLeft;
+
+    DnsRequest& operator = (const DnsRequest& ent) {
+      hostname = ent.hostname;
+      aliases = ent.aliases;
+      addresses = ent.addresses;
+      id = ent.id;
+      success = ent.success;
+      callerLeft = ent.callerLeft;
+      return *this;
+    }
+
+  private:
   };
-  
+
   /// DNS cache (not a Tree because we can't look up an IpAddress object)
-  static List<DnsEntry*> m_DnsCache;
-  
+  List<DnsEntry*> m_DnsCache;
+
   /// DNS request list
-  static Vector<DnsRequest*> m_DnsRequests;
-  
+  Vector<DnsRequest*> m_DnsRequests;
+
   /// DNS communication endpoint
-  static ConnectionlessEndpoint* m_Endpoint;
+  ConnectionlessEndpoint* m_Endpoint;
 };
 
-#endif /* _NetworkStack_DNS_h_ */
+#endif

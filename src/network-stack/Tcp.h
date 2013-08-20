@@ -33,15 +33,13 @@ private:
 
   static Tcp tcpInstance;
 
-	struct tcpOption
-	{
-		uint8_t optkind;
-		uint8_t optlen;
-	} __attribute__((packed));
+  struct tcpOption {
+    uint8_t optkind;
+    uint8_t optlen;
+  } __attribute__((packed));
 
   // Psuedo-header for checksum when being sent over IPv6
-  struct tcpPsuedoHeaderIpv6
-  {
+  struct tcpPsuedoHeaderIpv6 {
     uint8_t  src_addr[16];
     uint8_t  dest_addr[16];
     uint32_t length;
@@ -55,13 +53,11 @@ public:
   virtual ~Tcp();
 
   /** For access to the stack without declaring an instance of it */
-  static Tcp& instance()
-  {
+  static Tcp& instance() {
     return tcpInstance;
   }
 
-  struct tcpHeader
-  {
+  struct tcpHeader {
     uint16_t  src_port;
     uint16_t  dest_port;
     uint32_t  seqnum;
@@ -92,8 +88,7 @@ public:
   uint16_t tcpChecksum(IpAddress srcip, IpAddress destip, tcpHeader* data, uint16_t len);
 
   /// \todo Work on my hex to be able to do this in my head rather than use decimal numbers
-  enum TcpFlag
-  {
+  enum TcpFlag {
     FIN = 1,
     SYN = 2,
     RST = 4,
@@ -104,8 +99,7 @@ public:
     CWR = 128
   };
 
-  enum TcpOption
-  {
+  enum TcpOption {
     OPT_END = 0,
     OPT_NOP,
     OPT_MSS,
@@ -114,8 +108,7 @@ public:
     OPT_TMSTAMP
   };
 
-  enum TcpState
-  {
+  enum TcpState {
     LISTEN          = 0,
     SYN_SENT        = 1,
     SYN_RECEIVED    = 2,
@@ -131,34 +124,32 @@ public:
   };
 
   // provides a string representation of a given state
-  static const char* stateString(TcpState state)
-  {
-    switch(state)
-    {
-      case LISTEN:
-        return "LISTEN";
-      case SYN_SENT:
-        return "SYN-SENT";
-      case SYN_RECEIVED:
-        return "SYN-RECEIVED";
-      case ESTABLISHED:
-        return "ESTABLISHED";
-      case FIN_WAIT_1:
-        return "FIN-WAIT-1";
-      case FIN_WAIT_2:
-        return "FIN-WAIT-2";
-      case CLOSE_WAIT:
-        return "CLOSE-WAIT";
-      case CLOSING:
-        return "CLOSING";
-      case LAST_ACK:
-        return "LAST-ACK";
-      case TIME_WAIT:
-        return "TIME-WAIT";
-      case CLOSED:
-        return "CLOSED";
-      default:
-        return "UNKNOWN";
+  static const char* stateString(TcpState state) {
+    switch(state) {
+    case LISTEN:
+      return "LISTEN";
+    case SYN_SENT:
+      return "SYN-SENT";
+    case SYN_RECEIVED:
+      return "SYN-RECEIVED";
+    case ESTABLISHED:
+      return "ESTABLISHED";
+    case FIN_WAIT_1:
+      return "FIN-WAIT-1";
+    case FIN_WAIT_2:
+      return "FIN-WAIT-2";
+    case CLOSE_WAIT:
+      return "CLOSE-WAIT";
+    case CLOSING:
+      return "CLOSING";
+    case LAST_ACK:
+      return "LAST-ACK";
+    case TIME_WAIT:
+      return "TIME-WAIT";
+    case CLOSED:
+      return "CLOSED";
+    default:
+      return "UNKNOWN";
     }
   }
 };

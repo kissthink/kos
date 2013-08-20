@@ -38,19 +38,15 @@ int UdpEndpoint::recv(uintptr_t buffer, size_t maxSize, bool bBlock, RemoteEndpo
   bool bDataReady = false;
   if(m_DataQueue.count())
     bDataReady = true;
-  else if(bBlock)
-  {
+  else if(bBlock) {
     if(!dataReady(true, nTimeout))
       bDataReady = false;
-  }
-  else
+  } else
     bDataReady = false;
 
-  if(bDataReady)
-  {
+  if(bDataReady) {
     DataBlock* ptr = m_DataQueue.popFront();
-    if(ptr->magic != 0xdeadbeef)
-    {
+    if(ptr->magic != 0xdeadbeef) {
       // Bang! We've been overrun, impossible to recover.
       DBG::outln(DBG::Error, "UDP packet information is corrupted - magic is not 0xdeadbeef!");
       DBG::outln(DBG::Error, "The packet cannot be forwarded to the application *or* freed.");
@@ -62,8 +58,7 @@ int UdpEndpoint::recv(uintptr_t buffer, size_t maxSize, bool bBlock, RemoteEndpo
     bool allRead = false;
 
     // Only read in this block
-    if(nBytes >= ptr->size)
-    {
+    if(nBytes >= ptr->size) {
       nBytes = ptr->size;
       allRead = true;
     }
@@ -76,29 +71,25 @@ int UdpEndpoint::recv(uintptr_t buffer, size_t maxSize, bool bBlock, RemoteEndpo
     *remoteHost = ptr->remoteHost;
 
     // If the entire block has not been read, repush it with the new offset
-    if(!allRead)
-    {
+    if(!allRead) {
       ptr->offset = nBytes;
       m_DataQueue.pushFront(ptr);
       return nBytes;
     }
     // Otherwise we're done - free the block and return
-    else
-    {
+    else {
       delete reinterpret_cast<uint8_t*>(ptr->ptr);
       delete ptr;
       return nBytes;
     }
   }
 
-  if(!bBlock)
-  {
+  if(!bBlock) {
     // EAGAIN, or EWOULDBLOCK
 //    SYSCALL_ERROR(NoMoreProcesses);
     Processor::getCurrThread()->setErrno(EAGAIN);
     return -1;
-  }
-  else
+  } else
     return 0;
 };
 
@@ -123,11 +114,10 @@ size_t UdpEndpoint::depositPayload(size_t nBytes, uintptr_t payload, RemoteEndpo
   newBlock->remoteHost = remoteHost;
 
   m_DataQueue.pushBack(newBlock);
-  m_DataQueueSize.release();
+  m_DataQueueSize.V();
 
   // Data has arrived!
-  for(List<Socket*>::Iterator it = m_Sockets.begin(); it != m_Sockets.end(); ++it)
-  {
+  for(List<Socket*>::Iterator it = m_Sockets.begin(); it != m_Sockets.end(); ++it) {
     (*it)->endpointStateChanged();
   }
 
@@ -137,36 +127,34 @@ size_t UdpEndpoint::depositPayload(size_t nBytes, uintptr_t payload, RemoteEndpo
 
 bool UdpEndpoint::dataReady(bool block, uint32_t tmout)
 {
-    // Attempt to avoid setting up the timeout if possible
-    if(m_DataQueueSize.tryAcquire())
-        return true;
-    else if(!block)
-        return false;
-
-    // Otherwise jump straight into blocking
-    if(block)
-    {
-        if(tmout)
-            m_DataQueueSize.acquire(1, tmout);
-        else
-            m_DataQueueSize.acquire();
-
-        if(Processor::information().getCurrentThread()->wasInterrupted())
-            return false;
-    }
+  // Attempt to avoid setting up the timeout if possible
+  if(m_DataQueueSize.tryP())
     return true;
+  else if(!block)
+    return false;
+
+  // Otherwise jump straight into blocking
+  if(block) {
+    if(tmout)
+      m_DataQueueSize.P(tmout * 1000);
+    else
+      m_DataQueueSize.P();
+
+    if(Processor::getCurrThread()->isInterrupted())
+      return false;
+  }
+  return true;
 }
 
 void UdpManager::receive(IpAddress from, IpAddress to, uint16_t sourcePort, uint16_t destPort, uintptr_t payload, size_t payloadSize, Network* pCard)
 {
   if(!pCard)
     return;
-  
+
   // is there an endpoint for this port?
   ConnectionlessEndpoint* e;
   StationInfo cardInfo = pCard->getStationInfo();
-  if((e = static_cast<ConnectionlessEndpoint *>(m_Endpoints.lookup(destPort))) != 0)
-  {
+  if((e = static_cast<ConnectionlessEndpoint *>(m_Endpoints.lookup(destPort))) != 0) {
     /** Should we pass on the packet? **/
     bool passOn = false;
 
@@ -197,8 +185,7 @@ void UdpManager::receive(IpAddress from, IpAddress to, uint16_t sourcePort, uint
 
 void UdpManager::returnEndpoint(Endpoint* e)
 {
-  if(e)
-  {
+  if(e) {
     m_Endpoints.remove(e->getLocalPort());
     delete e;
   }
@@ -209,11 +196,9 @@ Endpoint* UdpManager::getEndpoint(IpAddress remoteHost, uint16_t localPort, uint
   // Try to find a unique port
   /// \todo Bitmap! So much neater!
   /// \todo Move into a helper function
-  if(localPort == 0)
-  {
+  if(localPort == 0) {
     uint16_t base = 32768;
-    while(base < 0xFFFF)
-    {
+    while(base < 0xFFFF) {
       if(m_Endpoints.lookup(base++) == 0)
         break;
     }
@@ -226,8 +211,7 @@ Endpoint* UdpManager::getEndpoint(IpAddress remoteHost, uint16_t localPort, uint
   /// \note If there is already an Endpoint, we do *not* reallocate it.
   /// \todo Can UDP endpoints be shared? Is it a good idea?
   Endpoint* e;
-  if((e = m_Endpoints.lookup(localPort)) == 0)
-  {
+  if((e = m_Endpoints.lookup(localPort)) == 0) {
     e = new UdpEndpoint(remoteHost, localPort, remotePort);
     e->setManager(this);
 

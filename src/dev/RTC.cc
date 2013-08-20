@@ -53,20 +53,20 @@ void RTC::init() volatile { // see http://wiki.osdev.org/RTC
 
 void RTC::updateTime() volatile {
   ticksPerSec += 1;  // assuming base rate 1024HZ
-  if (ticksPerSec == 1024) {
+  if unlikely(ticksPerSec == 1024) {
     second += 1;
-    if (second == 60) {
+    if unlikely(second == 60) {
       second = 0;
       minute += 1;
-      if (minute == 60) {
+      if unlikely(minute == 60) {
         minute = 0;
         hour += 1;
-        if (hour == 24) {
+        if unlikely(hour == 24) {
           hour = 0;
           day += 1;
           // http://en.wikipedia.org/wiki/Leap_year
           bool leapYear = ((year % 400) == 0) || (((year % 100) != 0) && ((year % 4) == 0));
-          if (day > daysPerMonth[month-1]) {
+          if unlikely(day > daysPerMonth[month-1]) {
             if ((month != 2) || !leapYear) {
               month += 1;
               day = 1;
@@ -77,7 +77,7 @@ void RTC::updateTime() volatile {
               }
             }
           }
-          if (month == 12) {
+          if unlikely(month == 12) {
             year += 1;
             month = 1;
           }

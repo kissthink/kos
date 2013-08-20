@@ -14,21 +14,17 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <Module.h>
-#include <Log.h>
-#include <processor/Processor.h>
-#include "sqlite3.h"
-#include <utilities/utility.h>
+#include "util/Module.h"
+#include "kern/Debug.h"
+#include "config/sqlite3.h"
 #include <BootstrapInfo.h>
-#include <panic.h>
+#include "util/Output.h"
 
-#include <processor/PhysicalMemoryManager.h>
-#include <processor/VirtualAddressSpace.h>
-#include <processor/MemoryRegion.h>
+#include "mach/MemoryRegion.h"
 
 #include <linker/KernelElf.h>
 
-#include "Config.h"
+#include "config/Config.h"
 
 extern BootstrapStruct_t *g_pBootstrapInfo;
 

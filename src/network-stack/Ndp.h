@@ -28,83 +28,75 @@
 
 class Ndp
 {
-    public:
-        Ndp();
-        virtual ~Ndp();
+public:
+  Ndp();
+  virtual ~Ndp();
 
-        static Ndp &instance()
-        {
-            return ndpInstance;
-        }
+  static Ndp &instance() {
+    return ndpInstance;
+  }
 
-        void receive(IpAddress from, IpAddress to, uint8_t icmpType, uint8_t icmpCode, uintptr_t payload, size_t nBytes, Network *pCard);
+  void receive(IpAddress from, IpAddress to, uint8_t icmpType, uint8_t icmpCode, uintptr_t payload, size_t nBytes, Network *pCard);
 
-        /// Solicit a neighbour for an address. Uses cache where possible.
-        bool neighbourSolicit(IpAddress addr, MacAddress *pMac, Network *pCard);
+  /// Solicit a neighbour for an address. Uses cache where possible.
+  bool neighbourSolicit(IpAddress addr, MacAddress *pMac, Network *pCard);
 
-        /// Solicit a router for routing information. Should be called if
-        /// DHCPv6 is not used, in order to obtain a routable address for full
-        /// IPv6 connectivity.
-        /// Will automatically modify the StationInfo of pCard.
-        bool routerSolicit(Network *pCard);
+  /// Solicit a router for routing information. Should be called if
+  /// DHCPv6 is not used, in order to obtain a routable address for full
+  /// IPv6 connectivity.
+  /// Will automatically modify the StationInfo of pCard.
+  bool routerSolicit(Network *pCard);
 
-        /// Adds a given IP->LinkLayer association to the cache.
-        void addEntry(IpAddress addr, MacAddress mac);
+  /// Adds a given IP->LinkLayer association to the cache.
+  void addEntry(IpAddress addr, MacAddress mac);
 
-    private:
-        static Ndp ndpInstance;
+private:
+  static Ndp ndpInstance;
 
-        RadixTree<MacAddress*> m_LookupCache;
+  RadixTree<MacAddress*> m_LookupCache;
 
-        struct RouterSolicitation
-        {
-            uint32_t reserved;
-        } __attribute__((packed));
+  struct RouterSolicitation {
+    uint32_t reserved;
+  } __attribute__((packed));
 
-        struct RouterAdvertisement
-        {
-            uint16_t lifetime;
-            uint16_t hopLimitFlags;
-            uint32_t reachableTime;
-            uint32_t retransTimer;
-        } __attribute__((packed));
+  struct RouterAdvertisement {
+    uint16_t lifetime;
+    uint16_t hopLimitFlags;
+    uint32_t reachableTime;
+    uint32_t retransTimer;
+  } __attribute__((packed));
 
-        struct NeighbourSolicitation
-        {
-            uint32_t reserved;
-            uint8_t  target[16];
-        } __attribute__((packed));
+  struct NeighbourSolicitation {
+    uint32_t reserved;
+    uint8_t  target[16];
+  } __attribute__((packed));
 
-        struct NeighbourAdvertisement
-        {
-            uint32_t flags;
-            uint8_t  target[16];
-        } __attribute__((packed));
+  struct NeighbourAdvertisement {
+    uint32_t flags;
+    uint8_t  target[16];
+  } __attribute__((packed));
 
-        struct Option
-        {
-            uint8_t type;
-            uint8_t length;
-        } __attribute__((packed));
+  struct Option {
+    uint8_t type;
+    uint8_t length;
+  } __attribute__((packed));
 
-        struct LinkLayerAddressOption
-        {
-            uint8_t type;
-            uint8_t length;
-            uint8_t address[6];
-        } __attribute__((packed));
+  struct LinkLayerAddressOption {
+    uint8_t type;
+    uint8_t length;
+    uint8_t address[6];
+  } __attribute__((packed));
 
-        struct PrefixInformationOption
-        {
-            uint8_t type;
-            uint8_t length;
-            uint8_t prefixLength;
-            uint8_t rsvdFlags;
-            uint32_t validLifetime;
-            uint32_t preferredLifetime;
-            uint32_t rsvd2;
-            uint8_t prefix[16];
-        } __attribute__((packed));
+  struct PrefixInformationOption {
+    uint8_t type;
+    uint8_t length;
+    uint8_t prefixLength;
+    uint8_t rsvdFlags;
+    uint32_t validLifetime;
+    uint32_t preferredLifetime;
+    uint32_t rsvd2;
+    uint8_t prefix[16];
+  } __attribute__((packed));
 };
 
 #endif /* _NetworkStack_NDP_h_ */

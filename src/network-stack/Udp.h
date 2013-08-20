@@ -33,8 +33,7 @@ private:
 
   static Udp udpInstance;
 
-  struct udpHeader
-  {
+  struct udpHeader {
     uint16_t  src_port;
     uint16_t  dest_port;
     uint16_t  len;
@@ -46,8 +45,7 @@ public:
   virtual ~Udp();
 
   /** For access to the stack without declaring an instance of it */
-  static Udp& instance()
-  {
+  static Udp& instance() {
     return udpInstance;
   }
 

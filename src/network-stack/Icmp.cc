@@ -41,7 +41,7 @@ void Icmp::send(IpAddress dest, uint8_t type, uint8_t code, uint16_t id, uint16_
   StationInfo me = pCard->getStationInfo();
   if(me.ipv4 == 0)
     return; // We're not configured yet.
-  
+
   uintptr_t packet = NetworkStack::instance().getMemPool().allocate();
 
   icmpHeader* header = reinterpret_cast<icmpHeader*>(packet);
@@ -58,22 +58,21 @@ void Icmp::send(IpAddress dest, uint8_t type, uint8_t code, uint16_t id, uint16_
 
   /// \note Assume IPv4, as ICMPv6 exists for IPv6.
   Ipv4::instance().send(dest, Network::convertToIpv4(0, 0, 0, 0), IP_ICMP, nBytes + sizeof(icmpHeader), packet, pCard);
-  
+
   NetworkStack::instance().getMemPool().free(packet);
 }
 
 void Icmp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes, IpBase *pIp, Network* pCard)
 {
   if(!packet || !nBytes)
-      return;
+    return;
 
   // Check for filtering
-  if(!NetworkFilter::instance().filter(3, packet, nBytes))
-  {
+  if(!NetworkFilter::instance().filter(3, packet, nBytes)) {
     pCard->droppedPacket();
     return;
   }
-  
+
   // Grab the header
   icmpHeader* header = reinterpret_cast<icmpHeader*>(packet);
 
@@ -87,43 +86,38 @@ void Icmp::receive(IpAddress from, IpAddress to, uintptr_t packet, size_t nBytes
   header->checksum = checksum;
 
   DBG::outln(DBG::Net, "ICMP calculated checksum is ", FmtHex(calcChecksum), ", packet checksum = ", FmtHex(checksum));
-  
-  if(checksum == calcChecksum)
-  {
+
+  if(checksum == calcChecksum) {
     // what's come in?
-    switch(header->type)
-    {
-      case ICMP_ECHO_REQUEST:
-        {
+    switch(header->type) {
+    case ICMP_ECHO_REQUEST: {
 
-        DBG::outln(DBG::Net, "ICMP: Echo request from ", from.toString(), ".");
+      DBG::outln(DBG::Net, "ICMP: Echo request from ", from.toString(), ".");
 
-        // send the reply
-        send(
-          from,
-          ICMP_ECHO_REPLY,
-          header->code,
-          BIG_TO_HOST16(header->id),
-          BIG_TO_HOST16(header->seq),
-          nBytes - sizeof(icmpHeader),
-          packet + sizeof(icmpHeader),
-          pCard
-        );
+      // send the reply
+      send(
+        from,
+        ICMP_ECHO_REPLY,
+        header->code,
+        BIG_TO_HOST16(header->id),
+        BIG_TO_HOST16(header->seq),
+        nBytes - sizeof(icmpHeader),
+        packet + sizeof(icmpHeader),
+        pCard
+      );
 
-        }
-        break;
-
-      default:
-
-        // Now that things can be moved out to user applications thanks to SOCK_RAW,
-        // the kernel doesn't need to implement too much of the ICMP suite.
-
-        DBG::outln(DBG::Net, "ICMP: Unhandled packet - type is ", header->type, ".");
-        break;
     }
-  }
-  else
-  {
+    break;
+
+    default:
+
+      // Now that things can be moved out to user applications thanks to SOCK_RAW,
+      // the kernel doesn't need to implement too much of the ICMP suite.
+
+      DBG::outln(DBG::Net, "ICMP: Unhandled packet - type is ", header->type, ".");
+      break;
+    }
+  } else {
     DBG::outln(DBG::Warning, "ICMP: invalid checksum on incoming packet.");
     pCard->badPacket();
   }

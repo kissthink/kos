@@ -18,6 +18,7 @@
 
 #include "util/StaticString.h"
 #include "util/String.h"
+#include "util/endian.h"
 
 /** A MAC address */
 class MacAddress
