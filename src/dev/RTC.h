@@ -21,6 +21,19 @@
 
 class RTC {
   volatile mword currentTick;
+  unsigned char second;
+  unsigned char minute;
+  unsigned char hour;
+  unsigned char day;
+  unsigned char month;
+  uint16_t year;
+  mword ticksPerSec; // used to update above times
+
+  unsigned char read(int reg) volatile {
+    out8(0x70, reg);
+    return in8(0x71);
+  }
+  void updateTime() volatile;
 public:
   RTC() : currentTick(0) {}
   void init() volatile                                 __section(".boot.text");
@@ -28,6 +41,7 @@ public:
     out8(0x70,0x0C);
     in8(0x71);
     currentTick += 1;
+    updateTime();
   }
   void wait(mword ticks) volatile {
     mword start = currentTick;
