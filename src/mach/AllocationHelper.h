@@ -31,6 +31,7 @@ public:
 
   static void init();
   static bool allocRegion(MemoryRegion& region, size_t pages, Constraints constraints, PageOwner owner, PageType type);
+  static bool allocRegion(MemoryRegion& region, size_t pages, laddr start, Constraints constraints, PageOwner owner, PageType type);
 };
 
 inline AllocationHelper::Constraints operator|(AllocationHelper::Constraints a, AllocationHelper::Constraints b) {

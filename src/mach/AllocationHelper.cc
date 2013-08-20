@@ -50,3 +50,41 @@ bool AllocationHelper::allocRegion(MemoryRegion& region, size_t pages, Constrain
   }
   return false;
 }
+
+bool AllocationHelper::allocRegion(MemoryRegion& region, size_t pages, laddr start, Constraints con,
+                                   PageOwner owner, PageType type) {
+  ScopedLock<> lo(lk);
+  if (!Processor::getFrameManager()) {
+    ABORT1("FrameManager is not initialized yet");
+  }
+  if (!(con & Continuous)) {
+    ABORT1("allocRegion() cannot allocate non-contiguous physical region");
+  }
+  if (con & NonRAM) {
+    region.setNonRamMemory(true);
+    bool reserved = Processor::getFrameManager()->reserve(start, pages * pagesize<1>());
+    if (!reserved) {
+      if (!(con & Force)) {
+        return false;
+      }
+      region.setForced(true);
+    }
+  } else {
+    if (start >= CONST_16MB) {
+      region.setNonRamMemory(true); // do not free()
+      region.setForced(true);
+    }
+  }
+  if (owner == PageManager::User) {
+    ABORT1("user space allocation not implemented yet");
+  }
+  vaddr vAddress = kernelSpace.mapPages<1>(start, pages * pagesize<1>(), type);
+  if (vAddress) {
+    DBG::outln(DBG::VM, "allocRegion() mapped ", FmtHex(start), " to virtual addr: ", FmtHex(vAddress));
+    region.virtualAddr = reinterpret_cast<ptr_t>(vAddress);
+    region.physicalAddr = start;
+    region.regSize = pages * pagesize<1>();
+    return true;
+  }
+  return false;
+}
