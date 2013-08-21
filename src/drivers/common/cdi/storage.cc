@@ -8,9 +8,8 @@
  * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
  */  
 
-#include <processor/Processor.h>
-#include <processor/types.h>
-#include <Log.h>
+#include "util/basics.h"
+#include "kern/Debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -37,6 +37,7 @@ void RoutingTable::Add(Type type, IpAddress dest, IpAddress subIp, String meta, 
   // device is definitely available as an interface.
   DeviceHashTree::instance().add(card);
 
+#if 0
   Config::Result *pResult = 0;
   size_t hash = DeviceHashTree::instance().getHash(card);
 
@@ -80,6 +81,7 @@ void RoutingTable::Add(Type type, IpAddress dest, IpAddress subIp, String meta, 
   m_bHasRoutes = true;
 
   delete pResult;
+#endif
 }
 
 void RoutingTable::Add(Type type, IpAddress dest, IpAddress subnet, IpAddress subIp, String meta, Network *card)
@@ -90,6 +92,7 @@ void RoutingTable::Add(Type type, IpAddress dest, IpAddress subnet, IpAddress su
   // device is definitely available as an interface.
   DeviceHashTree::instance().add(card);
 
+#if 0
   Config::Result *pResult = 0;
 
   if(dest.getType() == IpAddress::IPv4 && (type != NamedV6)) {
@@ -148,10 +151,12 @@ void RoutingTable::Add(Type type, IpAddress dest, IpAddress subnet, IpAddress su
   m_bHasRoutes = true;
 
   delete pResult;
+#endif
 }
 
 Network *RoutingTable::route(IpAddress *ip, Config::Result *pResult)
 {
+#if 0
   // Grab the interface
   Network *pCard = static_cast<Network*>(DeviceHashTree::instance().getDevice(pResult->getNum(0, "iface")));
 
@@ -172,10 +177,13 @@ Network *RoutingTable::route(IpAddress *ip, Config::Result *pResult)
   // Return the interface to use
   delete pResult;
   return pCard;
+#endif
+  return nullptr;
 }
 
 Network *RoutingTable::DetermineRoute(IpAddress *ip, bool bGiveDefault)
 {
+#if 0
   ScopedLock<Mutex> guard(m_TableLock);
 
   // Use the IPv6 route table?
@@ -266,13 +274,14 @@ Network *RoutingTable::DetermineRoute(IpAddress *ip, bool bGiveDefault)
       return DefaultRoute();
     }
   }
-
+#endif
   // Not even the default route worked!
   return 0;
 }
 
 Network *RoutingTable::DefaultRoute()
 {
+#if 0
   // If already locked, will return false, so we don't unlock (DetermineRoute calls this function)
   bool bLocked = m_TableLock.tryAcquire();
 
@@ -291,12 +300,13 @@ Network *RoutingTable::DefaultRoute()
 
   if(bLocked)
     m_TableLock.release();
-
+#endif
   return 0;
 }
 
 Network *RoutingTable::DefaultRouteV6()
 {
+#if 0
   // If already locked, will return false, so we don't unlock (DetermineRoute calls this function)
   bool bLocked = m_TableLock.tryAcquire();
 
@@ -316,6 +326,7 @@ Network *RoutingTable::DefaultRouteV6()
   if(bLocked)
     m_TableLock.release();
 
+#endif
   return 0;
 }
 

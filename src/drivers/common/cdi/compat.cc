@@ -1,8 +1,6 @@
-#include <processor/types.h>
-#include <utilities/utility.h>
-#include <Log.h>
-
-#include "include/stdio.h"
+#include "util/basics.h"
+#include "kern/Debug.h"
+#include <cstdio>
 
 int printf(const char* fmt, ...)
 {

@@ -15,6 +15,7 @@
 */
 #include "drivers/common/cdi/CdiNet.h"
 #include "mach/Network.h"
+#include "kern/Debug.h"
 #include "network-stack/NetworkStack.h"
 
 // Prototypes in the extern "C" block to ensure that they are not mangled
@@ -64,21 +65,21 @@ bool CdiNet::setStationInfo(StationInfo info)
 
     // MAC isn't changeable, so set it all manually
     m_StationInfo.ipv4 = info.ipv4;
-    NOTICE("cdi-net: Setting ipv4, " << info.ipv4.toString() << ", " << m_StationInfo.ipv4.toString() << "...");
+    DBG::outln(DBG::Devices, "cdi-net: Setting ipv4, ", info.ipv4.toString(), ", ", m_StationInfo.ipv4.toString(), "...");
 
     m_StationInfo.ipv6 = info.ipv6;
     m_StationInfo.nIpv6Addresses = info.nIpv6Addresses;
-    NOTICE("cdi-net: Assigning " << Dec << info.nIpv6Addresses << Hex << " IPv6 addresses.");
+    DBG::outln(DBG::Devices, "cdi-net: Assigning ", info.nIpv6Addresses, " IPv6 addresses.");
 
     m_StationInfo.subnetMask = info.subnetMask;
-    NOTICE("cdi-net: Setting subnet mask, " << info.subnetMask.toString() << ", " << m_StationInfo.subnetMask.toString() << "...");
+    DBG::outln(DBG::Devices, "cdi-net: Setting subnet mask, ", info.subnetMask.toString(), ", ", m_StationInfo.subnetMask.toString(), "...");
     m_StationInfo.gateway = info.gateway;
-    NOTICE("cdi-net: Setting gateway, " << info.gateway.toString() << ", " << m_StationInfo.gateway.toString() << "...");
+    DBG::outln(DBG::Devices, "cdi-net: Setting gateway, ", info.gateway.toString(), ", ", m_StationInfo.gateway.toString(), "...");
 
     // Callers do not free their dnsServers memory
     m_StationInfo.dnsServers = info.dnsServers;
     m_StationInfo.nDnsServers = info.nDnsServers;
-    NOTICE("cdi-net: Setting DNS servers [" << Dec << m_StationInfo.nDnsServers << Hex << " servers being set]...");
+    DBG::outln(DBG::Devices, "cdi-net: Setting DNS servers [", m_StationInfo.nDnsServers, " servers being set]...");
 
     return true;
 }

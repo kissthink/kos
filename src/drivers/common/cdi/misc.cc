@@ -8,18 +8,14 @@
  * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
  */  
 
-#include <Log.h>
-#include <processor/Processor.h>
-#include <processor/MemoryRegion.h>
-#include <processor/PhysicalMemoryManager.h>
-#include <processor/VirtualAddressSpace.h>
-#include <machine/Machine.h>
-#include <machine/IrqHandler.h>
+#include "mach/MemoryRegion.h"
+#include "mach/Machine.h"
+#include "mach/IrqHandler.h"
+#include "mach/AllocationHelper.h"
 
-#include <utilities/TimeoutGuard.h>
-#include <process/Semaphore.h>
-#include <process/Mutex.h>
-#include <LockGuard.h>
+//#include <utilities/TimeoutGuard.h>
+#include "kern/Debug.h"
+#include "ipc/BlockingSync.h"
 
 class CdiIrqHandler : public IrqHandler {
         virtual bool irq(irq_id_t number, InterruptState &state);
@@ -87,7 +83,7 @@ void cdi_register_irq(uint8_t irq, void (*handler)(struct cdi_device*),
 
     // Der Interrupt wurde schon mal registriert
     if (driver_irq_handler[irq]) {
-        NOTICE("cdi: Versuch IRQ " << irq << " mehrfach zu registrieren");
+        DBG::outln(DBG::Devices, "cdi: Versuch IRQ ", irq, " mehrfach zu registrieren");
         return;
     }
 
@@ -168,7 +164,7 @@ int cdi_wait_irq(uint8_t irq, uint32_t timeout)
     if(pSem)
     {
         pSem->acquire(1, 0, timeout * 1000);
-        if(Processor::information().getCurrentThread()->wasInterrupted())
+        if(Processor::getCurrThread()->isInterrupted())
             return -3;
         else
             return 0;
@@ -201,13 +197,11 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
     /// \todo Incorrectly assumes many flags won't be set
 
     MemoryRegion* region = new MemoryRegion("cdi");
-    size_t pageSize = PhysicalMemoryManager::getPageSize();
 
-    if(!PhysicalMemoryManager::instance().allocateRegion(
-        *region, (size + (pageSize - 1)) / pageSize,
-        PhysicalMemoryManager::continuous, VirtualAddressSpace::Write, -1))
+    if (!AllocationHelper::allocRegion(*region, (size + pagesize<1>()-1)/pagesize<1>(),
+                                       AllocationHelper::Continuous, PageManager::Data))
     {
-        WARNING("cdi: cdi_mem_alloc: couldn't allocate memory");
+        DBG::outln(DBG::Warning, "cdi: cdi_mem_alloc: couldn't allocate memory");
         delete region;
         return 0;
     }
@@ -244,14 +238,11 @@ struct cdi_mem_area* cdi_mem_alloc(size_t size, cdi_mem_flags_t flags)
 struct cdi_mem_area* cdi_mem_map(uintptr_t paddr, size_t size)
 {
     MemoryRegion* region = new MemoryRegion("cdi");
-    size_t pageSize = PhysicalMemoryManager::getPageSize();
 
-    if(!PhysicalMemoryManager::instance().allocateRegion(
-        *region, (size + (pageSize - 1)) / pageSize,
-        PhysicalMemoryManager::continuous, VirtualAddressSpace::Write,
-        paddr))
+    if (!AllocationHelper::allocRegion(*region, (size + pagesize<1>() - 1)/pagesize<1>(), paddr,
+                                       AllocationHelper::Continuous, PageManager::Data))
     {
-        WARNING("cdi: cdi_mem_map: couldn't allocate memory");
+        DBG::outln(DBG::Warning, "cdi: cdi_mem_map: couldn't allocate memory");
         delete region;
         return 0;
     }
@@ -386,7 +377,7 @@ int cdi_ioports_free(uint16_t start, uint16_t count)
 void cdi_sleep_ms(uint32_t ms)
 {
     Semaphore sem(0);
-    sem.acquire(1, 0, ms * 1000);
+    sem.P(ms);
 }
 
 uint8_t cdi_cmos_read(uint8_t index)

@@ -11,6 +11,7 @@
 #include "util/basics.h"
 #include "mach/MemoryRegion.h"
 #include "kern/Debug.h"
+#include "mach/AllocationHelper.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -35,15 +36,13 @@ int cdi_dma_open(struct cdi_dma_handle* handle, uint8_t channel, uint8_t mode, s
     size_t page_size = pagesize<1>();
 
     // Allocate memory under 16 MB for the transfer
-    if (!PhysicalMemoryManager::instance().allocateRegion(*region,
-                                                          (length + page_size - 1) / page_size,
-                                                          PhysicalMemoryManager::continuous | PhysicalMemoryManager::below16MB,
-                                                          VirtualAddressSpace::Write,
-                                                          -1))
-    {
-        WARNING("cdi: Couldn't allocate physical memory for DMA!");
-        delete region;
-        return -1;
+    if (!AllocationHelper::allocRegion(*region,
+                                      (length + pagesize<1>() - 1) / pagesize<1>(),
+                                      AllocationHelper::Continuous|AllocationHelper::Below16MB,
+                                      PageManager::Data)) {
+      DBG::outln(DBG::Warning, "cdi: Couldn't allocate physical memory for DMA!");
+      delete region;
+      return -1;
     }
 
     // Add the region to the handle
@@ -68,13 +67,9 @@ int cdi_dma_open(struct cdi_dma_handle* handle, uint8_t channel, uint8_t mode, s
  */
 int cdi_dma_read(struct cdi_dma_handle* handle)
 {
-#ifdef X86_COMMON
     // Copy the memory across
     memcpy(handle->meta.realbuffer, handle->buffer, handle->length);
     return 0;
-#else
-    return -1;
-#endif
 }
 
 /**
@@ -84,13 +79,9 @@ int cdi_dma_read(struct cdi_dma_handle* handle)
  */
 int cdi_dma_write(struct cdi_dma_handle* handle)
 {
-#ifdef X86_COMMON
     // Copy the memory across
     memcpy(handle->buffer, handle->meta.realbuffer, handle->length);
     return 0;
-#else
-    return -1;
-#endif
 }
 
 /**
@@ -100,13 +91,9 @@ int cdi_dma_write(struct cdi_dma_handle* handle)
  */
 int cdi_dma_close(struct cdi_dma_handle* handle)
 {
-#ifdef X86_COMMON
     // Grab the region from the handle and free it
     MemoryRegion* region = reinterpret_cast<MemoryRegion*>(handle->meta.region);
     delete region;
 
     return 0;
-#else
-    return -1;
-#endif
 }

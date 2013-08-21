@@ -8,7 +8,7 @@
  * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
  */
 
-#include <machine/Device.h>
+#include "mach/Device.h"
 
 extern "C" {
 
