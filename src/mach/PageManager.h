@@ -172,6 +172,10 @@ private:
   }
 
 protected:
+  static void installAddressSpace(laddr pml4) {
+    CPU::writeCR3(pml4);
+  }
+
   // specialization for <pagelevels> below (must be outside of class scope)
   template <unsigned int N>
   static inline void maprecursive( mword vma, Owner owner, FrameManager& fm ) {
@@ -224,8 +228,6 @@ protected:
     return ret;
   }
 
-  static inline void installAddressSpace(laddr pml4);
-
 public:
   PageManager() {}
   PageManager(const PageManager&) = delete;            // no copy
@@ -251,11 +253,6 @@ template<> inline mword PageManager::vtolInternal<1>( mword vma ) {
   PageEntry* pe = getEntry<1>(vma);
   KASSERT1(pe->P, FmtHex(vma));
   return ADDR(pe->c) + offset<1>(vma);
-}
-
-inline void PageManager::installAddressSpace(laddr pml4) {
-  CPU::writeCR3(pml4); // flush what's necessary?
-//  CPU::invTLB(ptp<1>());
 }
 
 inline ostream& operator<<(ostream &os, const PageManager::FmtFlags& f) {
