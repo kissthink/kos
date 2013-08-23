@@ -19,8 +19,6 @@
 #include "world/File.h"
 #include "extern/elfio/elfio.hpp"
 
-// #define AS_PROPER 1
-
 void Process::execElfFile(const kstring& fileName) {
   File* f = kernelFS.find(fileName)->second;
   KASSERT0(f);
@@ -32,10 +30,8 @@ void Process::execElfFile(const kstring& fileName) {
   KASSERT0(check);
   KASSERT1(elfReader.get_class() == ELFCLASS64, elfReader.get_class());
 
-#if AS_PROPER
-  as.clonePagetable(kernelSpace);
-  as.activate();
-#endif
+//  as.clonePagetable(kernelSpace);
+//  as.activate();
   for (int i = 0; i < elfReader.segments.size(); ++i) {
     const ELFIO::segment* pseg = elfReader.segments[i];
     if (pseg->get_type() != PT_LOAD) continue;  // not a loadable segment
@@ -63,10 +59,7 @@ void Process::execElfFile(const kstring& fileName) {
   DBG::outln(DBG::Process, "User AS: ", as);
   function_t entry = (function_t)elfReader.get_entry();
   thread = Thread::create(as, fileName.c_str());
-#if AS_PROPER
-  kernelSpace.activate();
-#else
+//  kernelSpace.activate();
   as.clonePagetable(kernelSpace);
-#endif
   kernelScheduler.run(*thread, entry, nullptr);
 }
