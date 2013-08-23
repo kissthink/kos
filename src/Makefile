@@ -19,8 +19,7 @@ STAGE=stage
 .PHONY: all libs clean dep depend drivers vclean distclean run\
 	debug rgdb rgdba rgdbdebug rgdbadebug\
 	bochs pxe lpxe rpxe qpxe\
-	usb usbtest tests defines echo\
-	$(USERLIB)
+	usb usbtest tests defines echo
 
 .PHONY: Makefile.state
 

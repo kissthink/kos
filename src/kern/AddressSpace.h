@@ -101,20 +101,19 @@ public:
   }
 
   void setPagetable(laddr pt) { pagetable = pt; }
+
   laddr getPagetable() { return pagetable; }
-  void activate() {
-    KASSERT0(pagetable != topaddr);
-    installAddressSpace(pagetable);
-  }
 
   void clonePagetable(AddressSpace& as) {
     pagetable = Processor::getFrameManager()->alloc(pagetablesize());
-    vaddr vpt = mapPages<1>(pagetable, pagetablesize(), PageTable);
-    vaddr vptorig = mapPages<1>(as.pagetable, pagetablesize(), PageTable);
-    PageManager::clone(pagetable, vpt, vptorig);
-    unmapPages<1>(vptorig, pagetablesize());
-    unmapPages<1>(vpt, pagetablesize());
+    vaddr vpt = as.mapPages<1>(pagetable, pagetablesize(), PageTable);
+    vaddr vptorig = as.mapPages<1>(as.pagetable, pagetablesize(), PageTable);
+    memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
+    as.unmapPages<1>(vptorig, pagetablesize());
+    as.unmapPages<1>(vpt, pagetablesize());
   }
+
+  void activate() { PageManager::installAddressSpace(pagetable); }
 
   template<size_t N> // allocate memory and map to any virtual address
   vaddr allocPages( size_t size, Type t ) { 
