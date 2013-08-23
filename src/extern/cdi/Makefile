@@ -1,23 +1,47 @@
-SRCS = $(shell find -name '*.c')
-OBJS = $(addsuffix .o,$(basename $(SRCS)))
+SRCDIR:=$(CURDIR)/../..
+include $(SRCDIR)/Makefile.config
 
-CC = gcc
-CFLAGS = -m32 -Wall -g -I include -Werror -D_GNU_SOURCE -std=gnu99
+CDI_NE2K	=								ne2k
 
-run_command = $(if $(V),$(2),@echo $(1);$(2))
+CDI=$(CDI_NE2k)
 
-all: $(OBJS)
+CDI_NE2K_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_NE2K)))
+CDI_NE2K_OBJS=$(subst .c,.o,$(CDI_NE2K_SRCS))
 
-%.o: %.c
-	$(call run_command,"CC $^",$(CC) $(CFLAGS) $(addprefix -I,$(addprefix $(dir $^),. include)) -c -o $@ $^)
+CDI_KOS   =               impl
+KOS_SRCS=$(wildcard $(addsuffix /*.cc,$(CDI_KOS)))
+KOS_OBJS=$(subst .cc,.o,$(KOS_SRCS))
+
+OBJECTS=$(CDI_NE2K_OBJS)
+
+CFLAGS += -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
+CXXFLAGS += -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
+
+vpath %.c $(CDI)
+vpath %.cc $(CDI_KOS)
+
+all: libcdi.o
+
+$(CDI_NE2K_OBJS): %.o: %.c
+		$(CC) -c $(CFLAGS) -I$(CDI_NE2K)/include $< -o $@
+
+$(KOS_OBJS): %.o: %.cc
+		$(CXX) -c $(CXXFLAGS) $< -o $@
+
+libcdi.o: $(CDI_NE2K_OBJS) $(KOS_OBJS)
+		$(LD) -r -o $@ $^
+
+libcdi.a: $(OBJECTS)
+		$(AR) r $@ $^
+		$(RANLIB) $@
+
+define:
+		@echo $(CC)
+		@echo $(SRCDIR)
+		@echo $(CDI_NE2K_SRCS)
+		@echo $(CDI_NE2K_OBJS)
 
 clean:
-	-rm $(OBJS) 2> /dev/null
 
-doc:
-	for lang in german english; do \
-		sed -e "s/%LANG%/$$lang/g#" doc/doxyfile.in > doc/doxyfile; \
-		doxygen doc/doxyfile; \
-	done
-
-.PHONY: clean doc
+vclean:
+		rm -rf libcdi.a libcdi.o $(OBJECTS) $(KOS_OBJS)

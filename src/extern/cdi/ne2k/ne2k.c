@@ -42,7 +42,7 @@
 
 //Hier koennen die Debug-Nachrichten aktiviert werden
 // #define DEBUG_MSG(s) printf("[ne2k] debug: %s() '%s'\n", __FUNCTION__, s)
-#define DEBUG_MSG(s) //
+#define DEBUG_MSG(s)
 
 static void ne2k_handle_interrupt(struct cdi_device* device);
 static void receive_ok_handler(struct ne2k_device* netcard);

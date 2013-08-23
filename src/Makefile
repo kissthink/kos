@@ -12,7 +12,7 @@ AS_SOURCES=$(wildcard mach/*.S) $(wildcard gdb/*.S)
 AS_OBJECTS=$(subst .S,.o,$(notdir $(AS_SOURCES)))
 BOOT_SOURCES=$(wildcard boot/*.S)
 BOOT_OBJECTS=$(subst .S,.o,$(notdir $(BOOT_SOURCES)))
-LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o #extern/linux/libdriver.a
+LIBS=extern/acpica/libacpica.a extern/dlmalloc/malloc.o extern/cdi/libcdi.o
 USERLIB=ulib/libKOS.a
 STAGE=stage
 
@@ -135,11 +135,8 @@ extern/acpica/libacpica.a: extern/acpica/Makefile
 extern/dlmalloc/malloc.o: extern/dlmalloc/Makefile
 	$(MAKE) -C extern/dlmalloc $(notdir $@)
 
-extern/linux/libdriver.a: extern/linux/Makefile
-	$(MAKE) -C extern/linux $(notdir $@)
-
-drivers:
-	$(MAKE) -C extern/linux $@
+extern/cdi/libcdi.o: extern/cdi/Makefile
+	$(MAKE) -C extern/cdi $(notdir $@)
 
 $(USERLIB):
 	$(MAKE) -C ulib $(notdir $@)
@@ -158,7 +155,7 @@ echo:
 clean:
 	$(MAKE) -C extern/dlmalloc $@
 	$(MAKE) -C extern/acpica $@
-	$(MAKE) -C extern/linux $@
+	$(MAKE) -C extern/cdi $@
 	$(MAKE) -C user $@
 	$(MAKE) -C ulib $@
 	rm -f kernel.sys.debug kernel.sys $(VDISK) $(ISO) $(BOOT_OBJECTS)\
@@ -171,6 +168,7 @@ distclean: clean
 
 vclean: distclean
 	$(MAKE) -C extern/acpica $@
+	$(MAKE) -C extern/cdi $@
 	rm -f /tmp/KOS.dbg /tmp/KOS.serial /tmp/qemu.log
 
 dep depend Makefile.dep: # include order: extern, util, mach, dep, kern

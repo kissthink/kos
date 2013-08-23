@@ -59,7 +59,6 @@ static int ne2k_driver_destroy(void)
     return 0;
 }
 
-
 static struct cdi_net_driver ne2k_driver = {
     .drv = {
         .name           = DRIVER_NAME,

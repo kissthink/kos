@@ -59,7 +59,8 @@ public:
     Code      = 0,
     RoData    = XD(),
     PageTable = RW(),
-    Data      = RW() | XD()
+    Data      = RW() | XD(),
+    MMapIO    = RW() | PWT() | PCD() | XD()
   };
 
   struct FmtFlags {

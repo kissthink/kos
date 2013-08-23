@@ -11,6 +11,8 @@
 #ifndef _CDI_OSDEP_H_
 #define _CDI_OSDEP_H_
 
+struct cdi_driver;
+
 /**
  * \german
  * Muss fuer jeden CDI-Treiber genau einmal verwendet werden, um ihn bei der
@@ -30,7 +32,36 @@
  * @param deps List of names of other drivers on which this driver depends
  * \endenglish
  */
-#define CDI_DRIVER(name, drv, deps...) /* TODO */
+#define CDI_DRIVER(name, drvobj, deps...) /*\
+  static void entry() {\
+    (drvobj).drv.init();\
+    cdi_kos_walk_dev_list_init((struct cdi_driver*)&(drvobj));\
+  }\
+  static void exit() {\
+    cdi_kos_walk_dev_list_destroy((struct cdi_driver*)&(drvobj));\
+    (drvobj).drv.destroy();\
+  }\
+  MODULE_INFO(name, &entry, &exit, deps)*/
+
+/**
+ * \english
+ * This function walks the ilst of devices stored by a driver and initializes
+ * each one. It is called when the module is executed, directly after driver
+ * initialization.
+ *
+ * @param driver Driver struct containing the list of devices and function pointers.
+ */
+void cdi_kos_walk_dev_list_init(struct cdi_driver* dev);
+
+/**
+ * \english
+ * This function walks the list of devices stored by a driver and destroys
+ * each one. It is called when the module is unloaded, right before driver
+ * destruction.
+ *
+ * @param driver Driver struct containing the list of devices and function pointers.
+ */
+void cdi_kos_walk_dev_list_destroy(struct cdi_driver* dev);
 
 /**
  * \german
