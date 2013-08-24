@@ -1,6 +1,10 @@
 #ifndef _Device_h_
 #define _Device_h_ 1
 
+#include "mach/IOPort.h"
+#include "mach/IOMemory.h"
+#include "kern/Kernel.h"
+
 class Device {
   Device(const Device&) = delete;
   Device& operator=(const Device&) = delete;
@@ -16,6 +20,11 @@ class Device {
 
   void release();   // destroy all I/O regions
 public:
+  Device(const char* name) : devName(name) {}
+  virtual ~Device() { release(); }
+  static Device* getRoot() {
+    return &root;
+  }
   Device* getParent() {
     return parent;
   }

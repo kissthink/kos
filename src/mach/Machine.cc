@@ -30,6 +30,9 @@
 #include "kern/Multiboot.h"
 #include "kern/Thread.h"
 
+// drivers
+#include "mach/IOPortManager.h"
+
 #include <atomic>
 #include <list>
 
@@ -248,8 +251,15 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   rtc.init();
   pit.init();
 
+  // init IOPortManager
+  IOPortManager::init(0, 0xfff); // hope 1KB is enough
+
+  // detect PCI controller
+  PCI::sanityCheck();
+
   // find PCI devices
-  PCI::probeAll();
+//  PCI::probeAll();
+  PCI::checkAllBuses();
 
   // find additional devices ("current thread" faked for ACPI)
   parseACPI();

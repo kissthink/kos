@@ -3,4 +3,5 @@
 
 void IOPort::releaseMe() {
   IOPortManager::release( baseAddr, portRange );
+  initialized = false;
 }

@@ -5,11 +5,9 @@ SpinLock IOPortManager::lk;
 bool IOPortManager::initialized = false;
 
 // initializes internal buddy map
-void IOPortManager::init() {
+void IOPortManager::init(uint16_t start, size_t size) {
   ScopedLock<> lo(lk);
   if (!initialized) {
-    uint16_t start = 0;
-    size_t size = 0x1000; // hope this is enough
     availablePortRange.insert(start, size);
     DBG::outln(DBG::Devices, "IOPort reserve: ", FmtHex(start), '/', FmtHex(size));
     initialized = true;
@@ -25,6 +23,7 @@ bool IOPortManager::allocate(IOPort& ioPort, uint16_t port, size_t size) {
     DBG::outln(DBG::Devices, "IOPort alloc: ", FmtHex(size), " -> ", FmtHex(port));
     ioPort.baseAddr = port;
     ioPort.portRange = size;
+    ioPort.initialized = true;
   }
   return reserved;
 }
@@ -38,6 +37,7 @@ bool IOPortManager::allocate(IOPort& ioPort, size_t size) {
   DBG::outln(DBG::Devices, "IOPort alloc: ", FmtHex(size), " -> ", FmtHex(addr));
   ioPort.baseAddr = addr;
   ioPort.portRange = size;
+  ioPort.initialized = true;
   return true;
 }
 
@@ -45,7 +45,11 @@ bool IOPortManager::allocate(IOPort& ioPort, size_t size) {
 bool IOPortManager::release(IOPort& ioPort) {
   ScopedLock<> lo(lk);
   KASSERT0(initialized);
-  return availablePortRange.insert(ioPort.base(), ioPort.range());
+  bool released = availablePortRange.insert(ioPort.base(), ioPort.range());
+  if (released) {
+    ioPort.initialized = false;
+  }
+  return released;
 }
 
 bool IOPortManager::release(uint16_t base, size_t range) {

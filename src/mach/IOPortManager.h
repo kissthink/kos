@@ -16,12 +16,12 @@ class IOPortManager {
   IOPortManager& operator=(const IOPortManager&) = delete;
 
   using BuddySet = set<uint16_t,less<uint16_t>,KernelAllocator<uint16_t>>;
-  static BuddyMap<0,12,BuddySet> availablePortRange;
+  static BuddyMap<0,12,BuddySet> availablePortRange;  // 0~4kb reserved
   static SpinLock lk;
   static bool initialized;
 
 public:
-  static void init();
+  static void init(uint16_t, size_t);
   static bool allocate(IOPort& ioPort, uint16_t port, size_t size); 
   static bool allocate(IOPort& ioPort, size_t size);
   static bool release(IOPort& ioPort);
