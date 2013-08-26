@@ -29,6 +29,7 @@
 #include "pcnet.h"
 #include "cdi/io.h"
 #include "cdi/mem.h"
+#include "cdi/printf.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -48,7 +49,7 @@ static void pcnet_write_bcr(struct pcnet_device *netcard, size_t bcr, uint16_t v
 #define DEBUG
 
 #ifdef DEBUG
-    #define DEBUG_MSG(s) printf("[PCNET] debug: %s() '%s'\n", __FUNCTION__, s)
+    #define DEBUG_MSG(s) CdiPrintf("[PCNET] debug: %s() '%s'\n", __FUNCTION__, s)
 #else
     #define DEBUG_MSG(s) //
 #endif
@@ -68,7 +69,7 @@ struct cdi_device* pcnet_init_device(struct cdi_bus_data* bus_data)
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
 
     // PCI-bezogenes Zeug initialisieren
-    DEBUG_MSG("Interrupthandler und Ports registrieren");
+    DEBUG_MSG("Register Interrupts and I/O ports");
     cdi_register_irq(pci->irq, pcnet_handle_interrupt, &netcard->net.dev);
     cdi_pci_alloc_ioports(pci);
 
@@ -83,7 +84,7 @@ struct cdi_device* pcnet_init_device(struct cdi_bus_data* bus_data)
     }
 
     #ifdef DEBUG
-        printf("pcnet: I/O port @ %x\n", netcard->port_base);
+        CdiPrintf("pcnet: I/O port @ %x\n", netcard->port_base);
     #endif
 
     // Read MAC address
@@ -92,7 +93,7 @@ struct cdi_device* pcnet_init_device(struct cdi_bus_data* bus_data)
     uint16_t mac2 = cdi_inw(netcard->port_base + APROM4);
     netcard->net.mac = mac0 | ((uint64_t) mac1 << 16) | ((uint64_t) mac2 << 32);
     #ifdef DEBUG
-        printf("pcnet: MAC %x.%x.%x.%x.%x.%x\n", mac0 & 0xFF, mac0 >> 8, mac1 & 0xFF, mac1 >> 8, mac2 & 0xFF, mac2 >> 8);
+        CdiPrintf("pcnet: MAC %x.%x.%x.%x.%x.%x\n", mac0 & 0xFF, mac0 >> 8, mac1 & 0xFF, mac1 >> 8, mac2 & 0xFF, mac2 >> 8);
     #endif
 
     // Reset ausführen
@@ -110,7 +111,7 @@ struct cdi_device* pcnet_init_device(struct cdi_bus_data* bus_data)
     // Netzwerkkarte registrieren
     cdi_net_device_init(&netcard->net);
 
-    DEBUG_MSG("Fertig initialisiert");
+    DEBUG_MSG("Finished Initialization");
 
     return &netcard->net.dev;
 }
@@ -163,7 +164,7 @@ static void pcnet_handle_interrupt(struct cdi_device* device)
     if ((csr0 & STATUS_ERROR) != 0)
     {
         pcnet_stop(netcard);
-        printf("pcnet: error (csr0 = %x)\n", csr0);
+        CdiPrintf("pcnet: error (csr0 = %x)\n", csr0);
     }
     if ((csr0 & STATUS_TRANSMIT_INTERRUPT) != 0)
     {
@@ -173,7 +174,7 @@ static void pcnet_handle_interrupt(struct cdi_device* device)
         {
             if ((netcard->transmit_descriptor[netcard->last_transmit_descriptor_eval].flags & DESCRIPTOR_ERROR) != 0)
             {
-                printf("pcnet: transmit error (descriptor flags 0x%x flags2 0x%x)\n",
+                CdiPrintf("pcnet: transmit error (descriptor flags 0x%x flags2 0x%x)\n",
                        netcard->transmit_descriptor[netcard->last_transmit_descriptor_eval].flags,
                        netcard->transmit_descriptor[netcard->last_transmit_descriptor_eval].flags2);
             }
@@ -196,7 +197,7 @@ static void pcnet_handle_interrupt(struct cdi_device* device)
             if ((netcard->receive_descriptor[netcard->last_receive_descriptor].flags & DESCRIPTOR_ERROR) != 0 ||
                 (netcard->receive_descriptor[netcard->last_receive_descriptor].flags & (DESCRIPTOR_PACKET_START | DESCRIPTOR_PACKET_END)) != (DESCRIPTOR_PACKET_START | DESCRIPTOR_PACKET_END))
             {
-                printf("pcnet: receive error (descriptor flags 0x%x)\n", netcard->receive_descriptor[netcard->last_receive_descriptor].flags);
+                CdiPrintf("pcnet: receive error (descriptor flags 0x%x)\n", netcard->receive_descriptor[netcard->last_receive_descriptor].flags);
             }
             else
             {
@@ -262,7 +263,7 @@ static void pcnet_send_init_block(struct pcnet_device* netcard, int promisc)
     initialization_block->physical_address = netcard->net.mac;
 
     #ifdef DEBUG
-        printf("pcnet: initialization block at 0x%p virtual, 0x%p physical\n",
+        CdiPrintf("pcnet: initialization block at 0x%p virtual, 0x%p physical\n",
                initialization_block,
                (void*) buf->paddr.items[0].start);
     #endif
@@ -281,7 +282,7 @@ static void pcnet_send_init_block(struct pcnet_device* netcard, int promisc)
     // Wait until initialization completed, NOTE: see pcnet_handle_interrupt()
     int irq = cdi_wait_irq(pci->irq, 1000);
     if(irq < 0 || netcard->init_wait_for_irq == 1)
-        printf("pcnet: waiting for IRQ failed: %d\n", irq);
+        CdiPrintf("pcnet: waiting for IRQ failed: %d\n", irq);
 
     // Free initialization block
     cdi_mem_free(buf);
@@ -294,12 +295,12 @@ void pcnet_dev_init(struct pcnet_device *netcard, int promiscuous)
 
     desc = cdi_mem_alloc(4096, CDI_MEM_DMA_4G | CDI_MEM_PHYS_CONTIGUOUS);
     if (desc == NULL) {
-        printf("pcnet: failed to allocate descriptor region\n");
+        CdiPrintf("pcnet: failed to allocate descriptor region\n");
         return;
     }
 
     #ifdef DEBUG
-        printf("pcnet: descriptor region at 0x%p virtual and 0x%p physical\n",
+        CdiPrintf("pcnet: descriptor region at 0x%p virtual and 0x%p physical\n",
             desc->vaddr, (void*) desc->paddr.items[0].start);
     #endif
     netcard->receive_descriptor = desc->vaddr;

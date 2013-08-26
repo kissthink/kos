@@ -1,6 +1,6 @@
 #include "mach/Device.h"
 
-Device Device::root("Root Device");
+Device Device::root("Root Device", Device::Root);
 
 void Device::release() {
   while (!ioPorts.empty()) {

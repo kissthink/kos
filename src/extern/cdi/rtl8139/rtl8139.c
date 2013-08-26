@@ -36,13 +36,14 @@
 #include "cdi/io.h"
 #include "cdi/misc.h"
 #include "cdi/mem.h"
+#include "cdi/printf.h"
 
 #include "rtl8139.h"
 #include "ethernet.h"
 
 //Hier koennen die Debug-Nachrichten aktiviert werden
 //#define DEBUG_MSG(s) printf("[RTL8139] debug: %s() '%s'\n", __FUNCTION__, s)
-#define DEBUG_MSG(s) //
+#define DEBUG_MSG(s) CdiPrintf("[RTL8139] debug: %s() '%s'\n", __FUNCTION__, s)
 
 static void rtl8139_handle_interrupt(struct cdi_device* device);
 
@@ -99,7 +100,7 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
 
     // PCI-bezogenes Zeug initialisieren
-    DEBUG_MSG("Interrupthandler und Ports registrieren");
+    DEBUG_MSG("Register Interrupts and I/O ports");
     cdi_register_irq(pci->irq, rtl8139_handle_interrupt, &netcard->net.dev);
     cdi_pci_alloc_ioports(pci);
 
@@ -113,7 +114,7 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
     }
 
     // Einen Reset der Karte durchf�hren
-    DEBUG_MSG("Reset der Karte");
+    DEBUG_MSG("Reset the map");
     write_register_byte(netcard, REG_COMMAND, CR_RESET);
 
     // Warten bis der Reset beendet ist
@@ -121,19 +122,19 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
         CR_RESET);
 
     // MAC-Adresse auslesen
-    DEBUG_MSG("MAC-Adresse auslesen");
+    DEBUG_MSG("Read MAC-Adress");
     netcard->net.mac = 
         read_register_dword(netcard, REG_ID0)
         | (((uint64_t) read_register_dword(netcard, REG_ID4) & 0xFFFF) << 32);
 
     // Receive/Transmit (Rx/Tx) aktivieren
-    DEBUG_MSG("Aktiviere Rx/Tx");
+    DEBUG_MSG("Enable Rx/Tx");
     write_register_byte(netcard, REG_COMMAND, 
         CR_RECEIVER_ENABLE | CR_TRANSMITTER_ENABLE);
 
     // RCR/TCR initialisieren
     // RBLEN = 00, 8K + 16 Bytes Rx-Ringpuffer
-    DEBUG_MSG("Inititalisiere RCR/TCR");
+    DEBUG_MSG("Initialize RCR/TCR");
     write_register_dword(netcard, REG_RECEIVE_CONFIGURATION,
         RCR_MXDMA_UNLIMITED | RCR_ACCEPT_BROADCAST | RCR_ACCEPT_PHYS_MATCH);
 
@@ -141,12 +142,12 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
         TCR_IFG_STANDARD | TCR_MXDMA_2048);
 
     // Wir wollen Interrupts, wann immer es was zu vermelden gibt
-    DEBUG_MSG("Setze Interruptmaske");
+    DEBUG_MSG("Set Interrupt");
     write_register_word(netcard, REG_INTERRUPT_STATUS, 0);
     write_register_word(netcard, REG_INTERRUPT_MASK, 0xFFFF);
 
     // Sende- und Empfangspuffer
-    DEBUG_MSG("Initialisiere Buffer");
+    DEBUG_MSG("Initialize Buffer");
     netcard->buffer_used = 0;
     netcard->cur_buffer = 0;
 
@@ -157,7 +158,7 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
     netcard->pending_sends = cdi_list_create();
 
     cdi_net_device_init(&netcard->net);
-    DEBUG_MSG("Fertig initialisiert");
+    DEBUG_MSG("Finished Initialization");
 
     return &netcard->net.dev;
 }
@@ -174,14 +175,14 @@ void rtl8139_send_packet
 
     if (size > 0x700) {
         // Spezialfall - keine Lust
-        printf("rtl8139: size ist boese\n");
+        DEBUG_MSG("rtl8139: size is evil\n");
         return;
     }
 
     if (!__sync_lock_test_and_set(&netcard->buffer_used, 1)) {
         netcard->buffer_used = 1;
     } else {
-        DEBUG_MSG("Tx-Buffer ist schon besetzt");
+        DEBUG_MSG("Tx-Buffer is already occupied");
 
         void* pending = malloc(size + sizeof(uint32_t));
         cdi_list_insert(netcard->pending_sends,
@@ -226,7 +227,7 @@ void rtl8139_send_packet
         REG_TRANSMIT_STATUS0 + (4 * cur_buffer),
         size);
 
-    DEBUG_MSG("Gesendet");
+    DEBUG_MSG("Sent");
 
     return;
 }
@@ -239,7 +240,7 @@ static void receive_ok_handler(struct rtl8139_device* netcard)
     {
         uint32_t cr = read_register_byte(netcard, REG_COMMAND);
         if (cr & CR_BUFFER_IS_EMPTY) {
-            DEBUG_MSG("Rx-Puffer ist leer.\n");
+            DEBUG_MSG("Rx-Buffer is empty.\n");
             break;
         }
 
@@ -249,7 +250,7 @@ static void receive_ok_handler(struct rtl8139_device* netcard)
         buffer += 2;
 
         if ((packet_header & 1) == 0) {
-            DEBUG_MSG("Paketheader: Kein ROK.\n");
+            DEBUG_MSG("PacketHeader: No ROK.\n");
             break;
         }
 
@@ -339,7 +340,7 @@ static void rtl8139_handle_interrupt(struct cdi_device* device)
     if (pending) {
         uint32_t size = *((uint32_t*) pending);
         pending += sizeof(uint32_t);
-        DEBUG_MSG("Sende Paket aus der pending-Queue");
+        DEBUG_MSG("Send packet from pending queue");
         rtl8139_send_packet((struct cdi_net_device*) device, pending, size);
         free(pending - sizeof(uint32_t));
     }

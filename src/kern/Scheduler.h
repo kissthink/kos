@@ -49,7 +49,8 @@ public:
   Scheduler() : enableInterrupts(false) {}
   void kill();
   void preempt();
-  void sleep(mword t);
+  bool sleep(mword t);
+  bool cancelTimerEvent(Thread& t);
   void suspend(SpinLock& rl);
   void suspend();
   void start(Thread& t) {

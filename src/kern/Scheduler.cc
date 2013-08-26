@@ -74,6 +74,19 @@ void Scheduler::timerEvent(mword ticks) {
   }
 }
 
+bool Scheduler::cancelTimerEvent(Thread& t) {
+  ScopedLock<> sl(timerLock);
+  EmbeddedMultiset<Thread*,Thread::TimeoutCompare>::iterator i = timerQueue.begin();
+  while (i != timerQueue.end()) {
+    if ((*i) == &t) {
+      t.interrupted = true;
+      timerQueue.erase(i);
+      break;
+    }
+  }
+  return t.interrupted;
+}
+
 // TODO: clean up AS/Process when last thread is gone...
 void Scheduler::kill() {
   ScopedLock<> sl(lock);
@@ -89,11 +102,16 @@ void Scheduler::preempt() {
   schedule(true);
 }
 
-void Scheduler::sleep(mword t) {
+bool Scheduler::sleep(mword t) {
   timerLock.acquire();
   Processor::getCurrThread()->timeout = t;
+  Processor::getCurrThread()->interrupted = false;  // reset interrupted flag
   timerQueue.insert(Processor::getCurrThread());
   suspend(timerLock);
+  if (Processor::getCurrThread()->interrupted) {
+    return false; // sleep interrupted
+  }
+  return true;
 }
 
 void Scheduler::suspend() {

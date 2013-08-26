@@ -53,9 +53,13 @@ public:
   Semaphore(mword c = 0) : counter(c) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Semaphore)); }
   void P() {
-    ScopedLock<> sl(lock);
-    if likely(counter < 1) suspend();
-    else counter -= 1;
+    lock.acquire();
+    if likely(counter < 1) {
+      suspend();                           // releases lock, no re-acquire
+    } else {
+      counter -= 1;
+      lock.release();
+    }
   }
   bool tryP() {
     ScopedLock<> sl(lock);
@@ -64,13 +68,9 @@ public:
     return true;
   }
   void V() {
-    lock.acquire();
-    if likely(waiting()) {
-      resume(); // pass closed lock to thread waiting on V()
-    } else {
-      counter += 1;
-      lock.release();
-    }
+    ScopedLock<> sl(lock);
+    if likely(waiting()) resume();         // baton-passing through counter == 0
+    else counter += 1;
   }
 };
 
@@ -81,19 +81,19 @@ public:
   Mutex() : owner(nullptr) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Mutex)); }
   void acquire() {
-    ScopedLock<> sl(lock);
-    if (owner) suspend();
-    else owner = Processor::getCurrThread();
-  }
-  void release() {
     lock.acquire();
-    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
-    if likely(waiting()) {
-      owner = resume();
+    if (owner) {
+      suspend();                           // releases lock, no re-acquire
     } else {
-      owner = nullptr;
+      owner = Processor::getCurrThread();
       lock.release();
     }
+  }
+  void release() {
+    ScopedLock<> sl(lock);
+    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
+    if likely(waiting()) owner = resume(); // baton-passing through owner set
+    else owner = nullptr;
   }
 };
 

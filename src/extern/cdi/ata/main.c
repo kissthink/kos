@@ -56,7 +56,7 @@ int init_ata(int _argc, char* _argv[])
     argc = _argc;
     argv = _argv;
 
-    cdi_init();
+//    cdi_init();
 
     return 0;
 }
@@ -124,7 +124,8 @@ static int ata_driver_init(void)
     }
 
     // Primaeren Controller vorbereiten
-    controller = calloc(1, sizeof(*controller));
+//    controller = calloc(1, sizeof(*controller));
+    controller = malloc(sizeof(*controller));
     controller->port_cmd_base = ATA_PRIMARY_CMD_BASE;
     controller->port_ctl_base = ATA_PRIMARY_CTL_BASE;
     controller->port_bmr_base = busmaster_regbase;
@@ -136,7 +137,8 @@ static int ata_driver_init(void)
     cdi_list_push(controller_list, controller);
     
     // Sekundaeren Controller vorbereiten
-    controller = calloc(1, sizeof(*controller));
+//    controller = calloc(1, sizeof(*controller));
+    controller = malloc(sizeof(*controller));
     controller->port_cmd_base = ATA_SECONDARY_CMD_BASE;
     controller->port_ctl_base = ATA_SECONDARY_CTL_BASE;
     controller->port_bmr_base = busmaster_regbase;

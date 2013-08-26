@@ -8,7 +8,7 @@ class Bus : public Device {
   Bus& operator=(const Bus&) = delete;
 
 public:
-  Bus(const char* name) : Device(name) {}
+  Bus(const char* name) : Device(name, Device::Bus) {}
 };
 
 #endif /* _Bus_h_ */

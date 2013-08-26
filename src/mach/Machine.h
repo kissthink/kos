@@ -57,12 +57,13 @@ public:
   static void initAP2();                               // not in .boot.text!
   static void initBSP(mword magic, vaddr mbi, funcvoid_t) __section(".boot.text");
   static void initBSP2();                              // not in .boot.text!
-  static void staticEnableIRQ(mword irq, mword idtnum) __section(".boot.text");
+  static void staticEnableIRQ(mword irq, mword idtnum, bool low = false, bool level = false) __section(".boot.text");
 
   static mword now();
   static inline void rtcInterrupt(mword);
 
   friend void exceptionHandler(int, void (*)());
+  friend class IRQManager;
 };
 
 #endif /* _Machine_h_ */

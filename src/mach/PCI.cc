@@ -128,8 +128,20 @@ void PCI::checkDevice(uint8_t bus, uint8_t device, Bus* busObj) {
   uint16_t vendorID = VendorID.get( readConfigWord(bus, device, func, 0, 32) );
   if (vendorID == 0xffff) return;    // device doesn't exist
   uint16_t deviceID = DeviceID.get( readConfigWord(bus, device, func, 0, 32) );
+  uint16_t command = Command.get( readConfigWord(bus, device, func, 1, 32) );
+  uint16_t status = Status.get( readConfigWord(bus, device, func, 1, 32) );
+  uint32_t bar0 = readConfigWord(bus, device, func, 4, 32);
+  uint32_t bar1 = readConfigWord(bus, device, func, 5, 32);
+  uint8_t intLine = PCIGeneral::InterruptLine.get(readConfigWord(bus, device, func, 15, 32));
+  uint8_t intPin = PCIGeneral::InterruptPin.get(readConfigWord(bus, device, func, 15, 32));
+  DBG::outln(DBG::PCI, "bus: ", FmtHex(bus), " device: ", FmtHex(device), " func: ", FmtHex(func));
   DBG::outln(DBG::PCI, "VendorID: ", FmtHex(vendorID), " DeviceID: ", FmtHex(deviceID));
   DBG::outln(DBG::PCI, "Vendor: ", getVendorName(vendorID), " Device: ", getDeviceName(vendorID, deviceID));
+  DBG::outln(DBG::PCI, "Command: ", FmtHex(command), " Status: ", FmtHex(status));
+  DBG::outln(DBG::PCI, "BAR0: ", FmtHex(bar0));
+  DBG::outln(DBG::PCI, "BAR1: ", FmtHex(bar1));
+  DBG::outln(DBG::PCI, "Interrupt Line: ", FmtHex(intLine));
+  DBG::outln(DBG::PCI, "Interrupt Pin: ", FmtHex(intPin));
   Device* dev = new PCIDevice( bus, device, func, getDeviceName(vendorID, deviceID) );
   busObj->addChild(dev);
   dev->setParent(busObj);

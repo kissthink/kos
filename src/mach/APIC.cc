@@ -43,8 +43,8 @@ void IOAPIC::maskIRQ(uint8_t irq) volatile {
   write( IOREDTBL + irq * 2 + 1, val >> 32 );
 }
 
-void IOAPIC::mapIRQ(uint8_t irq, uint8_t intr, uint32_t apicID) volatile {
-  uint64_t val = Vector(intr) | DestinationID(apicID);
+void IOAPIC::mapIRQ(uint8_t irq, uint8_t intr, uint32_t apicID, bool low, bool level) volatile {
+  uint64_t val = Vector(intr) | DestinationID(apicID) | Polarity((low ? 1 : 0)) | TriggerMode((level ? 1 : 0));
   write( IOREDTBL + irq * 2, val & 0xFFFFFFFF );
   write( IOREDTBL + irq * 2 + 1, val >> 32 );
 }

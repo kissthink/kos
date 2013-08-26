@@ -36,13 +36,14 @@
 #include "cdi/io.h"
 #include "cdi/misc.h"
 #include "cdi/mem.h"
+#include "cdi/printf.h"
 
 #include "ne2k.h"
 #include "ethernet.h"
 
 //Hier koennen die Debug-Nachrichten aktiviert werden
 // #define DEBUG_MSG(s) printf("[ne2k] debug: %s() '%s'\n", __FUNCTION__, s)
-#define DEBUG_MSG(s)
+#define DEBUG_MSG(s)  CdiPrintf("[ne2k] debug: %s() '%s'\n", __FUNCTION__, s)
 
 static void ne2k_handle_interrupt(struct cdi_device* device);
 static void receive_ok_handler(struct ne2k_device* netcard);
@@ -101,7 +102,7 @@ struct cdi_device* ne2k_init_device(struct cdi_bus_data* bus_data)
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
 
     // PCI-bezogenes Zeug initialisieren
-    DEBUG_MSG("Interrupthandler und Ports registrieren");
+    DEBUG_MSG("Register interrupts and allocate I/O ports");
     cdi_register_irq(pci->irq, ne2k_handle_interrupt, &netcard->net.dev);
     cdi_pci_alloc_ioports(pci);
 
@@ -166,13 +167,14 @@ struct cdi_device* ne2k_init_device(struct cdi_bus_data* bus_data)
 
     // Clear pending interrupts, enable them all, and begin card operation
     write_register_byte(netcard, NE_ISR, 0xFF);
-    write_register_byte(netcard, NE_IMR, 0x3F);
+//    write_register_byte(netcard, NE_IMR, 0x3F);
+    write_register_byte(netcard, NE_IMR, 0x3D);
     write_register_byte(netcard, NE_CMD, 0x22);
 
     netcard->pending_sends = cdi_list_create();
 
     cdi_net_device_init(&netcard->net);
-    DEBUG_MSG("Fertig initialisiert");
+    DEBUG_MSG("Initialization Finished");
 
     return &netcard->net.dev;
 }
@@ -188,14 +190,14 @@ void ne2k_send_packet
 
     if (size > 0x700) {
         // Spezialfall - keine Lust
-        printf("ne2k: size ist boese\n");
+        printf("ne2k: size is evil\n");
         return;
     }
 
     if (!__sync_lock_test_and_set(&netcard->tx_in_progress, 1)) {
         netcard->tx_in_progress = 1;
     } else {
-        DEBUG_MSG("Tx-Buffer ist schon besetzt");
+        DEBUG_MSG("Tx-Buffer is already occupied");
 
         void* pending = malloc(size + sizeof(uint32_t));
         cdi_list_insert(netcard->pending_sends,
@@ -340,7 +342,7 @@ static void ne2k_handle_interrupt(struct cdi_device* device)
             write_register_byte(netcard, NE_IMR, 0x3F);
         }
         else {
-            DEBUG_MSG("ne2k: receive failed");
+            CdiPrintf("[ne2k]: receive failed [status=%x]\n", isr);
         }
     }
 

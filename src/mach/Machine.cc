@@ -32,6 +32,8 @@
 
 // drivers
 #include "mach/IOPortManager.h"
+#include "mach/IRQManager.h"
+#include "kern/Drivers.h"
 
 #include <atomic>
 #include <list>
@@ -90,10 +92,13 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
+extern void cdi_init();
+
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
+    Drivers::handleKey((char)keycode);
 #if KEYBOARD_RAW
     StdErr.out(' ', FmtHex(keycode));
 #else
@@ -252,7 +257,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   pit.init();
 
   // init IOPortManager
-  IOPortManager::init(0, 0xfff); // hope 1KB is enough
+  IOPortManager::init(0, 0x3ffff); // hope 64KB is enough
 
   // detect PCI controller
   PCI::sanityCheck();
@@ -260,6 +265,9 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   // find PCI devices
 //  PCI::probeAll();
   PCI::checkAllBuses();
+
+  // initialize CDI
+  cdi_init();
 
   // find additional devices ("current thread" faked for ACPI)
   parseACPI();
@@ -319,13 +327,13 @@ void Machine::initBSP2() {
   kernelScheduler.run(*t, keybLoop, nullptr);
 }
 
-void Machine::staticEnableIRQ( mword irqnum, mword idtnum ) {
+void Machine::staticEnableIRQ( mword irqnum, mword idtnum, bool low, bool level ) {
   KASSERT1(irqnum < PIC::Max, irqnum);
   irqnum = irqOverrideTable[irqnum].global;
   // TODO: handle irq override flags
   volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>( irqTable[irqnum].ioApicAddr, pagesize<1>(), AddressSpace::Data );
   DBG::outln(DBG::Basic, "IRQ: ", FmtHex(irqTable[irqnum].ioapicIrq), " -> ", FmtHex(idtnum) );
-  ioapic->mapIRQ( irqTable[irqnum].ioapicIrq, idtnum, bspApicID );
+  ioapic->mapIRQ( irqTable[irqnum].ioapicIrq, idtnum, bspApicID, low, level );
   kernelSpace.unmapPages<1>( (vaddr)ioapic, pagesize<1>() );
 }
 
@@ -417,7 +425,10 @@ extern "C" void isr_handler_0xff() {
 }
 
 extern "C" void isr_handler_gen(mword num) {
-  StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
+  bool handled = IRQManager::handleIRQ(num);
+  if (!handled) {
+    StdErr.outln("\nUNEXPECTED INTERRUPT: ", FmtHex(num), '/', FmtHex(CPU::readCR2()));
+  }
   Processor::sendEOI();
 //  Reboot();
 }

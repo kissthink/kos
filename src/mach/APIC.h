@@ -241,7 +241,7 @@ public:
   uint8_t getVersion() volatile;
   uint8_t getRedirects() volatile;
   void maskIRQ(uint8_t irq) volatile;
-  void mapIRQ(uint8_t irq, uint8_t intr, uint32_t apicID) volatile;
+  void mapIRQ(uint8_t irq, uint8_t intr, uint32_t apicID, bool low = false, bool level = false) volatile;
 } __packed;
 
 #endif /* APIC */

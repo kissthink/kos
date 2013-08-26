@@ -38,11 +38,12 @@ private:
   size_t stackSize;
   vaddr stackPointer;
   mword timeout;
+  bool interrupted;
   int priority;
 
   Thread(AddressSpace& as, vaddr sp, size_t s, const char* n = nullptr)
     : name(n), addressSpace(&as), stackSize(s), stackPointer(sp),
-      timeout(0), priority(0) {}
+      timeout(0), interrupted(false), priority(0) {}
   ~Thread() = delete;
 
   void destroy();

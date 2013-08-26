@@ -24,6 +24,8 @@
 #include "kern/Thread.h"
 #include "world/File.h"
 
+#include "kern/Drivers.h"
+
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;
 Scheduler kernelScheduler;
@@ -68,6 +70,8 @@ static void mainLoop(ptr_t) {
 
   Process p;
   p.execElfFile("testprogram2");
+
+  Drivers::runTest();    // shows options for testing
 
   // TODO: create processes and leave BSP thread waiting for events
   kernelScheduler.run( *Thread::create(kernelSpace, "TT"), timertest, nullptr);

@@ -26,6 +26,7 @@ public:
     Acpi = 0,
     Boot,
     Basic,
+    CDI,
     Libc,
     Devices,
     Error,

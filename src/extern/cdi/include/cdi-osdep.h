@@ -32,16 +32,19 @@ struct cdi_driver;
  * @param deps List of names of other drivers on which this driver depends
  * \endenglish
  */
-#define CDI_DRIVER(name, drvobj, deps...) /*\
-  static void entry() {\
-    (drvobj).drv.init();\
-    cdi_kos_walk_dev_list_init((struct cdi_driver*)&(drvobj));\
-  }\
-  static void exit() {\
-    cdi_kos_walk_dev_list_destroy((struct cdi_driver*)&(drvobj));\
-    (drvobj).drv.destroy();\
-  }\
-  MODULE_INFO(name, &entry, &exit, deps)*/
+#define cdi_glue(x, y) x ## y
+#define cdi_declare_driver(drv, counter) \
+  static const void* __attribute__((section("cdi_drivers"), used)) \
+      cdi_glue(__cdi_driver_, counter) = &drv;
+
+#define CDI_DRIVER(name, drv, deps...) cdi_declare_driver(drv, __COUNTER__)
+
+#if 0
+#define CDI_DRIVER(name, drvobj, deps...) \
+  static void entry() {(drvobj).drv.init(); cdi_kos_walk_dev_list_init((struct cdi_driver *)&(drvobj));} \
+  static void exit() {cdi_kos_walk_dev_list_destroy((struct cdi_driver *)&(drvobj)); (drvobj).drv.destroy();}
+  MODULE_INFO(name, &entry, &exit, "cdi" deps)
+#endif
 
 /**
  * \english

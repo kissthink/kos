@@ -1,6 +1,6 @@
 #include "mach/IOPortManager.h"
 
-BuddyMap<0,12,IOPortManager::BuddySet> IOPortManager::availablePortRange;
+BuddyMap<0,18,IOPortManager::BuddySet> IOPortManager::availablePortRange;
 SpinLock IOPortManager::lk;
 bool IOPortManager::initialized = false;
 

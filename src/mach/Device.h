@@ -9,6 +9,15 @@ class Device {
   Device(const Device&) = delete;
   Device& operator=(const Device&) = delete;
 
+public:
+  enum Type {
+    Generic,
+    Root,
+    Bus,
+    PCI
+  };
+
+private:
   list<IOPort*,KernelAllocator<IOPort*>> ioPorts;
   list<IOMemory*,KernelAllocator<IOMemory*>> ioMemoryRegions;
   list<Device*,KernelAllocator<Device*>> children;
@@ -17,10 +26,13 @@ class Device {
   kstring devName;    // device name
   uint8_t irqNum;     // IRQ number
   static Device root; // root device
+  Type type;
 
   void release();   // destroy all I/O regions
+
 public:
-  Device(const char* name) : devName(name) {}
+  Device(const char* name) : devName(name), type(Generic) {}
+  Device(const char* name, Type type) : devName(name), type(type) {}
   virtual ~Device() { release(); }
   static Device* getRoot() {
     return &root;
@@ -48,7 +60,7 @@ public:
     auto it = children.begin();
     for ( ; it != children.end(); ++it) {
       if (i == n) return *it;
-      ++i, ++it;
+      ++i;
     }
     return nullptr;
   }
@@ -60,7 +72,7 @@ public:
         children.erase(it);
         break;
       }
-      ++i, ++it;
+      ++i;
     }
   }
   void removeChild(Device* d) {
@@ -71,8 +83,14 @@ public:
         children.erase(it);
         break;
       }
-      ++i, ++it;
+      ++i;
     }
+  }
+  size_t getNumChildren() const {
+    return children.size();
+  }
+  Type getType() const {
+    return type;
   }
 };
 

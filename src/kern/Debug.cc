@@ -22,6 +22,7 @@ static const char* options[] = {
   "acpi",
   "boot",
   "basic",
+  "cdi",
   "libc",
   "devices",
   "error",

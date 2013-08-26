@@ -24,6 +24,7 @@ extern "C" {
 #include "kern/AddressSpace.h"
 #include "kern/Kernel.h"
 #include "ipc/BlockingSync.h"
+#include "mach/IRQManager.h"
 
 #include <map>
 
@@ -95,6 +96,8 @@ laddr Machine::initACPI(vaddr r) {
   map<uint32_t,IrqInfo,less<uint32_t>,KernelAllocator<pair<uint32_t,IrqInfo>>> irqMap;
   map<uint32_t,IrqOverrideInfo,less<uint32_t>,KernelAllocator<pair<uint32_t,IrqOverrideInfo>>> irqOverrideMap;
 
+  uint8_t numIRQ = 0;
+
   // walk through subtables and gather information in dynamic maps
   acpi_subtable_header* subtable = (acpi_subtable_header*)(madt + 1);
   while (madtLength > 0) {
@@ -110,6 +113,7 @@ laddr Machine::initACPI(vaddr r) {
       volatile IOAPIC* ioapic = (IOAPIC*)kernelSpace.mapPages<1>(laddr(io->Address), pagesize<1>(), AddressSpace::Data );
       // get number of redirect entries, adjust irqCount
       uint8_t rdr = ioapic->getRedirects() + 1;
+      numIRQ += rdr;
       if ( io->GlobalIrqBase + rdr > irqCount ) irqCount = io->GlobalIrqBase + rdr;
       // mask all interrupts and store irq/ioapic information
       for (uint8_t x = 0; x < rdr; x += 1 ) {
@@ -182,6 +186,9 @@ laddr Machine::initACPI(vaddr r) {
     irqOverrideTable[i.first] = i.second;
   }
 
+  // initialize IRQManager
+  IRQManager::init(numIRQ);
+
   return apicPhysAddr;
 }
 
@@ -197,8 +204,85 @@ static ACPI_STATUS display(ACPI_HANDLE handle, UINT32 level, void* ctx, void** r
   KASSERT1( status == AE_OK, status );
   status = AcpiGetObjectInfo(handle, &info);
   KASSERT1( status == AE_OK, status );
-//  AcpiOsPrintf("%.4s HID: %s, ADR: %.8X, Status: %x\n", (char*)&info->Name,
-//    info->HardwareId.String, info->Address, info->CurrentStatus);
+  AcpiOsPrintf("Path: %s\n", (char *)path.Pointer);
+  AcpiOsPrintf("%.4s HID: %s, ADR: %.8X, Status: %x\n", (char*)&info->Name,
+    info->HardwareId.String, info->Address, info->CurrentStatus);
+  return AE_OK;
+}
+
+map<unsigned long,int,less<unsigned long>,KernelAllocator<pair<unsigned long,int>>> pciIrqMap;
+
+static ACPI_STATUS displayResource(ACPI_RESOURCE* resource, void* ctx) {
+  if (resource->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
+    ACPI_RESOURCE_EXTENDED_IRQ* r = &resource->Data.ExtendedIrq;
+    AcpiOsPrintf("ProducerConsumer %x Triggering %x Polarity %x Sharable %x WakeCapable %x InterruptCount %x Index %d StringLength %d String %s\n",
+        r->ProducerConsumer, r->Triggering, r->Polarity, r->Sharable, r->WakeCapable, r->InterruptCount, r->ResourceSource.Index,
+        r->ResourceSource.StringLength, r->ResourceSource.StringPtr);
+    for (int i = 0; i < r->InterruptCount; i++) {
+      AcpiOsPrintf("Interrupts[%d] = %x\n", i, r->Interrupts[i]);
+    }
+  }
+//  KASSERT1( resource->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ || resource->Type == ACPI_RESOURCE_TYPE_END_TAG, resource->Type );
+  return AE_OK;
+}
+
+static ACPI_STATUS getPCIDevices(ACPI_HANDLE handle, UINT32 level, void* ctx, void** retval) {
+  ACPI_STATUS status;
+  ACPI_DEVICE_INFO* info;
+
+  status = AcpiGetObjectInfo(handle, &info);
+  KASSERT1( status == AE_OK, status );
+  AcpiOsPrintf("%.4s HID: %s, ADR: %.8X, Status: %x\n", (char*)&info->Name,
+    info->HardwareId.String, info->Address, info->CurrentStatus);
+  if (info->Flags == ACPI_PCI_ROOT_BRIDGE) {  // only run this for each PCI bridge
+#if 0
+    // try walking resources on root
+    status = AcpiWalkResources( handle, "_CRS", displayResource, NULL );
+    KASSERT1( status == AE_OK, status );
+#endif
+    ACPI_BUFFER buffer;
+    buffer.Length = ACPI_ALLOCATE_BUFFER;
+    buffer.Pointer = nullptr;
+    status = AcpiGetIrqRoutingTable( handle, &buffer ); // get required length
+    KASSERT1( status == AE_OK, status );
+    ACPI_PCI_ROUTING_TABLE* routingTable = (ACPI_PCI_ROUTING_TABLE *) buffer.Pointer;
+    while ( routingTable->Length != 0 ) {
+      AcpiOsPrintf("PCI IRQ routing: %.8X -> %x\n", routingTable->Address, routingTable->Pin);
+      AcpiOsPrintf("Source: %s Index: %d\n", (char *) routingTable->Source, routingTable->SourceIndex);
+#if 0
+      ACPI_HANDLE resourceHandle;
+      status = AcpiGetHandle( NULL, (ACPI_STRING) routingTable->Source, &resourceHandle );
+      KASSERT1( status == AE_OK, status );
+      status = AcpiWalkResources( resourceHandle, "_CRS", displayResource, NULL );
+      KASSERT1( status == AE_OK, status );
+#endif
+#if 0
+      // Get handle for resource
+      ACPI_HANDLE resourceHandle;
+      status = AcpiGetHandle( NULL, (ACPI_STRING)routingTable->Source, &resourceHandle );
+      KASSERT1( status == AE_OK, status );
+      ACPI_BUFFER buffer2;
+      buffer2.Length = ACPI_ALLOCATE_BUFFER;
+      buffer2.Pointer = nullptr;
+      status = AcpiGetCurrentResources( resourceHandle, &buffer2 );
+      KASSERT1( status == AE_OK, status );
+      ACPI_RESOURCE* resourceEntry = (ACPI_RESOURCE *) buffer2.Pointer;
+      while ( resourceEntry->Type != ACPI_RESOURCE_TYPE_END_TAG ) {
+        KASSERT1( resourceEntry->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ, resourceEntry->Type );
+        ACPI_RESOURCE_EXTENDED_IRQ& irqEntry = resourceEntry->Data.ExtendedIrq;
+        AcpiOsPrintf("Triggering: %d Polarity: %d Sharable: %d InterruptCount: %d\n", irqEntry.Triggering, irqEntry.Polarity, irqEntry.Sharable,
+            irqEntry.InterruptCount);
+        for (int i = 0; i < irqEntry.InterruptCount; i++) {
+          AcpiOsPrintf("IRQ %d ResourceSource: %s\n", irqEntry.Interrupts[i], irqEntry.ResourceSource.StringPtr);
+        }
+        resourceEntry = (ACPI_RESOURCE *)((char *) resourceEntry + resourceEntry->Length);
+      }
+#endif
+      pciIrqMap[routingTable->Address] = routingTable->Pin;
+      routingTable = (ACPI_PCI_ROUTING_TABLE *)((char *)routingTable + routingTable->Length);
+    }
+    delete [] (char *)buffer.Pointer;
+  }
   return AE_OK;
 }
 
@@ -222,7 +306,12 @@ void Machine::parseACPI() {
   status = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
   KASSERT1( status == AE_OK, status );
 
+#if 0
   status = AcpiWalkNamespace(ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX, display, NULL, NULL, NULL);
+  KASSERT1( status == AE_OK, status );
+#endif
+
+  status = AcpiGetDevices( NULL, getPCIDevices, NULL, NULL );
   KASSERT1( status == AE_OK, status );
 
   // TODO: in principle, the ACPI subsystem keeps running...
