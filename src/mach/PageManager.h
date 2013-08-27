@@ -216,8 +216,10 @@ protected:
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, "unmapping ", FmtHex(vma), '/', FmtHex(pagesize<N>()), ": ", pe);
     KASSERT1( pe->P, FmtHex(vma) );
-    pe->P = 0;
-    mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before recursion
+//    pe->P = 0;
+//    if (N > 1) pe->PS = 0;                  // clear potential PS bit as well
+    mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before reset & recursion
+    pe->c = 0;
     if (levels > 0) unmaprecursive<N>(vma, fm, levels - 1);
     else CPU::invTLB(vma);
     return ret;
