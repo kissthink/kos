@@ -98,12 +98,12 @@ extern void cdi_init();
 static void keybLoop(ptr_t) {
   for (;;) {
     Keyboard::KeyCode keycode = (keyboard.read());
-    Drivers::handleKey((char)keycode);
 #if KEYBOARD_RAW
     StdErr.out(' ', FmtHex(keycode));
 #else
     if (keycode > 0 && keycode < 0x80) StdErr.out((char)keycode);
 #endif
+    Drivers::handleKey(keyboard, (char)keycode);
   }
 }
 

@@ -100,22 +100,22 @@ const BitSeg<uint32_t,16,16> PCI::PCItoCardBusBridge::BridgeControl;
 const BitSeg<uint32_t, 0,16> PCI::PCItoCardBusBridge::SubDeviceID;
 const BitSeg<uint32_t,16,16> PCI::PCItoCardBusBridge::SubVendorID;
 
-static const char* getVendorName(uint16_t vendorID) {
+const char* PCI::getVendorName(uint16_t vendorID) {
   for (unsigned int i = 0; i < PCI_VENTABLE_LEN; i++) {
     if (PCIVendorTable[i].VendorId == vendorID) {
       return PCIVendorTable[i].VendorFull;
     }
   }
-  return "";
+  return "Unknown vendor";
 }
 
-static const char* getDeviceName(uint16_t vendorID, uint16_t deviceID) {
+const char* PCI::getDeviceName(uint16_t vendorID, uint16_t deviceID) {
   for (unsigned int i = 0; i < PCI_DEVTABLE_LEN; i++) {
     if (PCIDeviceTable[i].VendorId == vendorID && PCIDeviceTable[i].DeviceId == deviceID) {
       return PCIDeviceTable[i].ChipDesc;
     }
   }
-  return "";
+  return "Unknown device";
 }
 
 /**

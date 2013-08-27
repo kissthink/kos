@@ -2,6 +2,7 @@
 #define _Drivers_h_ 1
 
 #include "ipc/BlockingSync.h"
+#include "dev/Keyboard.h"
 
 class Drivers {
   Drivers() = delete;
@@ -12,7 +13,7 @@ class Drivers {
   static Semaphore waitForKey;
   static bool running;
 public:
-  static void handleKey(char key);
+  static void handleKey(Keyboard& keyboard, char key);
   static void runTest();
 };
 

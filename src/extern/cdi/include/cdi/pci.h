@@ -324,6 +324,13 @@ void cdi_pci_config_writew(struct cdi_pci_device* device, uint8_t offset,
 void cdi_pci_config_writel(struct cdi_pci_device* device, uint8_t offset,
     uint32_t value);
 
+/**
+ * Get device name for the PCI device
+ *
+ * @param device the PCI device
+ */
+const char* cdi_pci_get_device_name(struct cdi_pci_device* device);
+
 #ifdef __cplusplus
 }; // extern "C"
 #endif

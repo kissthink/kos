@@ -1,5 +1,6 @@
 #include "cdi.h"
 #include "cdi/pci.h"
+#include "cdi/printf.h"
 
 // KOS
 #include "mach/Device.h"
@@ -7,109 +8,91 @@
 
 static cdi_list_t drivers = nullptr;
 
-extern struct cdi_driver* __start_cdi_drivers;
-extern struct cdi_driver* __stop_cdi_drivers;
+// drivers are placed in different sections between these pointers
+extern struct cdi_driver* __start_cdi_drivers;  // first driver
+extern struct cdi_driver* __stop_cdi_drivers;   // 1 past last driver
 
-static void cdi_run_drivers();
-static void cdi_init_pci_devices();
+static void cdi_run_drivers();        // match device/driver pairs
+static void cdi_init_pci_devices();   // PCI devices are detected
 
 void cdi_init() {
-  drivers = cdi_list_create();
+  drivers = cdi_list_create();          // create drivers list
 
-  // initialize and register all of active drivers
+  // drivers initialization
   cdi_driver** pdrv;
   cdi_driver* drv;
   pdrv = &__start_cdi_drivers;
-  while (pdrv < &__stop_cdi_drivers) {
+  while (pdrv < &__stop_cdi_drivers) {  // initialize and register drivers
     drv = *pdrv;
     if (drv->init != nullptr) {
       drv->init();
-      cdi_driver_register(drv);
+      cdi_driver_register(drv);         // insert to drivers list
     }
     pdrv += 1;
   }
-
-  // run all drivers
-  cdi_run_drivers();
+  cdi_run_drivers();                    // match device/driver pairs
 }
 
 void cdi_driver_init(cdi_driver* driver) {
-  driver->devices = cdi_list_create();
+  driver->devices = cdi_list_create();  // create device list for the driver
 }
 
 void cdi_driver_destroy(cdi_driver* driver) {
-  cdi_list_destroy(driver->devices);
+  cdi_list_destroy(driver->devices);    // delete device list of the driver
 }
 
 void cdi_driver_register(cdi_driver* driver) {
-  cdi_list_push(drivers, driver);
+  cdi_list_push(drivers, driver);       // insert to global drivers list
 }
 
 static void cdi_run_drivers() {
-  // initialize PCI devices
-  cdi_init_pci_devices();
-
+  cdi_init_pci_devices();         // detect PCI devices and assign drivers
   cdi_driver* driver;
   cdi_device* device;
   for (int i = 0; (driver = (cdi_driver *)cdi_list_get(drivers, i)); i++) {
     for (int j = 0; (device = (cdi_device *)cdi_list_get(driver->devices, j)); j++) {
-      device->driver = driver;
-      // TODO init net device
+      if (device->driver) {
+        CdiPrintf("Device %s already has a driver %s assigned\n", device->name, driver->name);
+      }
+      device->driver = driver;    // match best driver for each device  (including non-PCI)
+      CdiPrintf("Device %s -> Driver %s\n", device->name, driver->name);
     }
-    // register service
   }
 }
-
-#if 0
-int cdi_provide_device(cdi_bus_data* device) {
-  switch (device->bus_type) {
-    cdi_pci_device* pci = reinterpret_cast<cdi_pci_device*>(device);
-    if (pci->meta.initialized)  // already created
-      return -1;
-
-    // setup PCI device
-    Device* device = new PCIDevice(pci->bus, pci->dev, pci_function,
-        pci->vendor_id, pci->device_id,
-        pci->class_id, pci->subclass_id, pci->interface_id,
-        pci->rev_id, pci->irq);
-
-    // set up I/O resources
-    cdi_pci_resource* res = 0;
-#endif
 
 static void cdi_init_pci_devices() {
   cdi_driver* driver;
   cdi_device* device;
   cdi_pci_device* pci;
 
-  cdi_list_t pci_devices = cdi_list_create();
-  cdi_pci_get_all_devices(pci_devices);
+  cdi_list_t pci_devices = cdi_list_create();   // will store pci devices here
+  cdi_pci_get_all_devices(pci_devices);         // populate the list with detected PCI devices
 
   for (int i = 0; (pci = (cdi_pci_device *)cdi_list_get(pci_devices, i)); i++) {
-    // Enable I/O ports, MMIO and Bus-mastering
+    // turn on I/O ports, MMIO, and bus mastering
     uint32_t val = PCI::readConfigWord(pci->bus, pci->dev, pci->function, 1, 32);
     PCI::writeConfigWord(pci->bus, pci->dev, pci->function, 1, 32, val | 0x7);
 
+    // match best driver for each PCI device
     device = nullptr;
     for (int j = 0; (driver = (cdi_driver *)cdi_list_get(drivers, j)); j++) {
       if (driver->bus == CDI_PCI && driver->init_device) {
-        device = driver->init_device(&pci->bus_data);
+        device = driver->init_device(&pci->bus_data); // call device initialization code
         if (device) {
-          device->driver = driver;
+          device->driver = driver;  // found a match, assign driver to the device
           break;
         }
       }
     }
 
+    // PCI device has a suitable driver
     if (device != nullptr) {
-      cdi_list_push(driver->devices, device);
-      DBG::outln(DBG::CDI, "CDI: ", FmtHex(pci->bus), '.',
-          FmtHex(pci->dev), '.', FmtHex(pci->function), ": ",
-          driver->name);
+      cdi_list_push(driver->devices, device);   // insert to devices list of the driver
+      CdiPrintf("PCI device %4d:%4d:%4d - %s found!\n", pci->bus, pci->dev, pci->function, device->name);
     } else {
       cdi_pci_device_destroy(pci);
     }
   }
 
-  cdi_list_destroy(pci_devices);
+  cdi_list_destroy(pci_devices);    // delete pci device list
 }

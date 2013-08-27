@@ -157,7 +157,8 @@ public:
   static void checkBus(uint8_t bus);
   static void checkFunction(uint8_t bus, uint8_t device, uint8_t function);
   static void checkAllBuses();
-
+  static const char* getVendorName(uint16_t vendorID);
+  static const char* getDeviceName(uint16_t vendorID, uint16_t deviceID);
 };
 
 #endif /* _PCI_h_ */

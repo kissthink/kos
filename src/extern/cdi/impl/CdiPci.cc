@@ -6,6 +6,7 @@
 #include "mach/IOPortManager.h"
 #include "mach/IOMemory.h"
 #include "mach/IOMemoryManager.h"
+#include "mach/PCI.h"
 #include "mach/PCIDevice.h"
 
 static void add_child_devices(cdi_list_t list, Device* dev) {
@@ -125,4 +126,8 @@ void cdi_pci_free_memory(cdi_pci_device* device) {
       res->address = 0;
     }
   }
+}
+
+const char* cdi_pci_get_device_name(cdi_pci_device* device) {
+  return PCI::getDeviceName(device->vendor_id, device->device_id);
 }

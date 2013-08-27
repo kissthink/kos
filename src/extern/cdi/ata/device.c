@@ -295,7 +295,7 @@ void ata_init_controller(struct ata_controller* controller)
                 asprintf((char**) &(dev->dev.storage.dev.name), "ata%01d%01d",
                     (uint32_t) controller->id, i);
 #endif
-                sprintf((char **) &(dev->dev.storage.dev.name), "ata%01d%01d",
+                sprintf((char *) dev->dev.storage.dev.name, "ata%01d%01d",
                     (uint32_t) controller->id, i);
 
                 // Geraet registrieren
@@ -309,7 +309,7 @@ void ata_init_controller(struct ata_controller* controller)
                 asprintf((char**) &(dev->dev.scsi.dev.name),"atapi%01d%01d",
                     (uint32_t) controller->id, i);
 #endif
-                sprintf((char **) &(dev->dev.scsi.dev.name), "atapi%01d%01d",
+                sprintf((char *) dev->dev.scsi.dev.name, "atapi%01d%01d",
                     (uint32_t) controller->id, i);
             
                 // Geraet registrieren

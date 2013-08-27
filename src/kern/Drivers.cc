@@ -2,6 +2,7 @@
 #include "kern/Drivers.h"
 #include "kern/Debug.h"
 #include "util/Output.h"
+#include "dev/Keyboard.h"
 
 Semaphore Drivers::waitForKey;
 bool Drivers::running = false;
@@ -21,19 +22,36 @@ struct cdi_storage_device;
 extern int cdi_storage_read(cdi_storage_device* device, uint64_t pos, size_t size, ptr_t dest);
 extern int cdi_storage_write(cdi_storage_device* device, uint64_t pos, size_t size, ptr_t src);
 
-void Drivers::handleKey(char key) {
+static Keyboard::KeyCode getNextKey(Keyboard& keyboard) {
+  Keyboard::KeyCode key = keyboard.read();
+  StdErr.out((char) key);
+  return key;
+}
+
+void Drivers::handleKey(Keyboard& keyboard, char key) {
   if (!running) return;
+  char buf[256] = { 0 };  // assuming 256 bytes is enough for testing
+  Keyboard::KeyCode nextKey;
   switch (key) {
-    case '1':
-      cdi_net_send(0, (ptr_t)"hello world!", 13);
-      break;
+    case '1': {
+      int i = 0;
+      while ((nextKey = getNextKey(keyboard)) != 0x0d && i < 255) {
+        buf[i++] = (char) nextKey;
+      }
+      cdi_net_send(0, (ptr_t) buf, i);
+    } break;
     case '2': {
-      int res = cdi_storage_write(0, 0, 13, (ptr_t)"hello world!");
+      int i = 0;
+      memset(buf, 0, 256);
+      while ((nextKey = getNextKey(keyboard)) != 0x0d && i < 255) {
+        buf[i++] = (char) nextKey;
+      }
+      int res = cdi_storage_write(0, 0, 256, (ptr_t) buf);
       DBG::outln(DBG::Basic, "write ", (res == 0 ? "success" : "failed"));
     } break;
     case '3': {
-      char buf[256] = { 0 };
-      int res = cdi_storage_read(0, 0, 13, &buf);
+      memset(buf, 0, 256);
+      int res = cdi_storage_read(0, 0, 256, &buf);
       DBG::outln(DBG::Basic, "read ", (res == 0 ? "success" : "failed"));
       StdOut.outln(buf);
     } break;

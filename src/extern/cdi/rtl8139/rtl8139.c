@@ -42,7 +42,6 @@
 #include "ethernet.h"
 
 //Hier koennen die Debug-Nachrichten aktiviert werden
-//#define DEBUG_MSG(s) printf("[RTL8139] debug: %s() '%s'\n", __FUNCTION__, s)
 #define DEBUG_MSG(s) CdiPrintf("[RTL8139] debug: %s() '%s'\n", __FUNCTION__, s)
 
 static void rtl8139_handle_interrupt(struct cdi_device* device);
@@ -98,6 +97,7 @@ struct cdi_device* rtl8139_init_device(struct cdi_bus_data* bus_data)
 
     netcard->phys = buf->paddr.items[0].start;
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
+    netcard->net.dev.name = cdi_pci_get_device_name(pci);
 
     // PCI-bezogenes Zeug initialisieren
     DEBUG_MSG("Register Interrupts and I/O ports");
