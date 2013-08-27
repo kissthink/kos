@@ -96,12 +96,6 @@ void Scheduler::sleep(mword t) {
   suspend(timerLock);
 }
 
-void Scheduler::suspend() {
-  lock.acquire();
-  schedule();
-  lock.release(enableInterrupts);
-}
-
 void Scheduler::suspend(SpinLock& rl) {
   lock.acquire();
   rl.release();

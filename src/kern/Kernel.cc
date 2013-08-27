@@ -23,6 +23,7 @@
 #include "kern/Scheduler.h"
 #include "kern/Thread.h"
 #include "world/File.h"
+#include "test/LockTest.h"
 
 AddressSpace kernelSpace(AddressSpace::Kernel);
 KernelHeap kernelHeap;
@@ -65,6 +66,9 @@ static void mainLoop(ptr_t) {
     StdOut.out(c);
     StdDbg.out(c);
   }
+
+//  MutexTest();
+//  SemaphoreTest();
 
   Process p;
   p.execElfFile("testprogram2");

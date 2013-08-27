@@ -38,6 +38,8 @@ class Processor {
   volatile mword lockCount;
   GdbCpu*        gdbCpu;
 
+  static mword cpuCount;
+
   static const unsigned int nullSelector     = 0; // invalid null selector
   static const unsigned int kernCodeSelector = 1; // 1nd descriptor by convention?
   static const unsigned int kernDataSelector = 2; // 2nd descriptor by convention?
@@ -83,6 +85,7 @@ class Processor {
   }
 
 public:
+  static mword getCpuCount() { return cpuCount; }
   mword rApicID() {
     return apicID;
   }

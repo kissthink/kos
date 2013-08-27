@@ -51,7 +51,6 @@ public:
   void preempt();
   void sleep(mword t);
   void suspend(SpinLock& rl);
-  void suspend();
   void start(Thread& t) {
     ScopedLock<> sl(lock);
     ready(t);

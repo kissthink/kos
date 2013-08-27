@@ -21,6 +21,8 @@
 #include "kern/Thread.h"
 #include "kern/Debug.h"
 
+mword Processor::cpuCount = 0;
+
 void Processor::checkCapabilities(bool print) {
   KASSERT0(__atomic_always_lock_free(sizeof(mword),0));
   KASSERT0(RFlags::hasCPUID()); if (print) DBG::out(DBG::Basic, " CPUID");
