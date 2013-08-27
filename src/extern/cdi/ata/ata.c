@@ -37,14 +37,14 @@
 #include "device.h"
 
 /**
- * ATA-Geraet identifizieren
+ * ATA-Device identification
  *
- * @return 0 Wenn das Geraet erfolgreich identifiziert wurde, != 0 sonst
+ * @return 0 when the unit has been successfully identified, != 0 otherwise
  */
 int ata_drv_identify(struct ata_device* dev)
 {
     struct ata_identfiy_data id;
-    // Request vorbereiten
+    // prepare request
     struct ata_request request = {
         .dev = dev,
 
@@ -52,7 +52,7 @@ int ata_drv_identify(struct ata_device* dev)
         .flags.poll = 1,
         .flags.lba = 0,
 
-        // Die Identifikationsdaten werden ueber PIO DATA IN gelesen
+        // identification data is read over PIO DATA IN
         .protocol = PIO,
         .registers.ata.command = IDENTIFY_DEVICE,
         .block_count = 1,
@@ -62,14 +62,14 @@ int ata_drv_identify(struct ata_device* dev)
         .error = 0
     };
     
-    // Request starten
+    // Request start
     if (!ata_request(&request)) {
-        // Wenn ein Fehler aufgetreten ist, koennen wir es noch mit einem
-        // IDENTIFY PACKET DEVICE probieren.
+        // if an error has occurred, we can still try it with a
+        // IDENTIFY PACKET device
         return atapi_drv_identify(dev);
     }
     
-    // Pruefen, welche LBA-Modi dabei sind
+    // check LBA mode
     if (id.features_support.bits.lba48) {
         dev->lba48 = 1;
         dev->dev.storage.block_count = id.max_lba48_address;
@@ -79,61 +79,57 @@ int ata_drv_identify(struct ata_device* dev)
         dev->dev.storage.block_count = id.lba_sector_count;
     }
 
-    // Pruefen ob DMA unterstuetzt wird
+    // check if DMA supported
     if (id.capabilities.dma) {
         dev->dma = 1;
     }
 
-    // Wenn keiner der LBA-Modi unterstuetzt wird, muss abgebrochen werden, da
-    // CHS noch nicht implementiert ist.
+    // if none of the LBA mode is supported, must be canceled because
+    // CHS is not yet implemented
     if (!dev->lba48 && !dev->lba28) {
-        DEBUG("Geraet unterstuetzt nur CHS.\n");
+        DEBUG_ATA("Device supports CHS only.\n");
         return 0;
     }
 
-    // Ein ATA-Geraet
+    // an ata device
     dev->atapi = 0;
-
-
 
     return 1;
 }
 
 /**
- * Sektoren von einem ATA-Geraet lesen oder darauf schreiben
+ * RW sectors from a ATA device
  *
- * @param direction 0 fuer lesen, 1 fuer schreiben
- * @param start LBA des Startsektors
- * @param count Anzahl der Sektoren
- * @param buffer Pointer auf den Puffer in dem die Daten abgelegt werden
- * sollen, respektiv aus dem sie gelesen werden sollen.
+ * @param direction 0 for read, 1 for write
+ * @param start LBA of the starting sector
+ * @param count number of sectors
+ * @param buffer Pointer to buffer into which the data is to be stored, respective
+ * from which they are to be read.
  *
- * @return 1 wenn die Blocks erfolgreich gelesen/geschrieben wurden, 0 sonst
+ * @return 1 when the blocks were successfully read/written, 0 otherwise
  */
 static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
     uint64_t start, size_t count, void* buffer)
 {
     int result = 1;
     struct ata_request request;
-    // Da nicht mehr als 256 Sektoren auf einmal gelesen/geschrieben werden
-    // koennen, muss unter Umstaenden mehrmals gelesen/geschrieben werden.
+    // since not more than 256 sectors can be read at once or written, keep
+    // current count
     uint16_t current_count;
     void* current_buffer = buffer;
     uint64_t lba = start;
     int max_count;
     int again = 2;
-    // Anzahl der Sektoren die noch uebrig sind
+    // number of sectors that are remained
     size_t count_left = count;
 
-
-
-    // Request vorbereiten
+    // prepare request
     request.dev = dev;
     request.flags.poll = 0;
     request.flags.ata = 0;
     request.flags.lba = 1;
 
-    // Richtung festlegen
+    // determine the direction
     if (direction == 0) {
         request.flags.direction = READ;
     } else {
@@ -160,24 +156,26 @@ static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
         }
         request.protocol = PIO;
 
-        // Mit PIO pollen wir lieber, da IRQs dort _wirklich langsam_ sind
+        // prefer PIO poll since IRQs are limited??? (can't translate)
         request.flags.poll = 1;
     }
 
-    // Solange wie noch Sektoren uebrig sind, wird gelesen
+    // as long as sectors to be read remains
     while (count_left > 0) {
-        // Entscheiden wieviele Sektoren im aktuellen Durchlauf gelesen werden
+        // decide how many sectors are read in the current pass
         if (count_left > max_count) {
             current_count = max_count;
         } else {
             current_count = count_left;
         }
         
-
         // Achtung: Beim casten nach uint8_t wird bei 256 Sektoren eine 0.
         // Das macht aber nichts, da in der Spezifikation festgelegt ist,
         // dass 256 Sektoren gelesen werden sollen, wenn im count-Register
         // 0 steht.
+        // Caution: when cast by a uint8_t is at 256 sectors 0.
+        // But that doest not matter because is defined in the specification, that 256
+        // sectors are to be read when standing in the count register 0.
         request.registers.ata.count = (uint8_t) current_count;
         request.registers.ata.lba = lba;
 
@@ -191,7 +189,7 @@ static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
         // TODO: LBA48
         // TODO: CHS
         
-        // Request ausfuehren
+        // execute request
         if (!ata_request(&request)) {
             if (again) {
                 again--;
@@ -201,7 +199,7 @@ static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
             break;
         }
 
-        // Pufferpointer und Anzahl der uebrigen Blocks anpassen
+        // adjust buffer pointer an number of other blocks
         current_buffer += current_count * ATA_SECTOR_SIZE;
         count_left -= current_count;
         lba += current_count;
@@ -213,13 +211,13 @@ static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
 
 
 /**
- * Sektoren von einem ATA-Geraet lesen
+ * Read sectors from a ATA device
  *
- * @param start LBA des Startsektors
- * @param count Anzahl der Sektoren
- * @param buffer Pointer auf den Puffer in dem die Daten abgelegt werden sollen
+ * @param start LBA of the starting sector
+ * @param count number of sectors
+ * @param buffer pointer to the buffer into which the data will be stored
  *
- * @return 1 wenn die Blocks erfolgreich gelesen wurden, 0 sonst
+ * @return 1 if the block has been read successfully, 0 otherwise
  */
 int ata_drv_read_sectors(struct ata_device* dev, uint64_t start, size_t count,
     void* buffer)
@@ -228,13 +226,13 @@ int ata_drv_read_sectors(struct ata_device* dev, uint64_t start, size_t count,
 }
 
 /**
- * Sektoren auf eine ATA-Geraet schreiben
+ * Write sectors to a ATA device
  *
- * @param start LBA des Startsektors
- * @param count Anzahl der Sektoren
- * @param buffer Pointer auf den Puffer aus dem die Daten gelesen werden sollen
+ * @param start LBA of the starting sector
+ * @param count number of sectors
+ * @param buffer Pointer to the buffer from which the data are to be read
  *
- * @return 1 wenn die Blocks erfolgreich geschrieben wurden, 0 sonst
+ * @return 1 when the blocks were successfully written, 0 otherwise.
  */
 int ata_drv_write_sectors(struct ata_device* dev, uint64_t start, size_t count,
     void* buffer)

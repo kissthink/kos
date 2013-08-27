@@ -39,15 +39,15 @@
 
 
 /**
- * ATAPI-Geraet identifizieren
+ * ATAPI-device identification
  *
- * @return 0 Wenn das Geraet erfolgreich identifiziert wurde, != 0 sonst
+ * @return !=0 if unit has been successfully identified, 0 otherwise
  */
 int atapi_drv_identify(struct ata_device* dev)
 {
     struct ata_identfiy_data id;
 
-    // Request vorbereiten
+    // prepare request
     struct ata_request request = {
         .dev = dev,
 
@@ -55,7 +55,7 @@ int atapi_drv_identify(struct ata_device* dev)
         .flags.poll = 1,
         .flags.lba = 0,
 
-        // Die Identifikationsdaten werden ueber PIO DATA IN gelesen
+        // the identification data is read over PIO DATA IN
         .protocol = PIO,
         .registers.ata.command = IDENTIFY_PACKET_DEVICE,
         .block_count = 1,
@@ -65,13 +65,13 @@ int atapi_drv_identify(struct ata_device* dev)
         .error = 0
     };
     
-    // Request starten
+    // start request
     if (!ata_request(&request)) {
-        // Pech gehabt
+        // tough luck
         return 0;
     }
     
-    // Es handelt sich um ein ATAPI-Geraet
+    // it is an ATAPI device
     dev->atapi = 1;
 
     return 1;
@@ -99,8 +99,8 @@ int atapi_request(struct cdi_scsi_device* scsi,struct cdi_scsi_packet* packet)
         .flags = {
             .direction = WRITE,
             .poll = 1,
-            .ata = 0, // Ich brauch nur ATA-Befehle (Packet)
-            .lba = 0 // Der Kommentar in device.h ist kein deutscher Satz!
+            .ata = 0, // just need ATA commands (Packet)
+            .lba = 0  // Der Kommentar in device.h ist kein deutscher Satz!
         },
         .registers = {
             .ata = {
@@ -134,7 +134,7 @@ int atapi_request(struct cdi_scsi_device* scsi,struct cdi_scsi_packet* packet)
             .error = 0
         };
 
-        // Lesen bzw. Schreiben der Daten
+        // reading or writing data
         // TODO: DMA
         if (packet->direction==CDI_SCSI_READ) ata_protocol_pio_in(&rw_request);
         else if (packet->direction==CDI_SCSI_WRITE) ata_protocol_pio_in(&rw_request);

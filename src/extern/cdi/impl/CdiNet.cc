@@ -32,7 +32,7 @@ void cdi_net_device_init(struct cdi_net_device* device) {
 }
 
 cdi_net_device* cdi_net_get_device(int num) {
-  for (int i = 0; i < cdi_list_size(netcard_list); i++) {
+  for (size_t i = 0; i < cdi_list_size(netcard_list); i++) {
     cdi_net_device* dev = (cdi_net_device *) cdi_list_get(netcard_list, i);
     if (dev->number == num) return dev;
   }

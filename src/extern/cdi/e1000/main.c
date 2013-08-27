@@ -79,4 +79,4 @@ static struct cdi_net_driver driver = {
     .send_packet        = e1000_send_packet,
 };
 
-CDI_DRIVER(DRIVER_NAME, driver)
+//CDI_DRIVER(DRIVER_NAME, driver)

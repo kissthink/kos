@@ -38,12 +38,12 @@
 #include "device.h"
 
 /**
- * Warten bis ein ATA-Geraet bereit ist
+ * Wait until an ATA device is ready
  *
- * @param bits Bits die gesetzt sein muessen
- * @param timeout Timeout in Millisekunden
+ * @param bits the bits must be set
+ * @param timeout Timeout in milliseconds
  *
- * @return 1 wenn das Geraet bereit ist, 0 sonst
+ * @return 1 if the unit is ready, 0 otherwise
  */
 static inline int ata_drv_wait_ready(struct ata_device* dev, uint8_t bits,
     uint32_t timeout)
@@ -62,10 +62,10 @@ static inline int ata_drv_wait_ready(struct ata_device* dev, uint8_t bits,
         cdi_sleep_ms(10);
     }
 
-    // Dem Geraet etwas Zeit geben
+    // give the device some time
     ATA_DELAY(dev->controller);
 
-    // Jetzt koennen wir warten bis die gewuenschten Bits gesetzt sind
+    // now we can wait until DESIRED bits are set
     while (((ata_reg_inb(ctrl, REG_STATUS) & bits) != bits) &&
         (time < timeout)) 
     {
@@ -78,9 +78,9 @@ static inline int ata_drv_wait_ready(struct ata_device* dev, uint8_t bits,
 
 
 /**
- * Befehlsausfuehrung von einem ATA-Request starten
+ * start ATA-request command execution
  *
- * @return 1 wenn der Befehl erfolgreich gestartet wurde, 0 sonst
+ * @return 1 the command was successfully started, 0 otherwise
  */
 static int ata_request_command(struct ata_request* request)
 {
@@ -94,18 +94,18 @@ static int ata_request_command(struct ata_request* request)
 
     ata_drv_select(dev);
 
-    // Warten bis das Geraet bereit ist
+    // wait until the unit is ready
     if (!ata_drv_wait_ready(dev, 0, ATA_READY_TIMEOUT)) {
         request->error = DEVICE_READY_TIMEOUT;
         return 0;
     }
     
-    // Device Register schreiben
-    // TODO: nicht lba?
+    // write device registers
+    // TODO: no LBA?
     ata_reg_outb(ctrl, REG_DEVICE, (request->flags.lba << 6) | (request->dev->
         id << 4) | ((request->registers.ata.lba >> 24) & 0xF));
 
-    // Control Register schreiben
+    // write control register
     control = 0;
     if (request->flags.poll) {
         // Wenn nur gepollt werden soll, muessen Interrupts deaktiviert werden
@@ -114,39 +114,39 @@ static int ata_request_command(struct ata_request* request)
     // TODO: HOB
     ata_reg_outb(ctrl, REG_CONTROL, control);
 
-    // Features-Register schreiben
+    // write features register
     ata_reg_outb(ctrl, REG_FEATURES, request->registers.ata.features);
 
-    // Count-Register schrieben
+    // write count register
     ata_reg_outb(ctrl, REG_SEC_CNT, request->registers.ata.count);
     
-    // LBA Register schreiben
+    // write LBA register
     ata_reg_outb(ctrl, REG_LBA_LOW, request->registers.ata.lba & 0xFF);
     ata_reg_outb(ctrl, REG_LBA_MID, (request->registers.ata.lba >> 8) & 0xFF);
     ata_reg_outb(ctrl, REG_LBA_HIG, (request->registers.ata.lba >> 16) &
         0xFF);
 
-    // Befehl ausfuehren
+    // execute command
     ata_reg_outb(ctrl, REG_COMMAND, request->registers.ata.command);
 
     return 1;
 }
 
 /**
- * Verarbeitet einen ATA-Request bei dem keine Daten uebertragen werden
+ * No data will be processed in processing a request from the ATA
  */
 static int ata_protocol_non_data(struct ata_request* request)
 {
     struct ata_device* dev = request->dev;
     struct ata_controller* ctrl = dev->controller;
     
-    // Aktueller Status im Protokol
+    // current status protocol
     enum {
         IRQ_WAIT,
         CHECK_STATUS
     } state;
     
-    // Der Anfangsstatus haengt davon ab, ob gepollt werden soll oder nicht.
+    // initial state depends on whether or not to be polled
     if  (request->flags.poll) {
         state = CHECK_STATUS;
     } else {
@@ -156,24 +156,23 @@ static int ata_protocol_non_data(struct ata_request* request)
     while (1) {
         switch (state) {
             case IRQ_WAIT:
-                // Auf IRQ warten
+                // wait for IRQ
                 if (!ata_wait_irq(ctrl, ATA_IRQ_TIMEOUT)) {
                     request->error = IRQ_TIMEOUT;
-                    DEBUG("non_data IRQ-Timeout\n");
+                    DEBUG_ATA("non_data IRQ-Timeout\n");
                     return 0;
                 }
 
-                // Jetzt muss der Status ueberprueft werden
+                // now the status has to be checked
                 state = CHECK_STATUS;
                 break;
             
             case CHECK_STATUS: {
                 uint8_t status = ata_reg_inb(ctrl, REG_STATUS);
                 
-                // Status ueberpruefen
+                // check status
                 if ((status & STATUS_BSY) == STATUS_BSY) {
-                    // Wenn das Busy-Flag gesetzt ist, muss gewartet werden,
-                    // bis es geloescht wird.
+                    // when the busy flag is set, you must wait until it is deleted
                     cdi_sleep_ms(20);
                 } else {
                     return 1;
@@ -187,7 +186,7 @@ static int ata_protocol_non_data(struct ata_request* request)
 /**
  * Verarbeitet einen ATA-Request bei dem Daten ueber PIO eingelesen werden
  * sollen.
- * Nach Kapitel 11 in der ATA7-Spec
+ * According to Chapter 11 in the ATA-7 spec
  */
 int ata_protocol_pio_in(struct ata_request* request)
 {
@@ -195,14 +194,14 @@ int ata_protocol_pio_in(struct ata_request* request)
     struct ata_controller* ctrl = dev->controller;
     size_t packet_size = 0;
     
-    // Aktueller Status im Protokol
+    // current status protocol
     enum {
         IRQ_WAIT,
         CHECK_STATUS,
         TRANSFER_DATA
     } state;
     
-    // Der Anfangsstatus haengt davon ab, ob gepollt werden soll oder nicht.
+    // the initial state depends on whether or not to be polled
     if  (request->flags.poll) {
         state = CHECK_STATUS;
     } else {
@@ -212,32 +211,31 @@ int ata_protocol_pio_in(struct ata_request* request)
     while (1) {
         switch (state) {
             case IRQ_WAIT:
-                // Auf IRQ warten
+                // wait for IRQ
                 if (!ata_wait_irq(ctrl, ATA_IRQ_TIMEOUT)) {
                     request->error = IRQ_TIMEOUT;
-                    DEBUG("pio_in IRQ-Timeout\n");
+                    DEBUG_ATA("pio_in IRQ-Timeout\n");
                     return 0;
                 }
 
                 if (request->flags.ata && packet_size==0) // ATAPI
                 {
-                    // Paketgroesse einlesen, da sonst unendlich viel gelesen wird
+                    // read packet size, otherwise an infinite amount is read
                     packet_size = ata_reg_inb(ctrl,REG_LBA_MID)|(ata_reg_inb(ctrl,REG_LBA_HIG)<<8);
                 }
 
-                // Jetzt muss der Status ueberprueft werden
+                // now the status has to be checked
                 state = CHECK_STATUS;
                 break;
             
             case CHECK_STATUS: {
                 uint8_t status = ata_reg_inb(ctrl, REG_STATUS);
                 
-                // Status ueberpruefen
-                // Wenn DRQ und BSY geloescht wurden ist irgendetwas schief
-                // gelaufen.
+                // check status
+                // when BSY and DRQ were deleted, something went wrong.
                 if ((status & (STATUS_BSY | STATUS_DRQ)) == 0) {
-                    // TODO: Fehlerbehandlung
-                    DEBUG("pio_in unerwarteter Status: 0x%x\n", status);
+                    // TODO: Troubleshooting
+                    DEBUG_ATA("pio_in unerwarteter Status: 0x%x\n", status);
                     return 0;
                 } else if ((status & STATUS_BSY) == STATUS_BSY) {
                     // Wenn das Busy-Flag gesetzt ist, muss gewartet werden,
@@ -322,7 +320,7 @@ int ata_protocol_pio_out(struct ata_request* request)
                 // Auf IRQ warten
                 if (!ata_wait_irq(ctrl, ATA_IRQ_TIMEOUT)) {
                     request->error = IRQ_TIMEOUT;
-                    DEBUG("pio_out IRQ-Timeout\n");
+                    DEBUG_ATA("pio_out IRQ-Timeout\n");
                     return 0;
                 }
 
@@ -330,7 +328,7 @@ int ata_protocol_pio_out(struct ata_request* request)
                 {
                     // Paketgroesse einlesen, da sonst unendlich viel geschrieben wird
                     packet_size = ata_reg_inb(ctrl,REG_LBA_MID)|(ata_reg_inb(ctrl,REG_LBA_HIG)<<8);
-                    DEBUG("packet_size = %d\n",packet_size);
+                    DEBUG_ATA("packet_size = %d\n",packet_size);
                 }
 
                 // Jetzt muss der Status ueberprueft werden
@@ -357,7 +355,7 @@ int ata_protocol_pio_out(struct ata_request* request)
                 else if ((status & (STATUS_BSY | STATUS_DRQ)) == 0)
                 {
                     // TODO: Fehlerbehandlung
-                    DEBUG("pio_out unerwarteter Status: 0x%x\n", status);
+                    DEBUG_ATA("pio_out unerwarteter Status: 0x%x\n", status);
                     return 0;
 
                 } else if ((status & STATUS_BSY) == STATUS_BSY) {
@@ -485,7 +483,7 @@ static int ata_protocol_dma(struct ata_request* request)
                 // Auf IRQ warten
                 if (!ata_wait_irq(ctrl, ATA_IRQ_TIMEOUT)) {
                     request->error = IRQ_TIMEOUT;
-                    DEBUG("dma IRQ-Timeout\n");
+                    DEBUG_ATA("dma IRQ-Timeout\n");
                     return 0;
                 }
 
@@ -526,13 +524,13 @@ int ata_request(struct ata_request* request)
 
     // Bei einem DMA-Request muss der DMA-Controller erst vorbereitet werden
     if ((request->protocol == DMA) && !ata_request_dma_init(request)) {
-        DEBUG("ata: Fehler beim Initialisieren des DMA-Controllers\n");
+        DEBUG_ATA("ata: Fehler beim Initialisieren des DMA-Controllers\n");
         return 0;
     }
 
     // Befehl ausfuehren
     if (!ata_request_command(request)) {
-        DEBUG("Fehler bei der Befehlsausfuehrung\n");
+        DEBUG_ATA("Fehler bei der Befehlsausfuehrung\n");
         return 0;
     }
 

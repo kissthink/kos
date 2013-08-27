@@ -42,47 +42,62 @@
 static inline void ata_controller_irq(struct cdi_device* dev);
 
 /**
+ * This function checks if the bus is empty. For if the bus is empty, any attempt
+ * to read the status register 0xff will give back an invalid value. It depends
+ * that the bus is held with pullup resistors on a high level when no device are
+ * closed tight.
+ *
  * Diese Funktion prueft, ob der Bus leer ist. Denn wenn der Bus leer ist, wird
  * jeder Versuch das Status-Register zu lesen 0xFF zurueck geben, was ein
  * ungueltiger Wert ist. Das haengt damit zusammen, dass der Bus mit
  * Pullup-Widerstaenden auf hohem Pegel gehalten wird, wenn keine Geraete
  * angeschlossen sind.
  *
- * @return 1 wenn der Bus leer ist, 0 sonst
+ * @return 1 if the bus is empty, 0 otherwise
  */
 static int ata_bus_floating(struct ata_controller* controller)
 {
     uint8_t status;
 
     // Master auswaehlen und Status auslesen
+    // selected league master and read status
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(0));
     ATA_DELAY(controller);
     status = ata_reg_inb(controller, REG_STATUS);
 
-    // Nicht floating
+    // Not floating
     if (status != 0xFF) {
         return 0;
     }
 
-    // Slave auswaehlen
+    // selected league slave
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(1));
     ATA_DELAY(controller);
     status = ata_reg_inb(controller, REG_STATUS);
 
-    // Wenn alle Bits gesetzt sind, ist der Bus floating
+    // when all bits are set, the bus is floating
     return (status == 0xFF);
 }
 
 /**
+ * This function checks whether at least one end device answer depends on the bus.
+ * It is possible to find out by any values written to the LBA register. If some
+ * device is present, the values must be read again.
+ *
  * Diese Funktion prueft, ob mindestens ein Antwortendes Geraet am Bus haengt.
  * Das laesst sich herausfinden, indem irgendwelche Werte in die LBA-Register
  * geschrieben werden. Wenn ein Geraet vorhanden ist, muessen die Werte wieder
  * ausgelesen werden koennen.
  *
- * @return 1 wenn ein Geraet vorhanden ist, 0 sonst
+ * @return 1 if some device is present, 0 otherwise
  */
 static int ata_bus_responsive_drv(struct ata_controller* controller)
 {
+    // selected league slave, so sure someone reacts, because the master must,
+    // if no slave exists. So it looks at least in theory. In practice, vmware
+    // does not seem to make it that way. Therefore we turn below a special
+    // round for vmware
+    //
     // Slave auswaehlen, da so sicher jemand reagiert, da der Master antworten
     // muss, wenn kein Slave existiert. So sieht es zumindest in der Theorie
     // aus. In der Praxis scheint vmware das nicht so zu machen. Deshalb drehen
@@ -90,12 +105,17 @@ static int ata_bus_responsive_drv(struct ata_controller* controller)
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(1));
     ATA_DELAY(controller);
 
+    // Now something is written to the port. The values are absolute matter comes
+    // back as long as the same when read is good.
+    //
     // Jetzt wird irgendwas auf die Ports geschrieben. Die Werte sind absolut
     // egal, solange das selbe beim auslesen zurueckkommt ist gut.
     ata_reg_outb(controller, REG_LBA_LOW, 0xAF);
     ata_reg_outb(controller, REG_LBA_MID, 0xBF);
     ata_reg_outb(controller, REG_LBA_HIG, 0xCF);
 
+    // If the values are read at least some device available
+    //
     // Wenn die ausgelesenen Werte stimmen ist mindestens ein Geraet vorhanden
     if ((ata_reg_inb(controller, REG_LBA_LOW) == 0xAF) &&
         (ata_reg_inb(controller, REG_LBA_MID) == 0xBF) &&
@@ -105,17 +125,23 @@ static int ata_bus_responsive_drv(struct ata_controller* controller)
     }
 
 
-
+    // Here's the small lap of honour for vmware
+    //
     // Hier noch die kleine Ehrenrunde fuer vmware ;-)
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(0));
     ATA_DELAY(controller);
 
+    // now something is written to the port. The values are absolute matter comes
+    // back as long as the same when read is good.
+    //
     // Jetzt wird irgendwas auf die Ports geschrieben. Die Werte sind absolut
     // egal, solange das selbe beim auslesen zurueckkommt ist gut.
     ata_reg_outb(controller, REG_LBA_LOW, 0xAF);
     ata_reg_outb(controller, REG_LBA_MID, 0xBF);
     ata_reg_outb(controller, REG_LBA_HIG, 0xCF);
 
+    // if the values are read at least some device available
+    //
     // Wenn die ausgelesenen Werte stimmen ist mindestens ein Geraet vorhanden
     if ((ata_reg_inb(controller, REG_LBA_LOW) == 0xAF) &&
         (ata_reg_inb(controller, REG_LBA_MID) == 0xBF) &&
@@ -130,11 +156,18 @@ static int ata_bus_responsive_drv(struct ata_controller* controller)
 /**
  * IRQ-Handler fuer ATA-Controller
  *
+ *            Attention! here is not a real device! This was only applied to
+ *            register the handler
  * @param dev Achtung hier handelt es sich um kein echtes Geraet!!! Das wurde
  *            nur zum Registrieren des Handlers angelegt.
  */
 static void ata_controller_irq(struct cdi_device* dev)
 {
+    // Here we have to actually do nothing, because we always want just
+    // waiting for IRQ, and in return provides CDI features at your disposal.
+    // But the IRQ must still be registered, and there we have to specify a handler,
+    // otherwise we fly in the first IRQ to the ears
+    //
     // Hier muessen wir eigentlich garnichts tun, da wir immer nur auf IRQs
     // warten wollen, und dafuer stellt CDI Funktionen zur Verfuegung. Doch
     // registriert muss der IRQ dennoch werden, und dort muessen wir einen
@@ -142,11 +175,11 @@ static void ata_controller_irq(struct cdi_device* dev)
 }
 
 /**
- * Auf einen IRQ warten
+ * Wait for an IRQ
  *
- * @param timeout Timeout nachdem die Funktion abbricht
+ * @param timeout timeout after the timeout function cancels
  *
- * @return 1 Wenn der IRQ wie erwartet aufgetreten ist, 0 sonst
+ * @return 1 if the IRQ is occurred as expected, 0 otherwise
  */
 int ata_wait_irq(struct ata_controller* controller, uint32_t timeout)
 {
@@ -160,28 +193,31 @@ int ata_wait_irq(struct ata_controller* controller, uint32_t timeout)
 
 
 /**
- * ATA-Geraet initialisieren
+ * ATA-device initialization
  */
 void ata_init_controller(struct ata_controller* controller)
 {
     int i;
 
-    // Ports registrieren
+    // register ports
     if (cdi_ioports_alloc(controller->port_cmd_base, 8) != 0) {
-        DEBUG("Fehler beim allozieren der I/O-Ports\n");
+        DEBUG_ATA("Failed to allocate the I/O-Ports\n");
         return;
     }
     if (cdi_ioports_alloc(controller->port_ctl_base, 1) != 0) {
-        DEBUG("Fehler beim allozieren der I/O-Ports\n");
+        DEBUG_ATA("Failed to allocate the I/O-Ports\n");
         goto error_free_cmdbase;
     }
     if (controller->port_bmr_base &&
         (cdi_ioports_alloc(controller->port_bmr_base, 8) != 0))
     {
-        DEBUG("ata: Fehler beim allozieren der I/O-Ports\n");
+        DEBUG_ATA("ata: Failed to allocate the I/O-Ports\n");
         goto error_free_ctlbase;
     }
     
+    // Since LINES not work everywhere clean, but an IRQ handler must be registered
+    // already. And in return we need now time some device
+    //
     // Da NIEN nicht ueberall sauber funktioniert, muss jetzt trotzdem schon
     // ein IRQ-Handler registriert werden. Und dafuer brauchen wir nun mal ein
     // Geraet.
@@ -189,36 +225,51 @@ void ata_init_controller(struct ata_controller* controller)
     cdi_register_irq(controller->irq, ata_controller_irq, (struct cdi_device*)
         &controller->irq_dev);
 
+    // According to osdev forum, HOB bit should be deleted for all devices,
+    // there is not yet sure if this LBA48 support it. At the same time also
+    // interrupts disabled because it can only be used when it is clear that
+    // there are widgets.
+    //
     // Laut osdev-Forum sollte das HOB-Bit fuer alle Geraete geloescht werden,
     // da noch nicht sicher ist, ob diese LBA48 unterstuetzen. Gleichzeitig
     // werden auch noch interrupts deaktiviert, da die erst benutzt werden
     // koennen, wenn feststeht, welche geraete existieren.
     //
+    // Note: LINES not seem to work everywhere! On a test computer nevertheless,
+    // there are interrupt.
+    //
     // ACHTUNG: NIEN scheint nicht ueberall zu funktionieren!! Auf einem meiner
     // Testrechner kommen da Trotzdem Interrupts.
     for (i = 0; i < 2; i++) {
-        // Geraet auswaehlen
+        // select device
         ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(i));
         ATA_DELAY(controller);
 
-        // HOB loeschen und NIEN setzen
+        // HOB delete and set LINES
         ata_reg_outb(controller, REG_CONTROL, CONTROL_NIEN);
     }
 
-    // Jetzt pruefen wir ob der Bus leer ist (mehr dazu bei ata_bus_floating).
+    // Now we are testing whether the bus is empty (more on that in ata_bus_floating)
     if (ata_bus_floating(controller)) {
-        DEBUG("Floating Bus %d\n", controller->id);
+        DEBUG_ATA("Floating Bus %d\n", controller->id);
         return;
     }
     
+    // Test whether at least one answering device depends on the bus. Here it
+    // must be ensured that the master must also respond, although if the slave is
+    // opted, but does not exist.
+    //
     // Testen ob mindestens ein antwortendes Geraet am Bus haengt. Hier muss
     // darauf geachtet werden, dass der Master auch antworten muss, wenn zwar
     // der Slave ausgewaehlt ist, aber nicht existiert.
     if (!ata_bus_responsive_drv(controller)) {
-        DEBUG("No responsive drive on Bus %d\n", controller->id);
+        DEBUG_ATA("No responsive drive on Bus %d\n", controller->id);
         return;
     }
 
+    // now the individual widgets can be identified. There seems to begin with the
+    // slave swift.
+    //
     // Jetzt werden die einzelnen geraete identifiziert. Hier ist es
     // anscheinend geschickter mit dem Slave zu beginnen.
     for (i = 1; i >= 0; i--) {
@@ -228,7 +279,7 @@ void ata_init_controller(struct ata_controller* controller)
         dev->partition_list = cdi_list_create();
 
         if (ata_drv_identify(dev)) {
-            DEBUG("Bus %d  Device %d: ATAPI=%d\n", (uint32_t) controller->id, i, dev->atapi);
+            DEBUG_ATA("Bus %d  Device %d: ATAPI=%d\n", (uint32_t) controller->id, i, dev->atapi);
 
 #ifdef ATAPI_ENABLE
             if (dev->atapi == 0) {
@@ -240,7 +291,11 @@ void ata_init_controller(struct ata_controller* controller)
                 dev->write_sectors = ata_drv_write_sectors;
                 
                 // Name setzen
+#if 0
                 asprintf((char**) &(dev->dev.storage.dev.name), "ata%01d%01d",
+                    (uint32_t) controller->id, i);
+#endif
+                sprintf((char **) &(dev->dev.storage.dev.name), "ata%01d%01d",
                     (uint32_t) controller->id, i);
 
                 // Geraet registrieren
@@ -250,7 +305,11 @@ void ata_init_controller(struct ata_controller* controller)
 #ifdef ATAPI_ENABLE
             } else {
                 // Name setzen
+#if 0
                 asprintf((char**) &(dev->dev.scsi.dev.name),"atapi%01d%01d",
+                    (uint32_t) controller->id, i);
+#endif
+                sprintf((char **) &(dev->dev.scsi.dev.name), "atapi%01d%01d",
                     (uint32_t) controller->id, i);
             
                 // Geraet registrieren
@@ -264,6 +323,8 @@ void ata_init_controller(struct ata_controller* controller)
         }
     }
 
+    // finally DMA is still prepared, if possible
+    //
     // Abschliessend wird noch DMA vorbereitet, wenn moeglich
     if (controller->port_bmr_base) {
         struct cdi_mem_area* buf;
@@ -307,7 +368,7 @@ void ata_remove_device(struct cdi_device* device)
 
 
 /**
- * Blocks von einem ATA(PI) Geraet lesen
+ * Read blocks from an ATA(PI) device
  */
 int ata_read_blocks(struct cdi_storage_device* device, uint64_t block,
     uint64_t count, void* buffer)
@@ -315,19 +376,18 @@ int ata_read_blocks(struct cdi_storage_device* device, uint64_t block,
     struct ata_device* dev = (struct ata_device*) device;
     struct ata_partition* partition = NULL;
     
-    // Wenn der Pointer auf den Controller NULL ist, handelt es sich um eine
-    // Partition
+    // if the pointer is NULL on the controller, it is a partition
     if (dev->controller == NULL) {
         partition = (struct ata_partition*) dev;
         dev = partition->realdev;
     }
 
-    // Natuerlich nur ausfuehren wenn ein Handler eingetragen ist
+    // only execute if a handler is registered
     if (dev->read_sectors == NULL) {
         return -1;
     }
     
-    // Bei einer Partition noch den Offset dazurechnen
+    // if it is a partition, still expected to offset
     if (partition == NULL) {
         return !dev->read_sectors(dev, block, count, buffer);
     } else {
@@ -337,7 +397,7 @@ int ata_read_blocks(struct cdi_storage_device* device, uint64_t block,
 }
 
 /**
- * Blocks auf ein ATA(PI) Geraet schreiben
+ * Write blocks on an ATA(PI) device
  */
 int ata_write_blocks(struct cdi_storage_device* device, uint64_t block,
     uint64_t count, void* buffer)
@@ -345,19 +405,18 @@ int ata_write_blocks(struct cdi_storage_device* device, uint64_t block,
     struct ata_device* dev = (struct ata_device*) device;
     struct ata_partition* partition = NULL;
     
-    // Wenn der Pointer auf den Controller NULL ist, handelt es sich um eine
-    // Partition
+    // if the pointer to the controller is NULL, there is partition
     if (dev->controller == NULL) {
         partition = (struct ata_partition*) dev;
         dev = partition->realdev;
     }
 
-    // Natuerlich nur ausfuehren wenn ein Handler eingetragen ist
+    // course only execute if a handler is registered
     if (dev->write_sectors == NULL) {
         return -1;
     }
     
-    // Bei einer Partition muss noch ein Offset drauf addiert werden
+    // if it is a partition, still an offset must be added to it
     if (partition == NULL) {
         return !dev->write_sectors(dev, block, count, buffer);
     } else {

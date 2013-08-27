@@ -38,6 +38,7 @@
 #include "cdi/io.h"
 #include "cdi/lists.h"
 #include "cdi/scsi.h"
+#include "cdi/printf.h"
 
 #define ATAPI_ENABLE
 
@@ -128,9 +129,9 @@
 
 // Debug
 #ifdef DEBUG_ENABLE
-    #define DEBUG(fmt, ...) printf("ata: " fmt, ## __VA_ARGS__)
+    #define DEBUG_ATA(fmt, ...) CdiPrintf("ata: " fmt, ## __VA_ARGS__)
 #else
-    #define DEBUG(...)
+    #define DEBUG_ATA(...)
 #endif
 
 /**

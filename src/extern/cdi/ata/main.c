@@ -62,7 +62,7 @@ int init_ata(int _argc, char* _argv[])
 }
 
 /**
- * Initialisiert die Datenstrukturen fuer den sis900-Treiber
+ * initializes the data structure for the sis9000 driver
  */
 static int ata_driver_init(void)
 {
@@ -73,15 +73,15 @@ static int ata_driver_init(void)
     int i;
     int j;
 
-    // Konstruktor der Vaterklasse
+    // constructor of the parent class
     cdi_storage_driver_init((struct cdi_storage_driver*) &driver_storage);
     cdi_scsi_driver_init((struct cdi_scsi_driver*) &driver_scsi);
 
-    // Liste mit Controllern initialisieren
+    // initialize list of controllers
     controller_list = cdi_list_create();
 
 
-    // PCI-Geraet fuer Controller finden
+    // find device for PCI controllers
     pci_devices = cdi_list_create();
     cdi_pci_get_all_devices(pci_devices);
     for (i = 0; (pci_dev = cdi_list_get(pci_devices, i)) && !busmaster_regbase;
@@ -95,6 +95,11 @@ static int ata_driver_init(void)
             continue;
         }
 
+        // now even find the resource with the bus master registers
+        // TODO: This works so probably not anywhere as there probably are
+        // also controllers with only one channel and those in which the BM registers
+        // are mapped in memory
+        //
         // Jetzt noch die Ressource finden mit den Busmaster-Registern
         // TODO: Das funktioniert so vermutlich nicht ueberall, da es
         // warscheinlich auch Kontroller mit nur einem Kanal gibt und solche bei
@@ -107,6 +112,9 @@ static int ata_driver_init(void)
         }
     }
 
+    // broken VIA controller should only use PIO as it comes to hangers with DMA.
+    // it is the controller 82C686B
+    //
     // Kaputte VIA-Kontroller sollten nur PIO benutzen, da es bei DMA zu
     // haengern kommt. Dabei handelt es sich um den Kontroller 82C686B
     if (pci_dev && (pci_dev->vendor_id == PCI_VENDOR_VIA) &&
@@ -114,7 +122,7 @@ static int ata_driver_init(void)
     {
         busmaster_regbase = 0;
     } else {
-        // Wenn der nodma-Parameter uebergeben wurde, deaktivieren wir dma auch
+        // if the nodma parameter was handed over, we also disable dma
         for (i = 1; i < argc; i++) {
             if (!strcmp(argv[i], "nodma")) {
                 busmaster_regbase = 0;
@@ -123,7 +131,7 @@ static int ata_driver_init(void)
         }
     }
 
-    // Primaeren Controller vorbereiten
+    // preparing the primary controller
 //    controller = calloc(1, sizeof(*controller));
     controller = malloc(sizeof(*controller));
     controller->port_cmd_base = ATA_PRIMARY_CMD_BASE;
@@ -136,7 +144,7 @@ static int ata_driver_init(void)
     ata_init_controller(controller);
     cdi_list_push(controller_list, controller);
     
-    // Sekundaeren Controller vorbereiten
+    // preparing the secondary controller
 //    controller = calloc(1, sizeof(*controller));
     controller = malloc(sizeof(*controller));
     controller->port_cmd_base = ATA_SECONDARY_CMD_BASE;
@@ -153,20 +161,20 @@ static int ata_driver_init(void)
 }
 
 /**
- * Deinitialisiert die Datenstrukturen fuer den ata-Treiber
+ * uninitialized data structures for the ata driver
  */
 static int ata_driver_destroy(void)
 {
     cdi_storage_driver_destroy(&driver_storage);
 
-    // TODO Alle Karten deinitialisieren
+    // TODO deinitialize all cards
 
     return 0;
 }
 
 static int atapi_driver_init(void)
 {
-    // TODO ATAPI-Initialisierungscode hierher verschieben
+    // TODO move ATAPI initialization code here
     return 0;
 }
 
