@@ -67,8 +67,8 @@ static void mainLoop(ptr_t) {
     StdDbg.out(c);
   }
 
-//  MutexTest();
-//  SemaphoreTest();
+  MutexTest();
+  SemaphoreTest();
 
   Process p;
   p.execElfFile("testprogram2");

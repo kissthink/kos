@@ -25,7 +25,7 @@ class Scheduler;
 
 class Thread : public mod_set_elem<Thread*> {
 public:
-  static const size_t defaultStack = 2 * pagesize<1>();
+  static const size_t defaultStack = 1 * pagesize<2>();
   struct TimeoutCompare {
     inline bool operator()( const Thread* t1, const Thread* t2 ) {
       return t1->timeout < t2->timeout;

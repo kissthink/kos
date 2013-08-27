@@ -81,7 +81,7 @@ void Processor::init(FrameManager& fm, AddressSpace& as,
 
   gdbCpu = Gdb::setupGdb(cpuID);                 // setup gdb
 
-  currThread = idleThread = Thread::create(as, "idle", pagesize<1>());
+  currThread = idleThread = Thread::create(as, "idle", pagesize<2>());
 }
 
 void Processor::start(funcvoid_t func) {
