@@ -35,6 +35,7 @@
 #include "cdi/io.h"
 #include "cdi/dma.h"
 #include "cdi/cmos.h"
+#include "cdi/printf.h"
 
 #include "device.h"
 
@@ -450,7 +451,7 @@ static int floppy_drive_seek(struct floppy_device* device, uint8_t cylinder,
     // Pruefen ob der Seek geklappt hat anhand der neuen Zylinderangabge aus
     // int_sense
     if (device->current_cylinder != cylinder) {
-        printf("Fehler beim seek: Zylinder nach dem Seek nach %d ist %d\n",
+        CdiPrintf("Fehler beim seek: Zylinder nach dem Seek nach %d ist %d\n",
             cylinder, device->current_cylinder);
         return -1;
     }

@@ -6,8 +6,9 @@ CDI_RTL8139	  =						rtl8139
 CDI_E1000     =           e1000
 CDI_PCNET     =           pcnet
 CDI_ATA       =           ata
+CDI_FLOPPY    =           floppy
 
-CDI=$(CDI_NE2k) $(CDI_RTL8139) $(CDI_E1000) $(CDI_PCNET) $(CDI_ATA)
+CDI=$(CDI_NE2k) $(CDI_RTL8139) $(CDI_E1000) $(CDI_PCNET) $(CDI_ATA) $(CDI_FLOPPY)
 
 CDI_NE2K_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_NE2K)))
 CDI_NE2K_OBJS=$(subst .c,.o,$(CDI_NE2K_SRCS))
@@ -19,14 +20,20 @@ CDI_PCNET_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_PCNET)))
 CDI_PCNET_OBJS=$(subst .c,.o,$(CDI_PCNET_SRCS))
 CDI_ATA_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_ATA)))
 CDI_ATA_OBJS=$(subst .c,.o,$(CDI_ATA_SRCS))
+CDI_EXT2_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_EXT2)))
+CDI_EXT2_OBJS=$(subst .c,.o,$(CDI_EXT2_SRCS))
+CDI_LIBEXT2_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_LIBEXT2)))
+CDI_LIBEXT2_OBJS=$(subst .c,.o,$(CDI_LIBEXT2_SRCS))
+CDI_FLOPPY_SRCS=$(wildcard $(addsuffix /*.c,$(CDI_FLOPPY)))
+CDI_FLOPPY_OBJS=$(subst .c,.o,$(CDI_FLOPPY_SRCS))
 
 CDI_KOS   =               impl
 KOS_SRCS=$(wildcard $(addsuffix /*.cc,$(CDI_KOS)))
 KOS_OBJS=$(subst .cc,.o,$(KOS_SRCS))
 
-OBJECTS=$(CDI_NE2K_OBJS) $(CDI_RTL8139_OBJS) $(CDI_E1000_OBJS) $(CDI_PCNET_OBJS) $(CDI_ATA_OBJS)
+OBJECTS=$(CDI_NE2K_OBJS) $(CDI_RTL8139_OBJS) $(CDI_E1000_OBJS) $(CDI_PCNET_OBJS) $(CDI_ATA_OBJS) $(CDI_LIBEXT2_OBJS) $(CDI_EXT2_OBJS) $(CDI_FLOPPY_OBJS)
 
-CFLAGS += -I$(SRCDIR) -Iinclude -D__KOS__ -DDEBUG -DDEBUG_ENABLE -D_GNU_SOURCE $(OPTFLAGS)
+CFLAGS += -I$(SRCDIR) -Iinclude -D__KOS__ -DDEBUG -D_GNU_SOURCE $(OPTFLAGS)
 CXXFLAGS += -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
 
 vpath %.c $(CDI)
@@ -47,6 +54,15 @@ $(CDI_PCNET_OBJS): %.o: %.c
 		$(CC) -c $(CFLAGS) -I$(CDI_PCNET)/include $< -o $@
 
 $(CDI_ATA_OBJS): %.o: %.c
+		$(CC) -c $(CFLAGS) $< -o $@
+
+$(CDI_LIBEXT2_OBJS): %.o: %.c
+		$(CC) -c $(CFLAGS) -I$(CDI_LIBEXT2)/include $< -o $@
+
+$(CDI_EXT2_OBJS): %.o: %.c $(CDI_LIBEXT2_OBJS)
+		$(CC) -c $(CFLAGS) -I$(CDI_LIBEXT2)/include $< -o $@
+
+$(CDI_FLOPPY_OBJS): %.o: %.c
 		$(CC) -c $(CFLAGS) $< -o $@
 
 $(KOS_OBJS): %.o: %.cc

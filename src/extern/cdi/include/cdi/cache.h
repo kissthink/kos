@@ -29,7 +29,7 @@ struct cdi_cache_block {
     void*       data;
 
     /** Pointer auf blkpriv_len Bytes, die vom Aufrufer benutzt werden koennen*/
-    void*       private;
+    void*       priv;
 };
 
 /** Typ fuer Cache-Callback zum einlesen eines Blocks. */

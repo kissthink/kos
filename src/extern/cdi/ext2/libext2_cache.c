@@ -91,7 +91,7 @@ ext2_cache_block_t* cache_block(void* handle, uint64_t block, int noread)
         return NULL;
     }
 
-    b = cdi_b->private;
+    b = cdi_b->priv;
     b->opaque = cdi_b;
     b->data = cdi_b->data;
     b->cache = handle;

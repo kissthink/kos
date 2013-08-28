@@ -29,8 +29,6 @@
 #ifndef _ATA_DEVICE_H_
 #define _ATA_DEVICE_H_
 
-#undef DEBUG_ENABLE
-
 #include <stdint.h>
 
 #include "cdi.h"
@@ -127,12 +125,7 @@
 #define ATA_DMA_MAXSIZE         (64 * 1024)
 
 
-// Debug
-#ifdef DEBUG_ENABLE
-    #define DEBUG_ATA(fmt, ...) CdiPrintf("ata: " fmt, ## __VA_ARGS__)
-#else
-    #define DEBUG_ATA(...)
-#endif
+#define DEBUG_ATA(fmt, ...) CdiPrintf("[ata]: " fmt, ## __VA_ARGS__)
 
 /**
  * Resultat beim IDENTIFY DEVICE Befehl

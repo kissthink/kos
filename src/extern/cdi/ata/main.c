@@ -134,6 +134,7 @@ static int ata_driver_init(void)
     // preparing the primary controller
 //    controller = calloc(1, sizeof(*controller));
     controller = malloc(sizeof(*controller));
+    memset(controller, 0, sizeof(*controller));
     controller->port_cmd_base = ATA_PRIMARY_CMD_BASE;
     controller->port_ctl_base = ATA_PRIMARY_CTL_BASE;
     controller->port_bmr_base = busmaster_regbase;
@@ -147,6 +148,7 @@ static int ata_driver_init(void)
     // preparing the secondary controller
 //    controller = calloc(1, sizeof(*controller));
     controller = malloc(sizeof(*controller));
+    memset(controller, 0, sizeof(*controller));
     controller->port_cmd_base = ATA_SECONDARY_CMD_BASE;
     controller->port_ctl_base = ATA_SECONDARY_CTL_BASE;
     controller->port_bmr_base = busmaster_regbase;

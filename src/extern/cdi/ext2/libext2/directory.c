@@ -45,7 +45,7 @@ struct private_dir_get {
 };
 
 void ext2_dir_foreach(ext2_inode_t* inode,
-    int (*handler) (ext2_dirent_t*, void*), void* private)
+    int (*handler) (ext2_dirent_t*, void*), void* priv)
 {
     ext2_dirent_t* entry;
     char buf[inode->raw->size];
@@ -60,7 +60,7 @@ void ext2_dir_foreach(ext2_inode_t* inode,
             continue;
         }
 
-        if (handler(entry, private)) {
+        if (handler(entry, priv)) {
             break;
         }
 

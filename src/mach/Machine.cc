@@ -103,7 +103,7 @@ static void keybLoop(ptr_t) {
 #else
     if (keycode > 0 && keycode < 0x80) StdErr.out((char)keycode);
 #endif
-    Drivers::handleKey(keyboard, (char)keycode);
+    Drivers::parseCommands(keyboard, (char)keycode);
   }
 }
 
@@ -257,17 +257,13 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   pit.init();
 
   // init IOPortManager
-  IOPortManager::init(0, 0x3ffff); // hope 64KB is enough
+  IOPortManager::init(0, 0x3ffff); // hope 256KB is enough
 
   // detect PCI controller
   PCI::sanityCheck();
 
   // find PCI devices
-//  PCI::probeAll();
   PCI::checkAllBuses();
-
-  // initialize CDI
-  cdi_init();
 
   // find additional devices ("current thread" faked for ACPI)
   parseACPI();
@@ -280,6 +276,9 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
 void Machine::initBSP2() {
   // enable interrupts (off boot stack)
   Processor::enableInterrupts();
+
+  // initialize CDI
+  cdi_init();
 
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();

@@ -371,7 +371,7 @@ struct cdi_fs_res_res {
      *         sonst
      */
      int (*assign_class)(struct cdi_fs_stream* stream,
-        cdi_fs_res_class_t class);
+        cdi_fs_res_class_t cls);
 
     /**
      * Diese Ressource aus einer Klasse entfernen. Diese Funktion wird nur
@@ -388,7 +388,7 @@ struct cdi_fs_res_res {
      *         0 sonst
      */
      int (*remove_class)(struct cdi_fs_stream* stream,
-        cdi_fs_res_class_t class);
+        cdi_fs_res_class_t cls);
 
     /**
      * Metaeigenschaft lesen

@@ -20,8 +20,6 @@ int cdi_dma_open(cdi_dma_handle* handle, uint8_t channel, uint8_t mode,
   cdi_mem_area* area = CdiMemoryManager::alloc(length, flags);
   if (!area) return -1;     // failed to get required memory
 
-//  handle->buffer = area->vaddr;
-//  memset(handle->buffer, 0, handle->length);
   laddr physAddr = area->paddr.items->start;
   handle->meta.area = area;
 
@@ -32,21 +30,11 @@ int cdi_dma_open(cdi_dma_handle* handle, uint8_t channel, uint8_t mode,
 
 int cdi_dma_read(cdi_dma_handle* handle) {
   memcpy(handle->buffer, handle->meta.area->vaddr, handle->length);
-  CdiPrintf("reading: ");
-  for (unsigned int i = 0; i < handle->length; i++) {
-    CdiPrintf("%x", ((char *)handle->buffer)[i]);
-  }
-  CdiPrintf("\n");
   return 0;
 }
 
 int cdi_dma_write(cdi_dma_handle* handle) {
   memcpy(handle->meta.area->vaddr, handle->buffer, handle->length);
-  CdiPrintf("writing: ");
-  for (unsigned int i = 0; i < handle->length; i++) {
-    CdiPrintf("%x", ((char *)handle->buffer)[i]);
-  }
-  CdiPrintf("\n");
   return 0;
 }
 

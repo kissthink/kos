@@ -71,7 +71,7 @@ typedef struct ext2_dirent {
  * @param private   Wert der direkt an den Handler uebergeben wird.
  */
 void ext2_dir_foreach(ext2_inode_t* inode,
-    int (*handler) (ext2_dirent_t*, void*), void* private);
+    int (*handler) (ext2_dirent_t*, void*), void* priv);
 
 /**
  * Sucht einen Verzeichniseintrag nach dem Namen

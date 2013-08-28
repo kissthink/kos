@@ -46,13 +46,7 @@ static void pcnet_write_csr(struct pcnet_device *netcard, size_t csr, uint16_t v
 static void pcnet_write_bcr(struct pcnet_device *netcard, size_t bcr, uint16_t value);
 
 //Hier koennen die Debug-Nachrichten aktiviert werden
-#define DEBUG
-
-#ifdef DEBUG
-    #define DEBUG_MSG(s) CdiPrintf("[PCNET] debug: %s() '%s'\n", __FUNCTION__, s)
-#else
-    #define DEBUG_MSG(s) //
-#endif
+#define DEBUG_MSG(s) CdiPrintf("[PCNET] debug: %s() '%s'\n", __FUNCTION__, s)
 
 struct cdi_device* pcnet_init_device(struct cdi_bus_data* bus_data)
 {

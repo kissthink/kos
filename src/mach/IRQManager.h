@@ -2,9 +2,12 @@
 #define _IRQManager_h_ 1
 
 #include "kern/Kernel.h"
+#include "kern/KernelQueues.h"
+#include "kern/Thread.h"
+#include "ipc/SpinLock.h"
+#include "ipc/SyncQueues.h"
 #include "mach/platform.h"
 #include "mach/Machine.h"
-#include "ipc/SpinLock.h"
 #include "util/basics.h"
 
 #include <list>
@@ -21,6 +24,10 @@ class IRQManager {
   static SpinLock* lk;              // locks per IRQ
   static bool initialized;
   static unsigned int numIRQ;
+
+  static Thread* softIRQThread;     // bottom half
+  static ProdConsQueue<StaticRingBuffer<mword, 128>> irqQueue;
+  static void softIRQ(ptr_t arg);
 
   static void dump();
 public:

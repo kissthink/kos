@@ -8,8 +8,22 @@ SpinLock* IRQManager::lk;
 bool IRQManager::initialized = false;
 unsigned int IRQManager::numIRQ = 0;
 
+Thread* IRQManager::softIRQThread;
+ProdConsQueue<StaticRingBuffer<mword, 128>> IRQManager::irqQueue;
+
 // priority (highest->lowest) to IRQ number
 static int defaultIRQPriorities[16] = { 0,1,2,11,12,13,14,15,3,4,5,6,7,8,9,10 };
+
+void IRQManager::softIRQ(ptr_t arg) {
+  KASSERT0( initialized );
+  for (;;) {
+    mword irq = irqQueue.remove();  // sleep until interrupt occurs
+    ScopedLock<> lo(lk[irq]);
+    for (function_t f : irqHandlers[irq]) {
+      (*f)(&irq);
+    }
+  }
+}
 
 // map I/O APIC IRQ entries to IDT vector numbers
 void IRQManager::init(int rdr) {
@@ -27,6 +41,9 @@ void IRQManager::init(int rdr) {
   lk = new SpinLock[rdr];
   numIRQ = rdr;
   initialized = true;
+
+  softIRQThread = Thread::create(kernelSpace, "IRQ thread");
+  kernelScheduler.run(*softIRQThread, softIRQ, nullptr);      // start handling IRQ
 
   dump();
 }
@@ -48,13 +65,7 @@ bool IRQManager::handleIRQ(mword vector) {
   KASSERT0( initialized );
   int irq = vectorToIRQ[vector];
   if (irq == -1) return false;
-  ScopedLock<> lo(lk[irq]);
-  if (irqHandlers[irq].empty()) return false;
-  for (function_t f : irqHandlers[irq]) {
-    mword* arg = new mword;
-    *arg = irq;
-    (*f)(ptr_t(arg));
-  }
+  while (!irqQueue.tryAppend(irq)) Pause();
   return true;
 }
 

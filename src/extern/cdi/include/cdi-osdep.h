@@ -86,8 +86,10 @@ typedef struct
  * OS-specific DMA data.
  * \endenglish
  */
+struct cdi_mem_area;
 typedef struct
 {
+  struct cdi_mem_area* area;
 } cdi_dma_osdep;
 
 /**

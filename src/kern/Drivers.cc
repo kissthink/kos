@@ -4,8 +4,10 @@
 #include "util/Output.h"
 #include "dev/Keyboard.h"
 
+Thread* Drivers::testThread;
+ProdConsQueue<StaticRingBuffer<Command*,16>> Drivers::testQueue;
 Semaphore Drivers::waitForKey;
-bool Drivers::running = false;
+volatile bool Drivers::running = false;
 
 void Drivers::showMenu() {
   StdOut.outln("Drivers test menu");
@@ -13,14 +15,18 @@ void Drivers::showMenu() {
   StdOut.outln("[1] Send a network packet");
   StdOut.outln("[2] Write to a hard disk");
   StdOut.outln("[3] Read the hard disk");
+  StdOut.outln("[4] Write to floppy disk");
+  StdOut.outln("[5] Read from floppy disk");
   StdOut.outln("[q] Exit");
   StdOut.outln("");
 }
 
 extern void cdi_net_send(int, ptr_t, size_t);
-struct cdi_storage_device;
-extern int cdi_storage_read(cdi_storage_device* device, uint64_t pos, size_t size, ptr_t dest);
-extern int cdi_storage_write(cdi_storage_device* device, uint64_t pos, size_t size, ptr_t src);
+extern int cdi_storage_read(const kstring& devName, uint64_t pos, size_t size, ptr_t dest);
+extern int cdi_storage_write(const kstring& devName, uint64_t pos, size_t size, ptr_t src);
+
+static kstring hdiskName = "ata00";
+static kstring fdiskName = "fd0";
 
 static Keyboard::KeyCode getNextKey(Keyboard& keyboard) {
   Keyboard::KeyCode key = keyboard.read();
@@ -28,46 +34,123 @@ static Keyboard::KeyCode getNextKey(Keyboard& keyboard) {
   return key;
 }
 
-void Drivers::handleKey(Keyboard& keyboard, char key) {
+class Command {
+  char buf[256];
+  size_t len;
+public:
+  Command(Keyboard& keyboard) : len(0) {
+    len = 0;
+    memset(buf, 0, 256);
+    Keyboard::KeyCode nextKey;
+    while ((nextKey = getNextKey(keyboard)) != 0x0d && len < 255) {
+      buf[len++] = (char) nextKey;
+    }
+  }
+  virtual ~Command() {}
+  virtual bool run() = 0;
+  char* getBuffer() { return buf; }
+  size_t getLength() const { return len; }
+};
+
+struct SendNetworkPacketTest : public Command {
+  SendNetworkPacketTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    cdi_net_send(0, (ptr_t) getBuffer(), getLength());
+    DBG::outln(DBG::Basic, "packet sent");
+    return true;
+  }
+};
+
+struct WriteToHardDiskTest : public Command {
+  WriteToHardDiskTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    int res = cdi_storage_write(hdiskName, 0, 256, (ptr_t) getBuffer());
+    DBG::outln(DBG::Basic, "write ", (res == 0 ? "success" : "failed"));
+    return res == 0 ? true : false;
+  }
+};
+
+struct ReadFromHardDiskTest : public Command {
+  ReadFromHardDiskTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    int res = cdi_storage_read(hdiskName, 0, 256, getBuffer());
+    if (res == 0) {
+      StdOut.outln(getBuffer());
+    } else {
+      DBG::outln(DBG::Basic, "read failed");
+    }
+    return res == 0 ? true : false;
+  }
+};
+
+struct WriteToFloppyDiskTest : public Command {
+  WriteToFloppyDiskTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    int res = cdi_storage_write(fdiskName, 0, 256, (ptr_t) getBuffer());
+    DBG::outln(DBG::Basic, "write ", (res == 0 ? "success" : "failed"));
+    return res == 0 ? true : false;
+  }
+};
+
+struct ReadFromFloppyDiskTest : public Command {
+  ReadFromFloppyDiskTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    int res = cdi_storage_read(fdiskName, 0, 256, getBuffer());
+    if (res == 0) {
+      StdOut.outln(getBuffer());
+    } else {
+      DBG::outln(DBG::Basic, "read failed");
+    }
+    return res == 0 ? true : false;
+  }
+};
+
+void Drivers::run(ptr_t arg) {
+  while (running) {
+    Command* cmd = testQueue.remove();
+    cmd->run();
+    delete cmd;
+  }
+}
+
+void Drivers::parseCommands(Keyboard& keyboard, char key) {
   if (!running) return;
-  char buf[256] = { 0 };  // assuming 256 bytes is enough for testing
-  Keyboard::KeyCode nextKey;
   switch (key) {
     case '1': {
-      int i = 0;
-      while ((nextKey = getNextKey(keyboard)) != 0x0d && i < 255) {
-        buf[i++] = (char) nextKey;
-      }
-      cdi_net_send(0, (ptr_t) buf, i);
+      Command* cmd = new SendNetworkPacketTest(keyboard);
+      testQueue.append(cmd);
     } break;
     case '2': {
-      int i = 0;
-      memset(buf, 0, 256);
-      while ((nextKey = getNextKey(keyboard)) != 0x0d && i < 255) {
-        buf[i++] = (char) nextKey;
-      }
-      int res = cdi_storage_write(0, 0, 256, (ptr_t) buf);
-      DBG::outln(DBG::Basic, "write ", (res == 0 ? "success" : "failed"));
+      Command* cmd = new WriteToHardDiskTest(keyboard);
+      testQueue.append(cmd);
     } break;
     case '3': {
-      memset(buf, 0, 256);
-      int res = cdi_storage_read(0, 0, 256, &buf);
-      DBG::outln(DBG::Basic, "read ", (res == 0 ? "success" : "failed"));
-      StdOut.outln(buf);
+      Command* cmd = new ReadFromHardDiskTest(keyboard);
+      testQueue.append(cmd);
     } break;
-    case 'q':
+    case '4': {
+      Command* cmd = new WriteToFloppyDiskTest(keyboard);
+      testQueue.append(cmd);
+    } break;
+    case '5': {
+      Command* cmd = new ReadFromFloppyDiskTest(keyboard);
+      testQueue.append(cmd);
+    } break;
+    case 'q': {
       StdErr.outln("Exiting drivers test...");
       running = false;
-      break;
-    default:
-      StdErr.outln("Key ", key, " pressed"); 
-      break;
+    } break;
+    default: break;
   }
-  waitForKey.V();
+
+  waitForKey.V(); // ready for next round
 }
 
 void Drivers::runTest() {
   running = true;
+  testThread = Thread::create(kernelSpace, "drivers test");
+  kernelScheduler.run(*testThread, run, nullptr);
+
   for (;;) {
     showMenu();
     waitForKey.P();

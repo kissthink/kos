@@ -16,17 +16,16 @@ static cdi_device* driver_irq_device[IRQ_COUNT] = { nullptr };
 static bool irqWaiting[IRQ_COUNT] = { false };
 
 static void cdiIrqHandler(ptr_t irqPtr) {
-  mword* irq = (mword *) irqPtr;
-  DBG::outln(DBG::CDI, "Got cdi interrupt: ", FmtHex(*irq));
-  if (driver_irq_handler[*irq]) {
-    driver_irq_handler[*irq](driver_irq_device[*irq]);
+  mword irq = *(mword *) irqPtr;
+  DBG::outln(DBG::CDI, "Got cdi interrupt: ", FmtHex(irq));
+  if (driver_irq_handler[irq]) {
+    driver_irq_handler[irq](driver_irq_device[irq]);
   }
-  if (irqWaiting[*irq]) {    // cdi_wait_irq called
+  if (irqWaiting[irq]) {    // cdi_wait_irq called
     if (!kernelScheduler.cancelTimerEvent(*Processor::getCurrThread())) {
-      DBG::outln(DBG::CDI, "IRQ ", FmtHex(*irq), " already canceled");
+      DBG::outln(DBG::CDI, "IRQ ", FmtHex(irq), " already canceled");
     }
   }
-  delete irq;
 }
 
 void cdi_register_irq(uint8_t irq, void (*handler)(cdi_device *),
@@ -78,5 +77,6 @@ int cdi_ioports_free(uint16_t start, uint16_t count) {
 }
 
 void cdi_sleep_ms(uint32_t ms) {
+  KASSERT0( Processor::interruptsEnabled() );
   kernelScheduler.sleep(ms);
 }
