@@ -41,6 +41,7 @@ void cdi_register_irq(uint8_t irq, void (*handler)(cdi_device *),
   KASSERT0( driver_irq_handler[irq] == nullptr );
   driver_irq_handler[irq] = handler;
   driver_irq_device[irq] = device;
+  DBG::outln(DBG::CDI, "cdi_register_irq() registered device: ", FmtHex(device), " at irq:", FmtHex(irq));
 
   IRQManager::registerIRQ(irq, cdiIrqHandler);
 }
