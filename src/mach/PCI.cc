@@ -127,30 +127,12 @@ void PCI::checkDevice(uint8_t bus, uint8_t device, Bus* busObj) {
   uint8_t func = 0;
   uint16_t vendorID = VendorID.get( readConfigWord(bus, device, func, 0, 32) );
   if (vendorID == 0xffff) return;    // device doesn't exist
-  uint16_t deviceID = DeviceID.get( readConfigWord(bus, device, func, 0, 32) );
-  uint16_t command = Command.get( readConfigWord(bus, device, func, 1, 32) );
-  uint16_t status = Status.get( readConfigWord(bus, device, func, 1, 32) );
-  uint32_t bar0 = readConfigWord(bus, device, func, 4, 32);
-  uint32_t bar1 = readConfigWord(bus, device, func, 5, 32);
-  uint8_t intLine = PCIGeneral::InterruptLine.get(readConfigWord(bus, device, func, 15, 32));
-  uint8_t intPin = PCIGeneral::InterruptPin.get(readConfigWord(bus, device, func, 15, 32));
-  DBG::outln(DBG::PCI, "bus: ", FmtHex(bus), " device: ", FmtHex(device), " func: ", FmtHex(func));
-  DBG::outln(DBG::PCI, "VendorID: ", FmtHex(vendorID), " DeviceID: ", FmtHex(deviceID));
-  DBG::outln(DBG::PCI, "Vendor: ", getVendorName(vendorID), " Device: ", getDeviceName(vendorID, deviceID));
-  DBG::outln(DBG::PCI, "Command: ", FmtHex(command), " Status: ", FmtHex(status));
-  DBG::outln(DBG::PCI, "BAR0: ", FmtHex(bar0));
-  DBG::outln(DBG::PCI, "BAR1: ", FmtHex(bar1));
-  DBG::outln(DBG::PCI, "Interrupt Line: ", FmtHex(intLine));
-  DBG::outln(DBG::PCI, "Interrupt Pin: ", FmtHex(intPin));
-  Device* dev = new PCIDevice( bus, device, func, getDeviceName(vendorID, deviceID) );
-  busObj->addChild(dev);
-  dev->setParent(busObj);
-  checkFunction(bus, device, func);
+  checkFunction(bus, device, func, busObj);
   uint8_t headerType = HeaderType.get( readConfigWord(bus, device, func, 3, 32) );
   if ((headerType & 0x80) != 0) {   // multi-function
     for (func = 1; func < 8; func++) {
       if (VendorID.get( readConfigWord(bus, device, func, 0, 32) ) != 0xffff) {
-        checkFunction(bus, device, func);
+        checkFunction(bus, device, func, busObj);
       }
     }
   }
@@ -167,16 +149,43 @@ void PCI::checkBus(uint8_t bus) {
   }
 }
 
-// detects if the function is a PCI to PCI bridge
-void PCI::checkFunction(uint8_t bus, uint8_t device, uint8_t function) {
+// detects if the function is a PCI to PCI bridge; also add the detected PCI device
+void PCI::checkFunction(uint8_t bus, uint8_t device, uint8_t func, Bus* busObj) {
   uint8_t baseClass;
   uint8_t subClass;
   uint8_t secondaryBus;
 
-  baseClass = ClassCode.get( readConfigWord(bus, device, function, 2, 32) );
-  subClass = SubClass.get( readConfigWord(bus, device, function, 2, 32) );
+  uint16_t vendorID = VendorID.get( readConfigWord(bus, device, func, 0, 32) );
+  uint16_t deviceID = DeviceID.get( readConfigWord(bus, device, func, 0, 32) );
+  uint16_t command = Command.get( readConfigWord(bus, device, func, 1, 32) );
+  uint16_t status = Status.get( readConfigWord(bus, device, func, 1, 32) );
+  uint32_t bar0 = readConfigWord(bus, device, func, 4, 32);
+  uint32_t bar1 = readConfigWord(bus, device, func, 5, 32);
+  uint8_t intLine = PCIGeneral::InterruptLine.get(readConfigWord(bus, device, func, 15, 32));
+  uint8_t intPin = PCIGeneral::InterruptPin.get(readConfigWord(bus, device, func, 15, 32));
+  uint8_t headerType = HeaderType.get( readConfigWord(bus, device, func, 3, 32) );
+  DBG::outln(DBG::PCI, "bus: ", FmtHex(bus), " device: ", FmtHex(device), " func: ", FmtHex(func));
+  DBG::outln(DBG::PCI, "VendorID: ", FmtHex(vendorID), " DeviceID: ", FmtHex(deviceID));
+  DBG::outln(DBG::PCI, "Vendor: ", getVendorName(vendorID), " Device: ", getDeviceName(vendorID, deviceID));
+  DBG::outln(DBG::PCI, "Command: ", FmtHex(command), " Status: ", FmtHex(status));
+  DBG::outln(DBG::PCI, "BAR0: ", FmtHex(bar0));
+  DBG::outln(DBG::PCI, "BAR1: ", FmtHex(bar1));
+  if ((headerType & 0x7f) == 0) {
+    DBG::outln(DBG::PCI, "BAR2: ", FmtHex(readConfigWord(bus, device, func, 6, 32)));
+    DBG::outln(DBG::PCI, "BAR3: ", FmtHex(readConfigWord(bus, device, func, 7, 32)));
+    DBG::outln(DBG::PCI, "BAR4: ", FmtHex(readConfigWord(bus, device, func, 8, 32)));
+    DBG::outln(DBG::PCI, "BAR5: ", FmtHex(readConfigWord(bus, device, func, 9, 32)));
+  } 
+  DBG::outln(DBG::PCI, "Interrupt Line: ", FmtHex(intLine));
+  DBG::outln(DBG::PCI, "Interrupt Pin: ", FmtHex(intPin));
+  Device* dev = new PCIDevice( bus, device, func, getDeviceName(vendorID, deviceID) );
+  busObj->addChild(dev);
+  dev->setParent(busObj);
+
+  baseClass = ClassCode.get( readConfigWord(bus, device, func, 2, 32) );
+  subClass = SubClass.get( readConfigWord(bus, device, func, 2, 32) );
   if ( baseClass == 0x06 && subClass == 0x04 ) {
-    secondaryBus = PCItoPCIBridge::SecondaryBus.get( readConfigWord(bus, device, function, 6, 32) );
+    secondaryBus = PCItoPCIBridge::SecondaryBus.get( readConfigWord(bus, device, func, 6, 32) );
     checkBus(secondaryBus); // recurse for secondary bus
   }
 }

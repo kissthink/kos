@@ -14,6 +14,7 @@ static const int IRQ_COUNT = 0x10;
 static void (*driver_irq_handler[IRQ_COUNT])(cdi_device*) = { nullptr };
 static cdi_device* driver_irq_device[IRQ_COUNT] = { nullptr };
 static bool irqWaiting[IRQ_COUNT] = { false };
+static Thread* waitingThread[IRQ_COUNT] = { nullptr };
 
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
@@ -22,9 +23,11 @@ static void cdiIrqHandler(ptr_t irqPtr) {
     driver_irq_handler[irq](driver_irq_device[irq]);
   }
   if (irqWaiting[irq]) {    // cdi_wait_irq called
-    if (!kernelScheduler.cancelTimerEvent(*Processor::getCurrThread())) {
+    KASSERT0( waitingThread[irq] );
+    if (!kernelScheduler.cancelTimerEvent(*waitingThread[irq])) {
       DBG::outln(DBG::CDI, "IRQ ", FmtHex(irq), " already canceled");
     }
+    waitingThread[irq] = nullptr;
   }
 }
 
@@ -59,7 +62,10 @@ int cdi_wait_irq(uint8_t irq, uint32_t timeout) {
   }
   if (irqWaiting[irq]) return 0;
   irqWaiting[irq] = true;
+  KASSERT0( !waitingThread[irq] );
+  waitingThread[irq] = Processor::getCurrThread();
   if (kernelScheduler.sleep(Machine::now() + timeout)) {
+    DBG::outln(DBG::CDI, "cdi_wait_irq() timed out");
     return -3;  // timedout
   }
   return 0;     // interrupted

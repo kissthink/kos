@@ -44,7 +44,7 @@ static void add_child_devices(cdi_list_t list, Device* dev) {
       for (int i = 0; i < numBars; i++) {
         cdi_pci_resource* res = new cdi_pci_resource;
         uint32_t bar = child->getBAR(i);
-        if (bar == 0) break;
+        if (bar == 0) continue;
         res->type = (bar & 0x1 ? CDI_PCI_IOPORTS : CDI_PCI_MEMORY);
         if (res->type == CDI_PCI_IOPORTS) {
           res->start = (bar & 0xfffffffc);
@@ -130,4 +130,28 @@ void cdi_pci_free_memory(cdi_pci_device* device) {
 
 const char* cdi_pci_get_device_name(cdi_pci_device* device) {
   return PCI::getDeviceName(device->vendor_id, device->device_id);
+}
+
+uint8_t cdi_pci_config_readb(cdi_pci_device* device, uint8_t offset) {
+  return PCI::readConfigWord(device->bus, device->dev, device->function, offset, 8);
+}
+
+uint16_t cdi_pci_config_readw(cdi_pci_device* device, uint8_t offset) {
+  return PCI::readConfigWord(device->bus, device->dev, device->function, offset, 16);
+}
+
+uint32_t cdi_pci_config_readl(cdi_pci_device* device, uint8_t offset) {
+  return PCI::readConfigWord(device->bus, device->dev, device->function, offset, 32);
+}
+
+void cdi_pci_config_writeb(cdi_pci_device* device, uint8_t offset, uint8_t value) {
+  PCI::writeConfigWord(device->bus, device->dev, device->function, offset, 8, value);
+}
+
+void cdi_pci_config_writew(cdi_pci_device* device, uint8_t offset, uint16_t value) {
+  PCI::writeConfigWord(device->bus, device->dev, device->function, offset, 16, value);
+}
+
+void cdi_pci_config_writel(cdi_pci_device* device, uint8_t offset, uint32_t value) {
+  PCI::writeConfigWord(device->bus, device->dev, device->function, offset, 32, value);
 }

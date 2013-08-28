@@ -138,16 +138,18 @@ public:
     }
   }
 
-  static uint32_t probeDevice(uint16_t bus, uint16_t device) {
-    return readConfigWord(bus, device, 0, 0, 32);
+  static uint32_t probeDevice(uint16_t bus, uint16_t device,uint16_t func) {
+    return readConfigWord(bus, device, func, 0, 32);
   }
 
   static void probeAll() {
     for (int bus = 0; bus < MaxBus; bus += 1) {
       for (int dev = 0; dev < MaxDevice; dev += 1) {
-        uint32_t r = probeDevice(bus,dev);
+        for (int func = 0; func < 8; func += 1) {
+        uint32_t r = probeDevice(bus,dev,func);
         if (VendorID.get(r) != 0xFFFF) {
-          DBG::outln(DBG::PCI, "PCI ", bus, '/', dev, ' ', FmtHex(VendorID.get(r),4), ':', FmtHex(DeviceID.get(r),4));
+          DBG::outln(DBG::PCI, "PCI ", bus, '/', dev, '/', func, ' ', FmtHex(VendorID.get(r),4), ':', FmtHex(DeviceID.get(r),4));
+        }
         }
       }
     }
@@ -155,7 +157,7 @@ public:
 
   static void checkDevice(uint8_t bus, uint8_t device, Bus* busObj);
   static void checkBus(uint8_t bus);
-  static void checkFunction(uint8_t bus, uint8_t device, uint8_t function);
+  static void checkFunction(uint8_t bus, uint8_t device, uint8_t function, Bus* busObj);
   static void checkAllBuses();
   static const char* getVendorName(uint16_t vendorID);
   static const char* getDeviceName(uint16_t vendorID, uint16_t deviceID);

@@ -81,8 +81,10 @@ bool Scheduler::cancelTimerEvent(Thread& t) {
     if ((*i) == &t) {
       t.interrupted = true;
       timerQueue.erase(i);
+      start(t); // put it on run queue
       break;
     }
+    ++i;
   }
   return t.interrupted;
 }

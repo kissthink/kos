@@ -32,19 +32,14 @@
 
 #include "cdi/pci.h"
 #include "cdi/misc.h"
+#include "cdi/printf.h"
 
 #include "device.h"
 
 #define DRIVER_NAME "hdaudio"
 
-#undef DEBUG
-
-#ifdef DEBUG
 #define DPRINTF(fmt, ...) \
-    do { stdout = NULL; printf(DRIVER_NAME ": " fmt, ##__VA_ARGS__); } while(0)
-#else
-#define DPRINTF(...) do {} while(0)
-#endif
+    do { CdiPrintf(DRIVER_NAME ": " fmt, ##__VA_ARGS__); } while(0)
 
 static struct cdi_audio_driver driver;
 
@@ -365,7 +360,9 @@ static struct cdi_device* hda_init_device(struct cdi_bus_data* bus_data)
     }
 
     /* Initialise device structure */
-    hda = calloc(1, sizeof(*hda));
+//    hda = calloc(1, sizeof(*hda));
+    hda = malloc(sizeof(*hda));
+    memset(hda, 0, sizeof(*hda));
 
     hda->rings = cdi_mem_alloc(1024 + 2048 + BDL_BYTES_ROUNDED + 128,
         CDI_MEM_PHYS_CONTIGUOUS | 7);

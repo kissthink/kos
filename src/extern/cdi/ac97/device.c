@@ -49,7 +49,9 @@ struct cdi_device* ac97_init_device(struct cdi_bus_data* bus_data)
         return NULL;
     }
 
-    struct ac97_device* dev = calloc(1, sizeof(*dev));
+//    struct ac97_device* dev = calloc(1, sizeof(*dev));
+    struct ac97_device* dev = malloc(sizeof(*dev));
+    memset(dev, 0, sizeof(*dev));
 
     cdi_pci_alloc_ioports(pci);
 

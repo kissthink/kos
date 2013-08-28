@@ -92,7 +92,7 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
-extern void cdi_init();
+extern "C" void cdi_init();
 
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
@@ -263,6 +263,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   PCI::sanityCheck();
 
   // find PCI devices
+  PCI::probeAll();
   PCI::checkAllBuses();
 
   // find additional devices ("current thread" faked for ACPI)

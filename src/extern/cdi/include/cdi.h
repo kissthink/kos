@@ -105,6 +105,10 @@
 #include <cdi-osdep.h>
 #include <cdi/lists.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     CDI_UNKNOWN         = 0,
     CDI_NETWORK         = 1,
@@ -345,6 +349,10 @@ void cdi_driver_register(struct cdi_driver* driver);
  * \endenglish
  */
 int cdi_provide_device(struct cdi_bus_data* device);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 
