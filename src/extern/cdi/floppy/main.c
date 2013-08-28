@@ -75,6 +75,9 @@ static int floppy_driver_init(void)
         }
     }
 
+    // failed detecting floppy drive
+    if (cdi_list_empty(floppy_driver.drv.devices)) return -1;
+
     // IRQ fuer FDC registrieren(ist hier egal fuer welches Geraet, da er eh
     // nur in der Controller-Struktur etwas macht).
     cdi_register_irq(6, floppy_handle_interrupt, (struct cdi_device*)

@@ -36,11 +36,10 @@
 #include "cdi/misc.h"
 #include "cdi/pci.h"
 #include "cdi/mem.h"
+#include "cdi/printf.h"
 
 #include "device.h"
 #include "e1000_io.h"
-
-#undef DEBUG
 
 #define PHYS(netcard, field) \
     (netcard->phys + offsetof(struct e1000_device, field))
@@ -246,7 +245,7 @@ static uint16_t e1000_eeprom_read(struct e1000_device* device, uint16_t offset)
         data = e1000_read_uwire(device, offset);
         if(data == ((uint32_t) -1))
         {
-            printf("e1000: couldn't read eeprom via EERD or uwire!");
+            CdiPrintf("e1000: couldn't read eeprom via EERD or uwire!");
             return 0;
         }
     }
@@ -277,7 +276,7 @@ static void reset_nic(struct e1000_device* netcard)
     // Rx/Tx-Ring initialisieren
     reg_outl(netcard, REG_RXDESC_ADDR_HI, 0);
     reg_outl(netcard, REG_RXDESC_ADDR_LO, PHYS(netcard, rx_desc[0]));
-    printf("e1000: RX descriptors at %x\n", PHYS(netcard, rx_desc[0]));
+    CdiPrintf("e1000: RX descriptors at %x\n", PHYS(netcard, rx_desc[0]));
     reg_outl(netcard, REG_RXDESC_LEN,
         RX_BUFFER_NUM * sizeof(struct e1000_rx_descriptor));
     reg_outl(netcard, REG_RXDESC_HEAD, 0);
@@ -304,7 +303,7 @@ static void reset_nic(struct e1000_device* netcard)
         ((mac >> 32) & 0xFFFF) | RAH_VALID);
 
     netcard->net.mac = mac;
-    printf("e1000: MAC-Adresse: %012llx\n", (uint64_t) netcard->net.mac);
+    CdiPrintf("e1000: MAC-Adresse: %012llx\n", (uint64_t) netcard->net.mac);
 
     // Rx-Deskriptoren aufsetzen
     for (i = 0; i < RX_BUFFER_NUM; i++) {
@@ -312,7 +311,7 @@ static void reset_nic(struct e1000_device* netcard)
         netcard->rx_desc[i].buffer = PHYS(netcard, rx_buffer[i * RX_BUFFER_SIZE]);
 
 #ifdef DEBUG
-        printf("e1000: [%d] Rx: Buffer @ phys %08x, Desc @ phys %08x\n",
+        CdiPrintf("e1000: [%d] Rx: Buffer @ phys %08x, Desc @ phys %08x\n",
             i,
             netcard->rx_desc[i].buffer,
             PHYS(netcard, rx_desc[i]));
@@ -359,7 +358,7 @@ struct cdi_device* e1000_init_device(struct cdi_bus_data* bus_data)
     struct cdi_pci_device* pci = (struct cdi_pci_device*) bus_data;
     struct e1000_device* netcard;
     struct cdi_mem_area* buf;
-    int i;
+    unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(pci_id_list); i++) {
         if (pci->vendor_id == pci_id_list[i].vendor_id
@@ -398,10 +397,10 @@ found:
     }
 
     // Karte initialisieren
-    printf("e1000: IRQ %d, MMIO an %p  Revision:%d\n",
+    CdiPrintf("e1000: IRQ %d, MMIO an %p  Revision:%d\n",
         pci->irq, netcard->mem_base, netcard->revision);
 
-    printf("e1000: Fuehre Reset der Karte durch\n");
+    CdiPrintf("e1000: Fuehre Reset der Karte durch\n");
     reset_nic(netcard);
 
     cdi_net_device_init(&netcard->net);
@@ -435,7 +434,7 @@ void e1000_send_packet(struct cdi_net_device* device, void* data, size_t size)
     uint32_t cur, head;
 
 #ifdef DEBUG
-    printf("e1000: e1000_send_packet\n");
+    CdiPrintf("e1000: e1000_send_packet\n");
 #endif
 
     // Aktuellen Deskriptor erhoehen
@@ -446,7 +445,7 @@ void e1000_send_packet(struct cdi_net_device* device, void* data, size_t size)
     // Head auslesen
     head = reg_inl(netcard, REG_TXDESC_HEAD);
     if (netcard->tx_cur_buffer == head) {
-        printf("e1000: Kein Platz in der Sendewarteschlange!\n");
+        CdiPrintf("e1000: Kein Platz in der Sendewarteschlange!\n");
         return;
     }
 
@@ -463,7 +462,7 @@ void e1000_send_packet(struct cdi_net_device* device, void* data, size_t size)
         PHYS(netcard, tx_buffer) + (cur * TX_BUFFER_SIZE);
 
 #ifdef DEBUG
-    printf("e1000: Setze Tail auf %d, Head = %d\n", netcard->tx_cur_buffer, head);
+    CdiPrintf("e1000: Setze Tail auf %d, Head = %d\n", netcard->tx_cur_buffer, head);
 #endif
     reg_outl(netcard, REG_TXDESC_TAIL, netcard->tx_cur_buffer);
 }
@@ -475,7 +474,7 @@ static void e1000_handle_interrupt(struct cdi_device* device)
     uint32_t icr = reg_inl(netcard, REG_INTR_CAUSE);
 
 #ifdef DEBUG
-    printf("e1000: Interrupt, ICR = %08x\n", icr);
+    CdiPrintf("e1000: Interrupt, ICR = %08x\n", icr);
 #endif
 
     if (icr & ICR_RECEIVE) {
@@ -497,17 +496,17 @@ static void e1000_handle_interrupt(struct cdi_device* device)
             size -= 4;
 
 #ifdef DEBUG
-            printf("e1000: %d Bytes empfangen (status = %x)\n", size, status);
+            CdiPrintf("e1000: %d Bytes empfangen (status = %x)\n", size, status);
 /*
             int i;
             for (i = 0; i < (size < 49 ? size : 49); i++) {
-                printf("%02hhx ", netcard->rx_buffer[
+                CdiPrintf("%02hhx ", netcard->rx_buffer[
                     netcard->rx_cur_buffer * RX_BUFFER_SIZE + i]);
                 if (i % 25 == 0) {
-                    printf("\n");
+                    CdiPrintf("\n");
                 }
             }
-            printf("\n\n");
+            CdiPrintf("\n\n");
 */
 #endif
 
@@ -531,7 +530,7 @@ static void e1000_handle_interrupt(struct cdi_device* device)
         // Nichts zu tun
     } else {
 #ifdef DEBUG
-        printf("e1000: Unerwarteter Interrupt.\n");
+        CdiPrintf("e1000: Unerwarteter Interrupt.\n");
 #endif
     }
 }

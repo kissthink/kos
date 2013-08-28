@@ -43,6 +43,7 @@ void IRQManager::init(int rdr) {
   initialized = true;
 
   softIRQThread = Thread::create(kernelSpace, "IRQ thread");
+  softIRQThread->setPriority(1);
   kernelScheduler.run(*softIRQThread, softIRQ, nullptr);      // start handling IRQ
 
   dump();

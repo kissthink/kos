@@ -92,7 +92,7 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
-extern "C" void cdi_init();
+extern "C" void cdi_init(ptr_t);
 
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
@@ -278,8 +278,9 @@ void Machine::initBSP2() {
   // enable interrupts (off boot stack)
   Processor::enableInterrupts();
 
-  // initialize CDI
-  cdi_init();
+  // initialize CDI (run on separate thread because Thread::sleep() won't work as expected if it runs on the idle thread
+  Thread* cdiThread = Thread::create(kernelSpace, "CDI thread");
+  kernelScheduler.run(*cdiThread, cdi_init, nullptr);
 
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();

@@ -44,7 +44,10 @@ static void add_child_devices(cdi_list_t list, Device* dev) {
       for (int i = 0; i < numBars; i++) {
         cdi_pci_resource* res = new cdi_pci_resource;
         uint32_t bar = child->getBAR(i);
-        if (bar == 0) continue;
+        if (bar == 0) {
+          delete res;
+          continue;
+        }
         res->type = (bar & 0x1 ? CDI_PCI_IOPORTS : CDI_PCI_MEMORY);
         if (res->type == CDI_PCI_IOPORTS) {
           res->start = (bar & 0xfffffffc);
@@ -59,13 +62,15 @@ static void add_child_devices(cdi_list_t list, Device* dev) {
             res->index = i;
             res->address = 0;
           } else if (memType == 0x01) { // reserved for PCI LocalBus 3.0
-            ABORT1("what is going on?");
+            ABORT1("Do not know how to interpret this BAR");
           } else if (memType == 0x02) { // 64-bit wide
-            ABORT1("64-bit unimplemented");
-#if 0
-            uint32_t bar2 = child->getBar(i + 1);
+//            ABORT1("64-bit unimplemented");
+            uint32_t bar2 = child->getBAR(i + 1);
             res->start = ((bar & 0xfffffff0) + ((bar2 & 0xffffffff) << 32));
-#endif
+            res->length = (child->getBARSize(i) + (child->getBARSize(i+1) << 32));
+            res->index = i;
+            res->address = 0;
+            i += 1;   // consumed 2 registers
           } else ABORT1("unknown type field");
         }
         cdi_list_push(pciDev->resources, res);

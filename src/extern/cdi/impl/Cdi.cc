@@ -15,7 +15,7 @@ extern struct cdi_driver* __stop_cdi_drivers;   // 1 past last driver
 static void cdi_run_drivers();        // match device/driver pairs
 static void cdi_init_pci_devices();   // PCI devices are detected
 
-void cdi_init() {
+void cdi_init(void* arg) {
   drivers = cdi_list_create();          // create drivers list
 
   // drivers initialization

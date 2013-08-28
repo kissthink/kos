@@ -10,7 +10,7 @@ class CdiMemoryManager {
 
 public:
   static cdi_mem_area* alloc(size_t size, cdi_mem_flags_t flags);
-  static cdi_mem_area* reserve(uintptr_t paddr, size_t size);
+  static cdi_mem_area* mapPhysical(uintptr_t paddr, size_t size);
   static void free(cdi_mem_area* p);
 };
 

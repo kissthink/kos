@@ -90,13 +90,35 @@ cdi_mem_area* CdiMemoryManager::alloc(size_t size, cdi_mem_flags_t flags) {
   }
 }
 
-cdi_mem_area* CdiMemoryManager::reserve(uintptr_t paddr, size_t size) {
+cdi_mem_area* CdiMemoryManager::mapPhysical(uintptr_t paddr, size_t size) {
+  // I think we can ignore FrameManager failing to reserve physical address
+  // for us because these physical addresses (from PCI BAR) may be
+  // from device memory
+#if 0
   bool reserved = Processor::getFrameManager()->reserve( laddr(paddr), size );
   if (reserved) {
     DBG::outln(DBG::VM, "cdi_mem_map() reserved physical memory: ", FmtHex(paddr), '/', FmtHex(size));
     cdi_mem_area* area = new cdi_mem_area;
     area->size = size;
     area->vaddr = nullptr;
+    area->paddr.num = 1;
+    area->paddr.items = new cdi_mem_sg_item;
+    area->paddr.items->start = paddr;
+    area->paddr.items->size = size;
+    return area;
+  }
+#endif
+  vaddr mappedAddr = topaddr;
+  if ( size >= 0x200000 ) { // use 2MB paging
+    mappedAddr = kernelSpace.mapPages<2>( laddr(paddr), size, AddressSpace::Data);
+  } else {
+    mappedAddr = kernelSpace.mapPages<1>( laddr(paddr), size, AddressSpace::Data);
+  }
+  if (mappedAddr != topaddr) {
+    DBG::outln(DBG::VM, "cdi_mem_map() mapped physical memory: ", FmtHex(paddr), " -> ", FmtHex(mappedAddr));
+    cdi_mem_area* area = new cdi_mem_area;
+    area->size = size;
+    area->vaddr = (ptr_t)mappedAddr;
     area->paddr.num = 1;
     area->paddr.items = new cdi_mem_sg_item;
     area->paddr.items->start = paddr;

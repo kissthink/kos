@@ -255,7 +255,7 @@ struct cdi_driver {
  * return.
  * \endenglish
  */
-void cdi_init(void);
+void cdi_init(void*);
 
 /**
  * \german
