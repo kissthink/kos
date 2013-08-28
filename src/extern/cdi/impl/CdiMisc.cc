@@ -12,9 +12,9 @@
 static const int IRQ_COUNT = 0x10;
 
 static void (*driver_irq_handler[IRQ_COUNT])(cdi_device*) = { nullptr };
-static cdi_device* driver_irq_device[IRQ_COUNT] = { nullptr };
-static bool irqWaiting[IRQ_COUNT] = { false };
-static Thread* waitingThread[IRQ_COUNT] = { nullptr };
+static cdi_device* volatile driver_irq_device[IRQ_COUNT] = { nullptr };
+static bool volatile irqWaiting[IRQ_COUNT] = { false };
+static Thread* volatile waitingThread[IRQ_COUNT] = { nullptr };
 
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
