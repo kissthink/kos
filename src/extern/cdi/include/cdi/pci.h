@@ -112,7 +112,7 @@ struct cdi_pci_resource {
      * Size of the ressource in bytes
      * \endenglish
      */
-    size_t       length;
+    uint64_t       length;
 
     /**
      * \german

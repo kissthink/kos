@@ -36,7 +36,7 @@ CDI_HDAUDIO_OBJS  = $(subst .c,.o,$(CDI_HDAUDIO_SRCS))
 CDI_SIS900_SRCS   = $(wildcard $(addsuffix /*.c,$(CDI_SIS900)))
 CDI_SIS900_OBJS   = $(subst .c,.o,$(CDI_SIS900_SRCS))
 
-CDI_KOS   =               impl
+CDI_KOS   =               impl impl/scsi
 KOS_SRCS=$(wildcard $(addsuffix /*.cc,$(CDI_KOS)))
 KOS_OBJS=$(subst .cc,.o,$(KOS_SRCS))
 
@@ -45,8 +45,8 @@ ATA_OBJS		=	$(CDI_ATA_OBJS) $(CDI_LIBEXT2_OBJS) $(CDI_EXT2_OBJS) $(CDI_FLOPPY_OB
 AUDIO_OBJS	=	$(CDI_AC97_OBJS) $(CDI_HDAUDIO_OBJS)
 OBJECTS			=	$(NET_OBJS) $(ATA_OBJS) $(AUDIO_OBJS)
 
-CFLAGS 		+= -I$(SRCDIR) -Iinclude -D__KOS__ -DDEBUG -D_GNU_SOURCE $(OPTFLAGS)
-CXXFLAGS 	+= -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
+CFLAGS 		+= -Wno-missing-field-initializers -Wstrict-aliasing=0 -I$(SRCDIR) -Iinclude -D__KOS__ -DDEBUG -D_GNU_SOURCE $(OPTFLAGS)
+CXXFLAGS 	+= -Wstrict-aliasing=0 -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
 
 vpath %.c $(CDI)
 vpath %.cc $(CDI_KOS)

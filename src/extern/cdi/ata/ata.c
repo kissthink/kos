@@ -39,7 +39,7 @@
 /**
  * ATA-Device identification
  *
- * @return 0 when the unit has been successfully identified, != 0 otherwise
+ * @return 1 when the unit has been successfully identified, 0 otherwise
  */
 int ata_drv_identify(struct ata_device* dev)
 {
@@ -118,7 +118,7 @@ static int ata_drv_rw_sectors(struct ata_device* dev, int direction,
     uint16_t current_count;
     void* current_buffer = buffer;
     uint64_t lba = start;
-    int max_count;
+    size_t max_count;
     int again = 2;
     // number of sectors that are remained
     size_t count_left = count;

@@ -277,7 +277,7 @@ int ata_protocol_pio_in(struct ata_request* request)
                     // abgeschlossen.
                     return 1;
                 } else if (request->flags.ata &&
-                         request->blocks_done*request->block_size>=packet_size)
+                         (uint32_t)(request->blocks_done*request->block_size) >= packet_size)
                 {
                     // Wenn alle Bytes des ATAPI-Paketes gelesen wurden
                     // ist der Transfer abgeschlossen
@@ -339,7 +339,7 @@ int ata_protocol_pio_out(struct ata_request* request)
                 uint8_t status = ata_reg_inb(ctrl, REG_STATUS);
                 
                 if (request->flags.ata &&
-                    request->blocks_done * request->block_size>=packet_size)
+                    ((uint32_t)(request->blocks_done * request->block_size) >= packet_size))
                 {
                     // Das Paket wurde vollstaendig gelesen. DRQ wird nicht
                     // gesetzt, deswegen muss so beendet werden.

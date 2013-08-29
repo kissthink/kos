@@ -59,8 +59,7 @@ static int ata_bus_floating(struct ata_controller* controller)
 {
     uint8_t status;
 
-    // Master auswaehlen und Status auslesen
-    // selected league master and read status
+    // Selected master device and read status
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(0));
     ATA_DELAY(controller);
     status = ata_reg_inb(controller, REG_STATUS);
@@ -70,7 +69,7 @@ static int ata_bus_floating(struct ata_controller* controller)
         return 0;
     }
 
-    // selected league slave
+    // Selected slave device
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(1));
     ATA_DELAY(controller);
     status = ata_reg_inb(controller, REG_STATUS);
@@ -93,30 +92,20 @@ static int ata_bus_floating(struct ata_controller* controller)
  */
 static int ata_bus_responsive_drv(struct ata_controller* controller)
 {
-    // selected league slave, so sure someone reacts, because the master must,
+    // Selected slave device, to make sure someone reacts, because the master must,
     // if no slave exists. So it looks at least in theory. In practice, vmware
     // does not seem to make it that way. Therefore we turn below a special
-    // round for vmware
-    //
-    // Slave auswaehlen, da so sicher jemand reagiert, da der Master antworten
-    // muss, wenn kein Slave existiert. So sieht es zumindest in der Theorie
-    // aus. In der Praxis scheint vmware das nicht so zu machen. Deshalb drehen
-    // wir weiter unten noch eine Sonderrunde fuer vmware. ;-)
+    // round for vmware. ;-)
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(1));
     ATA_DELAY(controller);
 
-    // Now something is written to the port. The values are absolute matter comes
-    // back as long as the same when read is good.
-    //
-    // Jetzt wird irgendwas auf die Ports geschrieben. Die Werte sind absolut
-    // egal, solange das selbe beim auslesen zurueckkommt ist gut.
+    // Now something is written to the port. If the values read back are
+    // same, at least some device is available
     ata_reg_outb(controller, REG_LBA_LOW, 0xAF);
     ata_reg_outb(controller, REG_LBA_MID, 0xBF);
     ata_reg_outb(controller, REG_LBA_HIG, 0xCF);
 
     // If the values are read at least some device available
-    //
-    // Wenn die ausgelesenen Werte stimmen ist mindestens ein Geraet vorhanden
     if ((ata_reg_inb(controller, REG_LBA_LOW) == 0xAF) &&
         (ata_reg_inb(controller, REG_LBA_MID) == 0xBF) &&
         (ata_reg_inb(controller, REG_LBA_HIG) == 0xCF))
@@ -126,23 +115,16 @@ static int ata_bus_responsive_drv(struct ata_controller* controller)
 
 
     // Here's the small lap of honour for vmware
-    //
-    // Hier noch die kleine Ehrenrunde fuer vmware ;-)
     ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(0));
     ATA_DELAY(controller);
 
-    // now something is written to the port. The values are absolute matter comes
-    // back as long as the same when read is good.
-    //
-    // Jetzt wird irgendwas auf die Ports geschrieben. Die Werte sind absolut
-    // egal, solange das selbe beim auslesen zurueckkommt ist gut.
+    // Now something is written to the port. If the values read back are
+    // same, at least some device is available
     ata_reg_outb(controller, REG_LBA_LOW, 0xAF);
     ata_reg_outb(controller, REG_LBA_MID, 0xBF);
     ata_reg_outb(controller, REG_LBA_HIG, 0xCF);
 
-    // if the values are read at least some device available
-    //
-    // Wenn die ausgelesenen Werte stimmen ist mindestens ein Geraet vorhanden
+    // If the values are read at least some device available
     if ((ata_reg_inb(controller, REG_LBA_LOW) == 0xAF) &&
         (ata_reg_inb(controller, REG_LBA_MID) == 0xBF) &&
         (ata_reg_inb(controller, REG_LBA_HIG) == 0xCF))
@@ -154,19 +136,16 @@ static int ata_bus_responsive_drv(struct ata_controller* controller)
 }
 
 /**
- * IRQ-Handler fuer ATA-Controller
+ * IRQ-Handler for ATA-controller
  *
- *            Attention! here is not a real device! This was only applied to
- *            register the handler
- * @param dev Achtung hier handelt es sich um kein echtes Geraet!!! Das wurde
- *            nur zum Registrieren des Handlers angelegt.
+ * @param dev Not a real device. Only passed as the irq handler's signature is fixed.
  */
 static void ata_controller_irq(struct cdi_device* dev)
 {
     // Here we have to actually do nothing, because we always want just
     // waiting for IRQ, and in return provides CDI features at your disposal.
     // But the IRQ must still be registered, and there we have to specify a handler,
-    // otherwise we fly in the first IRQ to the ears
+    // otherwise we fly in the first IRQ to the ears (??? google translate sucks)
     //
     // Hier muessen wir eigentlich garnichts tun, da wir immer nur auf IRQs
     // warten wollen, und dafuer stellt CDI Funktionen zur Verfuegung. Doch
@@ -215,12 +194,9 @@ void ata_init_controller(struct ata_controller* controller)
         goto error_free_ctlbase;
     }
     
-    // Since LINES not work everywhere clean, but an IRQ handler must be registered
-    // already. And in return we need now time some device
-    //
     // Da NIEN nicht ueberall sauber funktioniert, muss jetzt trotzdem schon
     // ein IRQ-Handler registriert werden. Und dafuer brauchen wir nun mal ein
-    // Geraet.
+    // Geraet. (??? can't translate)
     controller->irq_dev.controller = controller;
     cdi_register_irq(controller->irq, ata_controller_irq, (struct cdi_device*)
         &controller->irq_dev);
@@ -235,7 +211,7 @@ void ata_init_controller(struct ata_controller* controller)
     // werden auch noch interrupts deaktiviert, da die erst benutzt werden
     // koennen, wenn feststeht, welche geraete existieren.
     //
-    // Note: LINES not seem to work everywhere! On a test computer nevertheless,
+    // Note: NIEN not seem to work everywhere! On a test computer nevertheless,
     // there are interrupt.
     //
     // ACHTUNG: NIEN scheint nicht ueberall zu funktionieren!! Auf einem meiner
@@ -245,7 +221,7 @@ void ata_init_controller(struct ata_controller* controller)
         ata_reg_outb(controller, REG_DEVICE, DEVICE_DEV(i));
         ATA_DELAY(controller);
 
-        // HOB delete and set LINES
+        // HOB delete and set NIEN
         ata_reg_outb(controller, REG_CONTROL, CONTROL_NIEN);
     }
 
@@ -286,33 +262,25 @@ void ata_init_controller(struct ata_controller* controller)
 #endif
                 dev->dev.storage.block_size = ATA_SECTOR_SIZE;
 
-                // Handler setzen
+                // Set handler
                 dev->read_sectors = ata_drv_read_sectors;
                 dev->write_sectors = ata_drv_write_sectors;
                 
-                // Name setzen
-#if 0
-                asprintf((char**) &(dev->dev.storage.dev.name), "ata%01d%01d",
-                    (uint32_t) controller->id, i);
-#endif
+                // Set name
                 sprintf((char *) dev->dev.storage.dev.name, "ata%01d%01d",
                     (uint32_t) controller->id, i);
 
-                // Geraet registrieren
+                // Register device
                 dev->dev.storage.dev.driver = &controller->storage->drv;
                 ata_init_device(dev);
                 cdi_list_push(controller->storage->drv.devices, dev);
 #ifdef ATAPI_ENABLE
             } else {
-                // Name setzen
-#if 0
-                asprintf((char**) &(dev->dev.scsi.dev.name),"atapi%01d%01d",
-                    (uint32_t) controller->id, i);
-#endif
+                // Set name
                 sprintf((char *) dev->dev.scsi.dev.name, "atapi%01d%01d",
                     (uint32_t) controller->id, i);
             
-                // Geraet registrieren
+                // Register device
                 dev->dev.scsi.dev.driver = &controller->scsi->drv;
                 atapi_init_device(dev);
                 cdi_list_push(controller->scsi->drv.devices, dev);
@@ -323,9 +291,7 @@ void ata_init_controller(struct ata_controller* controller)
         }
     }
 
-    // finally DMA is still prepared, if possible
-    //
-    // Abschliessend wird noch DMA vorbereitet, wenn moeglich
+    // Finally DMA is still prepared, if possible
     if (controller->port_bmr_base) {
         struct cdi_mem_area* buf;
 

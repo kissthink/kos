@@ -58,12 +58,12 @@ void parseIpPacket(cdi_net_device* device, ptr_t buffer, size_t size) {
   bytes[1] = (header->source_ip >> 8) & 0xff;
   bytes[2] = (header->source_ip >> 16) & 0xff;
   bytes[3] = (header->source_ip >> 24) & 0xff;
-  CdiPrintf("Source IP: %d.%d.%d.%d\n", bytes[3], bytes[2], bytes[1], bytes[0]);
+  CdiPrintf("Source IP: %d.%d.%d.%d\n", bytes[0], bytes[1], bytes[2], bytes[3]);
   bytes[0] = header->dest_ip & 0xff;
   bytes[1] = (header->dest_ip >> 8) & 0xff;
   bytes[2] = (header->dest_ip >> 16) & 0xff;
   bytes[3] = (header->dest_ip >> 24) & 0xff;
-  CdiPrintf("Dest IP: %d.%d.%d.%d\n", bytes[3], bytes[2], bytes[1], bytes[0]);
+  CdiPrintf("Dest IP: %d.%d.%d.%d\n", bytes[0], bytes[1], bytes[2], bytes[3]);
 
 //  printPayload((char *)buffer + sizeof(ip_header), size - sizeof(ip_header));
 }

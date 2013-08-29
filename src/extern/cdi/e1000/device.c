@@ -258,11 +258,11 @@ static void reset_nic(struct e1000_device* netcard)
     uint64_t mac;
     int i;
 
-    // Rx/Tx deaktivieren
+    // Disable Rx/Tx
     reg_outl(netcard, REG_RX_CTL, 0);
     reg_outl(netcard, REG_TX_CTL, 0);
 
-    // Reset ausfuehren
+    // Execute reset
     reg_outl(netcard, REG_CTL, CTL_PHY_RESET);
     cdi_sleep_ms(10);
 
@@ -270,10 +270,10 @@ static void reset_nic(struct e1000_device* netcard)
     cdi_sleep_ms(10);
     while (reg_inl(netcard, REG_CTL) & CTL_RESET);
 
-    // Kontrollregister initialisieren
+    // Initialize control register
     reg_outl(netcard, REG_CTL, CTL_AUTO_SPEED | CTL_LINK_UP);
 
-    // Rx/Tx-Ring initialisieren
+    // Rx/Tx-Ring initialization
     reg_outl(netcard, REG_RXDESC_ADDR_HI, 0);
     reg_outl(netcard, REG_RXDESC_ADDR_LO, PHYS(netcard, rx_desc[0]));
     CdiPrintf("e1000: RX descriptors at %x\n", PHYS(netcard, rx_desc[0]));
@@ -293,7 +293,7 @@ static void reset_nic(struct e1000_device* netcard)
     reg_outl(netcard, REG_TX_DELAY_TIMER, 0);
     reg_outl(netcard, REG_TADV, 0);
 
-    // VLANs deaktivieren
+    // Disable VLANs
     reg_outl(netcard, REG_VET, 0);
 
     // MAC-Filter
@@ -303,9 +303,9 @@ static void reset_nic(struct e1000_device* netcard)
         ((mac >> 32) & 0xFFFF) | RAH_VALID);
 
     netcard->net.mac = mac;
-    CdiPrintf("e1000: MAC-Adresse: %012llx\n", (uint64_t) netcard->net.mac);
+    CdiPrintf("e1000: MAC-Address: %012llx\n", (uint64_t) netcard->net.mac);
 
-    // Rx-Deskriptoren aufsetzen
+    // Assign physical addresses to Rx-Descriptors
     for (i = 0; i < RX_BUFFER_NUM; i++) {
         netcard->rx_desc[i].length = RX_BUFFER_SIZE;
         netcard->rx_desc[i].buffer = PHYS(netcard, rx_buffer[i * RX_BUFFER_SIZE]);
@@ -321,7 +321,7 @@ static void reset_nic(struct e1000_device* netcard)
     netcard->tx_cur_buffer = 0;
     netcard->rx_cur_buffer = 0;
 
-    // Rx/Tx aktivieren
+    // Enable Rx/Tx
     reg_outl(netcard, REG_RX_CTL, RCTL_ENABLE | RCTL_BROADCAST
         | RCTL_2K_BUFSIZE);
     reg_outl(netcard, REG_TX_CTL, TCTL_ENABLE | TCTL_PADDING
@@ -382,7 +382,7 @@ found:
     netcard->phys = buf->paddr.items[0].start;
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
 
-    // PCI-bezogenes Zeug initialisieren
+    // Initialize PCI related stuff
     netcard->revision = pci->rev_id;
     cdi_register_irq(pci->irq, e1000_handle_interrupt, &netcard->net.dev);
     cdi_pci_alloc_ioports(pci);
@@ -396,7 +396,6 @@ found:
         }
     }
 
-    // Karte initialisieren
     CdiPrintf("e1000: IRQ %d, MMIO an %p  Revision:%d\n",
         pci->irq, netcard->mem_base, netcard->revision);
 
@@ -405,7 +404,7 @@ found:
 
     cdi_net_device_init(&netcard->net);
 
-    // Interrupts aktivieren
+    // Enable interrupts
     reg_outl(netcard, REG_INTR_MASK_CLR, 0xFFFF);
     reg_outl(netcard, REG_INTR_MASK, 0xFFFF);
 
@@ -417,16 +416,15 @@ void e1000_remove_device(struct cdi_device* device)
 }
 
 /**
- * Die Uebertragung von Daten geschieht durch einen Ring von
- * Transmit-Deskriptoren, die jeweils ein zu uebertragendes Paket
- * beschreiben.
+ * The transmission of data is done by a ring of transmit descriptors,
+ * each a packet to be transmitted is described by.
  *
- * Die Hardware kennt dabei zwei besondere Deskriptoren, die Head und
- * Tail heissen. Wenn der Treiber ein neues Paket zum Senden einstellt,
- * fuegt er einen neuen Deskriptor nach Tail ein und erhoeht Tail.
+ * The hardware knows there are two special descriptors, Head and Tail.
+ * If the driver sets a new packet to transmit, it adds a new descriptor
+ * and increases tail.
  *
- * Die Hardware erhoeht ihrerseits Head, wenn sie ein Paket abgeschickt hat.
- * Wenn Head = Tail ist, ist die Sendewarteschlange leer.
+ * The hardware increases head in turn, when it has sent a packet.
+ * If Head == Tail, the transmit queue is empty.
  */
 void e1000_send_packet(struct cdi_net_device* device, void* data, size_t size)
 {
@@ -437,32 +435,32 @@ void e1000_send_packet(struct cdi_net_device* device, void* data, size_t size)
     CdiPrintf("e1000: e1000_send_packet\n");
 #endif
 
-    // Aktuellen Deskriptor erhoehen
+    // Increase current descriptor
     cur = netcard->tx_cur_buffer;
     netcard->tx_cur_buffer++;
     netcard->tx_cur_buffer %= TX_BUFFER_NUM;
 
-    // Head auslesen
+    // Read Head
     head = reg_inl(netcard, REG_TXDESC_HEAD);
     if (netcard->tx_cur_buffer == head) {
-        CdiPrintf("e1000: Kein Platz in der Sendewarteschlange!\n");
+        CdiPrintf("e1000: No space in the send queue!\n");
         return;
     }
 
-    // Buffer befuellen
+    // Filling buffer
     if (size > TX_BUFFER_SIZE) {
         size = TX_BUFFER_SIZE;
     }
     memcpy(netcard->tx_buffer + cur * TX_BUFFER_SIZE, data, size);
 
-    // TX-Deskriptor setzen und Tail erhoehen
+    // Set TX descriptor and increase Tail
     netcard->tx_desc[cur].cmd = TX_CMD_EOP | TX_CMD_IFCS;
     netcard->tx_desc[cur].length = size;
     netcard->tx_desc[cur].buffer =
         PHYS(netcard, tx_buffer) + (cur * TX_BUFFER_SIZE);
 
 #ifdef DEBUG
-    CdiPrintf("e1000: Setze Tail auf %d, Head = %d\n", netcard->tx_cur_buffer, head);
+    CdiPrintf("e1000: Set Tail = %d, Head = %d\n", netcard->tx_cur_buffer, head);
 #endif
     reg_outl(netcard, REG_TXDESC_TAIL, netcard->tx_cur_buffer);
 }
@@ -486,17 +484,16 @@ static void e1000_handle_interrupt(struct cdi_device* device)
             size_t size = netcard->rx_desc[netcard->rx_cur_buffer].length;
             uint8_t status = netcard->rx_desc[netcard->rx_cur_buffer].status;
 
-            // Wenn Descriptor Done nicht gesetzt ist, war die Hardware
-            // noch nicht gant fertig mit Kopieren
+            // If Done descriptor is not set, the hardware has not yet finished copying
             if ((status & 0x1) == 0) {
                 break;
             }
 
-            // 4 Bytes CRC von der Laenge abziehen
+            // Remove the 4 bytes CRC from length
             size -= 4;
 
 #ifdef DEBUG
-            CdiPrintf("e1000: %d Bytes empfangen (status = %x)\n", size, status);
+            CdiPrintf("e1000: %d Bytes received (status = %x)\n", size, status);
 /*
             int i;
             for (i = 0; i < (size < 49 ? size : 49); i++) {
@@ -527,11 +524,11 @@ static void e1000_handle_interrupt(struct cdi_device* device)
         }
 
     } else if (icr & ICR_TRANSMIT) {
-        // Nichts zu tun
+        // Nothing to do
         CdiPrintf("e1000: Packet sent interrupt!\n");
     } else {
 #ifdef DEBUG
-        CdiPrintf("e1000: Unerwarteter Interrupt.\n");
+        CdiPrintf("e1000: Unexpected interrupt.\n");
 #endif
     }
 }

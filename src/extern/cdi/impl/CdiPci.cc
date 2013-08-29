@@ -64,10 +64,9 @@ static void add_child_devices(cdi_list_t list, Device* dev) {
           } else if (memType == 0x01) { // reserved for PCI LocalBus 3.0
             ABORT1("Do not know how to interpret this BAR");
           } else if (memType == 0x02) { // 64-bit wide
-//            ABORT1("64-bit unimplemented");
             uint32_t bar2 = child->getBAR(i + 1);
-            res->start = ((bar & 0xfffffff0) + ((bar2 & 0xffffffff) << 32));
-            res->length = (child->getBARSize(i) + (child->getBARSize(i+1) << 32));
+            res->start = ((bar & 0xfffffff0) + (((uintptr_t)(bar2 & 0xffffffff)) << 32));
+            res->length = (child->getBARSize(i) + (((uint64_t)child->getBARSize(i+1)) << 32));
             res->index = i;
             res->address = 0;
             i += 1;   // consumed 2 registers
