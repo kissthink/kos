@@ -21,7 +21,7 @@ int cdi_dma_open(cdi_dma_handle* handle, uint8_t channel, uint8_t mode,
   if (!area) return -1;     // failed to get required memory
 
   laddr physAddr = area->paddr.items->start;
-  handle->meta.area = area;
+  handle->meta.area = area; // remember virtual address mapping for physical DMA address
 
   // start DMA
   bool started = DMA::startTransfer(channel, mode, length, physAddr);
@@ -29,16 +29,16 @@ int cdi_dma_open(cdi_dma_handle* handle, uint8_t channel, uint8_t mode,
 }
 
 int cdi_dma_read(cdi_dma_handle* handle) {
-  memcpy(handle->buffer, handle->meta.area->vaddr, handle->length);
+  memcpy(handle->buffer, handle->meta.area->vaddr, handle->length); // copy from DMA to buffer
   return 0;
 }
 
 int cdi_dma_write(cdi_dma_handle* handle) {
-  memcpy(handle->meta.area->vaddr, handle->buffer, handle->length);
+  memcpy(handle->meta.area->vaddr, handle->buffer, handle->length); // copy to DMA from buffer
   return 0;
 }
 
 int cdi_dma_close(cdi_dma_handle* handle) {
-  CdiMemoryManager::free(handle->meta.area);
+  CdiMemoryManager::free(handle->meta.area);  // free allocated region for DMA
   return 0;
 }

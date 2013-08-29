@@ -34,6 +34,7 @@ public:
   static void init(int rdr);    // pass # of IRQ supported by I/O APIC
   static void registerIRQ(unsigned int irq, function_t handler);
   static bool handleIRQ(mword vector);
+  static unsigned int getNumIRQ() { return numIRQ; }
 };
 
 #endif /* _IRQManager_h_ */

@@ -6,6 +6,7 @@
 #include <list>
 using namespace std;
 
+// Use std list as a background implementation for CDI list
 typedef list<ptr_t,KernelAllocator<ptr_t>> PtrList;
 
 struct cdi_list_implementation {

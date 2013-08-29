@@ -4,6 +4,7 @@
 #include "mach/platform.h"
 #include "util/basics.h"
 
+// referenced http://wiki.osdev.org/CMOS
 uint8_t cdi_cmos_read(uint8_t index) {
   out8( 0x70, index );
   return in8( 0x71 );

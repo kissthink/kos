@@ -100,6 +100,7 @@ struct cdi_device* ne2k_init_device(struct cdi_bus_data* bus_data)
 
     netcard->phys = buf->paddr.items[0].start;
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
+    netcard->net.dev.name = cdi_pci_get_device_name(pci);
 
     // PCI-bezogenes Zeug initialisieren
     DEBUG_MSG("Register interrupts and allocate I/O ports");
@@ -126,7 +127,7 @@ struct cdi_device* ne2k_init_device(struct cdi_bus_data* bus_data)
     write_register_byte(netcard, NE_TCR, 0x02);
 
     // Disable card interrupts
-    write_register_byte(netcard, NE_ISR, 0xFF);
+    write_register_byte(netcard, NE_ISR, 0xFF); // clear ISR
     write_register_byte(netcard, NE_IMR, 0);
 
     // Read the MAC address from PROM
@@ -167,8 +168,7 @@ struct cdi_device* ne2k_init_device(struct cdi_bus_data* bus_data)
 
     // Clear pending interrupts, enable them all, and begin card operation
     write_register_byte(netcard, NE_ISR, 0xFF);
-//    write_register_byte(netcard, NE_IMR, 0x3F);
-    write_register_byte(netcard, NE_IMR, 0x3D);
+    write_register_byte(netcard, NE_IMR, 0x3F);
     write_register_byte(netcard, NE_CMD, 0x22);
 
     netcard->pending_sends = cdi_list_create();

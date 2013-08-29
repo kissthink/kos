@@ -381,6 +381,7 @@ found:
 
     netcard->phys = buf->paddr.items[0].start;
     netcard->net.dev.bus_data = (struct cdi_bus_data*) pci;
+    netcard->net.dev.name = cdi_pci_get_device_name(pci);
 
     // Initialize PCI related stuff
     netcard->revision = pci->rev_id;

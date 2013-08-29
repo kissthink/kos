@@ -21,7 +21,7 @@ GCC=gcc-$GCCVER          # GNU mirror
 GDB=gdb-7.6              # GNU mirror
 GRUB=grub-2.00           # GNU mirror
 NEWLIB=newlib-2.0.0      # http://sourceware.org/newlib/
-QEMU=qemu-1.5.1          # http://www.qemu.org/
+QEMU=qemu-1.6.0          # http://www.qemu.org/
 
 # download FreeBSD's src.txz from local mirror, or original URL:
 # http://ftp.freebsd.org/pub/FreeBSD/releases/amd64/9.1-RELEASE/src.txz
