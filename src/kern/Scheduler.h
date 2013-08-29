@@ -50,6 +50,7 @@ public:
   void kill();
   void preempt();
   bool sleep(mword t);
+  bool sleep(mword t, SpinLock& rl);
   bool cancelTimerEvent(Thread& t);
   void suspend(SpinLock& rl);
   void suspend();

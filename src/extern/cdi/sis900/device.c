@@ -35,16 +35,10 @@
 #include "cdi.h"
 #include "cdi/misc.h"
 #include "cdi/mem.h"
+#include "cdi/printf.h"
 
 #include "device.h"
 #include "sis900_io.h"
-
-#ifdef TYNDUR
-#include <syscall.h>
-#endif
-
-
-#undef DEBUG
 
 #define PHYS(netcard, field) \
     (netcard->phys + offsetof(struct sis900_device, field))
@@ -86,7 +80,7 @@ static void reset_nic(struct sis900_device* netcard)
             status = sis900_mii_read(netcard, i, MII_STATUS);
             if ((status != 0x0000) && (status != 0xffff)) {
 #ifdef DEBUG
-                printf("PHY at %d: %04x:%04x\n", i,
+                CdiPrintf("PHY at %d: %04x:%04x\n", i,
                     sis900_mii_read(netcard, i, MII_PHY_ID1),
                     sis900_mii_read(netcard, i, MII_PHY_ID2));
 #endif
@@ -127,7 +121,7 @@ static void reset_nic(struct sis900_device* netcard)
             PHYS(netcard, rx_buffer[i * RX_BUFFER_SIZE]);
 
 #ifdef DEBUG
-        printf("sis900: [%d] Rx: Buffer @ phys %08x, Desc @ phys %08x\n",
+        CdiPrintf("sis900: [%d] Rx: Buffer @ phys %08x, Desc @ phys %08x\n",
             i,
             netcard->rx_desc[i].buffer, 
             PHYS(netcard, rx_desc[i]));
@@ -176,7 +170,7 @@ static uint64_t get_mac_address(struct sis900_device* device)
     // Altes Filterregister wiederherstellen
     reg_outl(device, REG_RX_FILT, old_rfcr | RXFCR_ENABLE);
     } else {
-        printf("sis900: Auslesen der Netzwerkkarte mit Revision %d nicht "
+        CdiPrintf("sis900: Auslesen der Netzwerkkarte mit Revision %d nicht "
             "unterstuetzt.", device->revision);
     }
     return mac;
@@ -220,18 +214,18 @@ struct cdi_device* sis900_init_device(struct cdi_bus_data* bus_data)
 
     // Karte initialisieren
 #ifdef DEBUG
-    printf("sis900: IRQ %d, Ports an %x  Revision:%d\n",
+    CdiPrintf("sis900: IRQ %d, Ports an %x  Revision:%d\n",
         pci->irq, netcard->port_base, netcard->revision);
 
-    printf("sis900: Fuehre Reset der Karte durch\n");
+    CdiPrintf("sis900: Fuehre Reset der Karte durch\n");
 #endif
     reset_nic(netcard);
     
     netcard->net.mac = get_mac_address(netcard);
 #ifdef DEBUG
-    printf("sis900: MAC-Adresse: %012llx\n", netcard->net.mac);
+    CdiPrintf("sis900: MAC-Adresse: %012llx\n", netcard->net.mac);
    
-    printf("sis900: CR = %08x\n", reg_inl(netcard, REG_COMMAND));
+    CdiPrintf("sis900: CR = %08x\n", reg_inl(netcard, REG_COMMAND));
 #endif
 
     reg_outl(netcard, REG_COMMAND, 0xC0);
@@ -259,7 +253,7 @@ void sis900_send_packet(struct cdi_net_device* device, void* data, size_t size)
     struct sis900_device* netcard = (struct sis900_device*) device;
 
 #ifdef DEBUG
-    printf("sis900: sis900_send_packet\n");
+    CdiPrintf("sis900: sis900_send_packet\n");
 #endif
 
     // Aktuellen Deskriptor erhoehen
@@ -267,7 +261,7 @@ void sis900_send_packet(struct cdi_net_device* device, void* data, size_t size)
     netcard->tx_cur_buffer++;
     netcard->tx_cur_buffer %= TX_BUFFER_NUM;
 #ifdef DEBUG
-    printf("send: cur == %d\n", cur);
+    CdiPrintf("send: cur == %d\n", cur);
 #endif
 
     // Transmitter stoppen
@@ -308,22 +302,22 @@ void sis900_send_packet(struct cdi_net_device* device, void* data, size_t size)
 
 #ifdef DEBUG
     if (netcard->tx_desc[cur].status & DESC_STATUS_OWN) {        
-        printf("sis900: Fehler beim Senden eines Pakets (%d Bytes)\n", size);
-        printf("sis900: tx_desc[%d] = %08x; buffer = %08x\n", 
+        CdiPrintf("sis900: Fehler beim Senden eines Pakets (%d Bytes)\n", size);
+        CdiPrintf("sis900: tx_desc[%d] = %08x; buffer = %08x\n", 
             cur, 
             (uintptr_t) &netcard->tx_desc[cur],
             (uintptr_t) &netcard->tx_desc[cur].buffer);
-        printf("sis900: Status: %08x, CR = %08x, ISR = %08x\n", 
+        CdiPrintf("sis900: Status: %08x, CR = %08x, ISR = %08x\n", 
             netcard->tx_desc[cur].status, reg_inl(netcard, REG_COMMAND),
             reg_inl(netcard, REG_ISR));
-        printf("sis900: MII status (0) = %04x/%04x/%04x/%04x %04x/%04x\n",
+        CdiPrintf("sis900: MII status (0) = %04x/%04x/%04x/%04x %04x/%04x\n",
             sis900_mii_read(netcard, 0, MII_CONTROL),
             sis900_mii_read(netcard, 0, MII_STATUS),
             sis900_mii_read(netcard, 0, MII_PHY_ID1),
             sis900_mii_read(netcard, 0, MII_PHY_ID2),
             sis900_mii_read(netcard, 0, MII_CFG1),
             sis900_mii_read(netcard, 0, MII_STATUS_OUT));
-        printf("sis900: MII status (1) = %04x/%04x/%04x/%04x %04x/%04x\n",
+        CdiPrintf("sis900: MII status (1) = %04x/%04x/%04x/%04x %04x/%04x\n",
             sis900_mii_read(netcard, 1, MII_CONTROL),
             sis900_mii_read(netcard, 1, MII_STATUS),
             sis900_mii_read(netcard, 1, MII_PHY_ID1),
@@ -344,18 +338,18 @@ void sis900_send_packet(struct cdi_net_device* device, void* data, size_t size)
         reset_nic(netcard);
         get_mac_address(netcard);
 
-        printf("sis900: Reset durchgefuehrt, verwerfe Paket. CR = %08x\n", 
+        CdiPrintf("sis900: Reset durchgefuehrt, verwerfe Paket. CR = %08x\n", 
             reg_inl(netcard, REG_COMMAND));
 */
     } else {
-        printf("sis900: Paket gesendet (%d Bytes)\n", size);
+        CdiPrintf("sis900: Paket gesendet (%d Bytes)\n", size);
     }
 #endif
     
     // Transmitter stoppen
     reg_outl(netcard, REG_COMMAND, CR_DISABLE_TX | CR_ENABLE_RX);
 #ifdef DEBUG
-    printf("sis900: Transmitter gestoppt.\n");
+    CdiPrintf("sis900: Transmitter gestoppt.\n");
 #endif
 }
 
@@ -365,25 +359,25 @@ static void sis900_handle_interrupt(struct cdi_device* device)
     uint32_t isr = reg_inl(netcard, REG_ISR);
 
 #ifdef DEBUG
-    printf("sis900: Interrupt, ISR = %08x\n", isr);
+    CdiPrintf("sis900: Interrupt, ISR = %08x\n", isr);
 
-    printf("sis900: RxDesc = %08x, RxCfg = %08x, CR = %08x, cmdsts0 = %08x\n",
+    CdiPrintf("sis900: RxDesc = %08x, RxCfg = %08x, CR = %08x, cmdsts0 = %08x\n",
         reg_inl(netcard, REG_RX_PTR), reg_inl(netcard, REG_RX_CFG),
         reg_inl(netcard, REG_COMMAND), netcard->rx_desc[0].status);
     
-    printf("sis900: rx_cur_buffer = %d, cmdsts_cur = %08x, desc_cur = %08x\n",
+    CdiPrintf("sis900: rx_cur_buffer = %d, cmdsts_cur = %08x, desc_cur = %08x\n",
         netcard->rx_cur_buffer,
         netcard->rx_desc[netcard->rx_cur_buffer].status,
         PHYS(netcard, rx_desc[netcard->rx_cur_buffer]));
 
     if (isr & ISR_RX_OVERFLOW) {
-        printf("RxOverflow. Status: ");
+        CdiPrintf("RxOverflow. Status: ");
         int i;
         for (i = 0; i < RX_BUFFER_NUM; i++) {
-            printf("[%d] %08x ", i, netcard->rx_desc[i].status);
+            CdiPrintf("[%d] %08x ", i, netcard->rx_desc[i].status);
         }
         //disable_intr(netcard);
-        printf("\n");
+        CdiPrintf("\n");
 
         reg_outl(netcard, REG_COMMAND, CR_DISABLE_RX);
         reg_inl(netcard, REG_COMMAND);
@@ -403,17 +397,17 @@ static void sis900_handle_interrupt(struct cdi_device* device)
             size_t size = (status & 0xFFF) - 4;
 
 #ifdef DEBUG
-            printf("sis900: %d Bytes empfangen (status = %x)\n", size, status);
+            CdiPrintf("sis900: %d Bytes empfangen (status = %x)\n", size, status);
 /*            
             int i;
             for (i = 0; i < (size < 49 ? size : 49); i++) {
-                printf("%02hhx ", netcard->rx_buffer[
+                CdiPrintf("%02hhx ", netcard->rx_buffer[
                     netcard->rx_cur_buffer * RX_BUFFER_SIZE + i]);
                 if (i % 25 == 0) {
-                    printf("\n");
+                    CdiPrintf("\n");
                 }
             }
-            printf("\n\n");
+            CdiPrintf("\n\n");
 */            
 #endif
             
@@ -435,6 +429,6 @@ static void sis900_handle_interrupt(struct cdi_device* device)
         reg_outl(netcard, REG_COMMAND, CR_ENABLE_RX);
 //    }
 #ifdef DEBUG
-    printf("sis900: Receiver wieder gestartet\n");
+    CdiPrintf("sis900: Receiver wieder gestartet\n");
 #endif
 }

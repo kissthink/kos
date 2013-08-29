@@ -3,6 +3,7 @@
 // KOS
 #include "kern/Debug.h"
 #include "kern/Kernel.h"
+#include "ipc/SpinLock.h"
 #include "mach/IOPort.h"
 #include "mach/IOPortManager.h"
 #include "mach/IRQManager.h"
@@ -15,6 +16,7 @@ static void (*driver_irq_handler[IRQ_COUNT])(cdi_device*) = { nullptr };
 static cdi_device* volatile driver_irq_device[IRQ_COUNT] = { nullptr };
 static bool volatile irqWaiting[IRQ_COUNT] = { false };
 static Thread* volatile waitingThread[IRQ_COUNT] = { nullptr };
+static SpinLock waitIrqLock[IRQ_COUNT];
 
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
@@ -22,11 +24,13 @@ static void cdiIrqHandler(ptr_t irqPtr) {
   if (driver_irq_handler[irq]) {
     driver_irq_handler[irq](driver_irq_device[irq]);
   }
-  if (irqWaiting[irq]) {    // cdi_wait_irq called
+  ScopedLock<> lo(waitIrqLock[irq]);
+  if ( irqWaiting[irq] ) {    // cdi_wait_irq called
     KASSERT0( waitingThread[irq] );
     if (!kernelScheduler.cancelTimerEvent(*waitingThread[irq])) {
       DBG::outln(DBG::CDI, "IRQ ", FmtHex(irq), " already canceled");
     }
+    irqWaiting[irq] = false;
     waitingThread[irq] = nullptr;
   }
 }
@@ -61,11 +65,15 @@ int cdi_wait_irq(uint8_t irq, uint32_t timeout) {
     DBG::outln(DBG::CDI, "cdi_wait_irq() handler not set for irq: ", FmtHex(irq));
     return -2;
   }
-  if (irqWaiting[irq]) return 0;
+  waitIrqLock[irq].acquire();
+  if (irqWaiting[irq]) {
+    waitIrqLock[irq].release();
+    return 0;
+  }
   irqWaiting[irq] = true;
   KASSERT0( !waitingThread[irq] );
   waitingThread[irq] = Processor::getCurrThread();
-  if (kernelScheduler.sleep(Machine::now() + timeout)) {
+  if (kernelScheduler.sleep(Machine::now() + timeout, waitIrqLock[irq])) {
     DBG::outln(DBG::CDI, "cdi_wait_irq() timed out");
     return -3;  // timedout
   }

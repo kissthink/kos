@@ -116,6 +116,21 @@ bool Scheduler::sleep(mword t) {
   return true;
 }
 
+// release spinlock after timerLock is acquired to prevent race
+// with cancelTimerEvent()
+bool Scheduler::sleep(mword t, SpinLock& rl) {
+  timerLock.acquire();
+  rl.release();
+  Processor::getCurrThread()->timeout = t;
+  Processor::getCurrThread()->interrupted = false;
+  timerQueue.insert(Processor::getCurrThread());
+  suspend(timerLock);
+  if (Processor::getCurrThread()->interrupted) {
+    return false; // sleep interrupted
+  }
+  return true;    // timed out
+}
+
 void Scheduler::suspend() {
   lock.acquire();
   schedule();
