@@ -22,6 +22,7 @@ void Drivers::showMenu() {
 }
 
 extern void cdi_net_send(int, ptr_t, size_t);
+extern void cdi_net_send(ptr_t, size_t);
 extern int cdi_storage_read(const kstring& devName, uint64_t pos, size_t size, ptr_t dest);
 extern int cdi_storage_write(const kstring& devName, uint64_t pos, size_t size, ptr_t src);
 
@@ -55,7 +56,7 @@ public:
 struct SendNetworkPacketTest : public Command {
   SendNetworkPacketTest(Keyboard& keyboard) : Command(keyboard) {}
   bool run() {
-    cdi_net_send(0, (ptr_t) getBuffer(), getLength());
+    cdi_net_send((ptr_t) getBuffer(), getLength());
     DBG::outln(DBG::Basic, "packet sent");
     return true;
   }

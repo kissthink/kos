@@ -528,6 +528,7 @@ static void e1000_handle_interrupt(struct cdi_device* device)
 
     } else if (icr & ICR_TRANSMIT) {
         // Nichts zu tun
+        CdiPrintf("e1000: Packet sent interrupt!\n");
     } else {
 #ifdef DEBUG
         CdiPrintf("e1000: Unerwarteter Interrupt.\n");
