@@ -18,6 +18,8 @@ void Drivers::showMenu() {
   StdOut.outln("[4] Write to floppy disk");
   StdOut.outln("[5] Read from floppy disk");
   StdOut.outln("[6] Send 1000 network packets");
+  StdOut.outln("[7] Read/Write to hard disk 1000 times");
+  StdOut.outln("[8] Read/Write to floppy disk 1000 times");
   StdOut.outln("[q] Exit");
   StdOut.outln("");
 }
@@ -118,6 +120,31 @@ struct Send1000NetworkPacketTest : public Command {
   }
 };
 
+struct ReadWriteHardDiskStressTest : public Command {
+  ReadWriteHardDiskStressTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    for (int i = 0; i < 1000; i++) {
+      int res = cdi_storage_write(hdiskName, 0, 256, (ptr_t) getBuffer());
+      KASSERT0( res == 0 );
+      res = cdi_storage_read(hdiskName, 0, 256, getBuffer());
+      KASSERT0( res == 0 );
+    }
+    return true;
+  }
+};
+
+struct ReadWriteFloppyDiskStressTest : public Command {
+  ReadWriteFloppyDiskStressTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    for (int i = 0; i < 1000; i++) {
+      int res = cdi_storage_write(fdiskName, 0, 256, (ptr_t) getBuffer());
+      KASSERT0( res == 0 );
+      res = cdi_storage_read(fdiskName, 0, 256, getBuffer());
+      KASSERT0( res == 0 );
+    }
+    return true;
+  }
+};
 
 void Drivers::run(ptr_t arg) {
   while (running) {
@@ -152,6 +179,14 @@ void Drivers::parseCommands(Keyboard& keyboard, char key) {
     } break;
     case '6': {
       Command* cmd = new Send1000NetworkPacketTest(keyboard);
+      testQueue.append(cmd);
+    } break;
+    case '7': {
+      Command* cmd = new ReadWriteHardDiskStressTest(keyboard);
+      testQueue.append(cmd);
+    } break;
+    case '8': {
+      Command* cmd = new ReadWriteFloppyDiskStressTest(keyboard);
       testQueue.append(cmd);
     } break;
     case 'q': {
