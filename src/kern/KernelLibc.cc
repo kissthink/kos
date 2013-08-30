@@ -31,7 +31,10 @@ extern "C" void __assert_func( const char* const file, const char* const line,
   StdDbg.outln(file, ':', line, ' ', func, ' ', expr);
 }
 
+#include "ipc/SpinLock.h"
+static SpinLock lk;
 extern "C" void* malloc(size_t s) {
+  ScopedLock<> lo(lk);
   DBG::out(DBG::Libc, "LIBC/malloc: ", FmtHex(s));
   void* p = kernelHeap.malloc(s);
   DBG::outln(DBG::Libc, " -> ", p);
@@ -39,6 +42,7 @@ extern "C" void* malloc(size_t s) {
 }
 
 extern "C" void free(void* p) {
+  ScopedLock<> lo(lk);
   DBG::outln(DBG::Libc, "LIBC/free: ", FmtHex(p));
   kernelHeap.free(p);
 }
