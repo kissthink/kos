@@ -1,4 +1,15 @@
+/*
+ * Copyright (c) 2007 Kevin Wolf
+ *
+ * This program is free software. It comes without any warranty, to
+ * the extent permitted by applicable law. You can redistribute it 
+ * and/or modify it under the terms of the Do What The Fuck You Want 
+ * To Public License, Version 2, as published by Sam Hocevar. See
+ * http://sam.zoy.org/projects/COPYING.WTFPL for more details.
+ */  
+
 #include "cdi/misc.h"
+#include "cdi/printf.h"
 
 // KOS
 #include "kern/Debug.h"
@@ -14,67 +25,66 @@ static const int IRQ_COUNT = 0x10;
 
 static void (*driver_irq_handler[IRQ_COUNT])(cdi_device*) = { nullptr };
 static cdi_device* volatile driver_irq_device[IRQ_COUNT] = { nullptr };
-static bool volatile irqWaiting[IRQ_COUNT] = { false };
-static Thread* volatile waitingThread[IRQ_COUNT] = { nullptr };
+static unsigned int irqCount[IRQ_COUNT] = { 0 };
+static Thread* sleepingThread[IRQ_COUNT] = { nullptr };
 static SpinLock waitIrqLock[IRQ_COUNT];
 
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
-  DBG::outln(DBG::CDI, "Got cdi interrupt: ", FmtHex(irq));
+  CdiPrintf("Got CDI interrupt %d\n", irq);
+  ScopedLock<> lo(waitIrqLock[irq]);
   if (driver_irq_handler[irq]) {
     driver_irq_handler[irq](driver_irq_device[irq]);
   }
-  ScopedLock<> lo(waitIrqLock[irq]);
-  if ( irqWaiting[irq] ) {    // cdi_wait_irq called
-    KASSERT0( waitingThread[irq] );
-    if (!kernelScheduler.cancelTimerEvent(*waitingThread[irq])) {
-      DBG::outln(DBG::CDI, "IRQ ", FmtHex(irq), " already canceled");
+  irqCount[irq] += 1;
+  if ( sleepingThread[irq] ) {                // a thread is sleeping for IRQ to occur
+    if (!kernelScheduler.cancelTimerEvent(*sleepingThread[irq])) {
+      CdiPrintf("IRQ %d already canceled\n", irq);
     }
-    irqWaiting[irq] = false;
-    waitingThread[irq] = nullptr;
+    sleepingThread[irq] = nullptr;
   }
 }
 
 void cdi_register_irq(uint8_t irq, void (*handler)(cdi_device *),
                       cdi_device* device) {
   if (irq >= IRQ_COUNT) {
-    DBG::outln(DBG::CDI, "cdi_register_irq() called with irq: ", FmtHex(irq));
+    CdiPrintf("Registering irq %d\n", irq);
     return;
   }
 
   KASSERT0( driver_irq_handler[irq] == nullptr );
   driver_irq_handler[irq] = handler;
   driver_irq_device[irq] = device;
-  DBG::outln(DBG::CDI, "cdi_register_irq() registered device: ", FmtHex(device), " at irq:", FmtHex(irq));
+  CdiPrintf("Registered device %x at irq %d\n", device, irq);
 
   IRQManager::registerIRQ(irq, cdiIrqHandler);
 }
 
 int cdi_reset_wait_irq(uint8_t irq) {
   if (irq > IRQ_COUNT) return -1;
-  irqWaiting[irq] = false;
+  ScopedLock<> lo(waitIrqLock[irq]);
+  irqCount[irq] = 0;
   return 0;
 }
 
 int cdi_wait_irq(uint8_t irq, uint32_t timeout) {
   if (irq >= IRQ_COUNT) {
-    DBG::outln(DBG::CDI, "cdi_wait_irq() called with irq: ", FmtHex(irq));
+    CdiPrintf("Waiting for irq %d\n", irq);
     return -1;
   }
   if (driver_irq_handler[irq] == nullptr) {
-    DBG::outln(DBG::CDI, "cdi_wait_irq() handler not set for irq: ", FmtHex(irq));
+    CdiPrintf("Handler not set for irq %d\n", irq);
     return -2;
   }
   waitIrqLock[irq].acquire();
-  if (irqWaiting[irq]) {
+  if (irqCount[irq]) {            // IRQ occurred already
     waitIrqLock[irq].release();
     return 0;
   }
-  irqWaiting[irq] = true;
-  KASSERT0( !waitingThread[irq] );
-  waitingThread[irq] = Processor::getCurrThread();
+  KASSERT0( !sleepingThread[irq] );
+  sleepingThread[irq] = Processor::getCurrThread();
+  CdiPrintf("Sleeping %x %s\n", sleepingThread[irq], sleepingThread[irq]->getName());
   if (kernelScheduler.sleep(Machine::now() + timeout, waitIrqLock[irq])) {
-    DBG::outln(DBG::CDI, "cdi_wait_irq() timed out");
     return -3;  // timedout
   }
   return 0;     // interrupted

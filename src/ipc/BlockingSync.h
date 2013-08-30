@@ -103,7 +103,7 @@ public:
       lock.release();
       kernelScheduler.start(*owner);
     } else {
-      owner = Processor::getCurrThread();
+      owner = nullptr;
       lock.release();
     }
   }

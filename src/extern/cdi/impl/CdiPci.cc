@@ -28,8 +28,6 @@ static void add_child_devices(cdi_list_t list, Device* dev) {
       pciDev->irq = child->getInterruptNumber();
       pciDev->resources = cdi_list_create(); 
 
-      // TODO should add backdev?
-
       // add BARs 
       uint8_t headerType = child->getHeaderType();
       uint8_t numBars;

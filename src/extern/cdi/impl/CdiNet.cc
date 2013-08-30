@@ -12,7 +12,6 @@
 
 static unsigned long netcard_highest_id = 0;
 static cdi_list_t netcard_list = nullptr;
-//static cdi_list_t ethernet_packet_receivers;
 
 void cdi_net_driver_init(struct cdi_net_driver* driver) {
   driver->drv.type = CDI_NETWORK;
@@ -20,7 +19,6 @@ void cdi_net_driver_init(struct cdi_net_driver* driver) {
   if (netcard_list == nullptr) {
     netcard_list = cdi_list_create();
   }
-//  ethernet_packet_receivers = cdi_list_create();
 }
 
 void cdi_net_driver_destroy(struct cdi_net_driver* driver) {
