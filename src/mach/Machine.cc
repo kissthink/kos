@@ -262,7 +262,6 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   PCI::sanityCheck();
 
   // find PCI devices
-  PCI::probeAll();
   PCI::checkAllBuses();
 
   // find additional devices ("current thread" faked for ACPI)
@@ -278,9 +277,12 @@ void Machine::initBSP2() {
   Processor::enableInterrupts();
 
   // initialize CDI (run on separate thread because Thread::sleep() won't work as expected if it runs on the idle thread
+#if 0
   Thread* cdiThread = Thread::create(kernelSpace, "CDI thread");
   unsigned int* numIRQ = new unsigned int(IRQManager::getNumIRQ());
   kernelScheduler.run(*cdiThread, cdi_init, numIRQ);
+#endif
+  cdi_init(nullptr);
 
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();

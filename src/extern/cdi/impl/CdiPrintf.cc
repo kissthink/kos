@@ -21,6 +21,7 @@ void CdiPrintf(const char* Format, ...) {
   char* buffer = new char[size];
   vsnprintf(buffer, size, Format, args);
   DBG::out(DBG::CDI, buffer);
-  globaldelete(buffer, size);
+//  globaldelete(buffer, size);
+  delete [] buffer;
   va_end(args);
 }

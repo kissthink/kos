@@ -24,6 +24,7 @@ void Drivers::showMenu() {
   StdOut.outln("");
 }
 
+// TODO: export these as API
 extern void cdi_net_send(int, ptr_t, size_t);
 extern void cdi_net_send(ptr_t, size_t);
 extern int cdi_storage_read(const kstring& devName, uint64_t pos, size_t size, ptr_t dest);
@@ -154,6 +155,10 @@ void Drivers::run(ptr_t arg) {
   }
 }
 
+// How to test
+// Type appropriate option number and type data as much as you want.
+// Carriage return is recognized as an end delimiter and the chosen command will run
+// with typed data as an argument
 void Drivers::parseCommands(Keyboard& keyboard, char key) {
   if (!running) return;
   switch (key) {
@@ -199,6 +204,7 @@ void Drivers::parseCommands(Keyboard& keyboard, char key) {
   waitForKey.V(); // ready for next round
 }
 
+// create a background thread to handle queued tests
 void Drivers::runTest() {
   running = true;
   testThread = Thread::create(kernelSpace, "drivers test");
@@ -206,7 +212,7 @@ void Drivers::runTest() {
 
   for (;;) {
     showMenu();
-    waitForKey.P();
+    waitForKey.P();       // wait until we receive 'q'
     if (!running) break;
   }
 }

@@ -3,6 +3,7 @@
 
 #include "mach/Bus.h"
 
+// Used as a placeholder (represents a PCI bus in device tree)
 class PCIBus : public Bus {
   PCIBus(const PCIBus&) = delete;
   PCIBus& operator=(const PCIBus&) = delete;

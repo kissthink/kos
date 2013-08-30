@@ -1,6 +1,7 @@
 #include "mach/IRQManager.h"
 #include "kern/Debug.h"
 
+// IRQ assignment is from http://www.osdever.net/tutorials/pdf/apic.pdf
 uint32_t* IRQManager::irqToVector;
 int IRQManager::vectorToIRQ[256] = { -1 };
 IRQManager::IRQHandlers* IRQManager::irqHandlers;
@@ -14,10 +15,12 @@ ProdConsQueue<StaticRingBuffer<mword, 128>> IRQManager::irqQueue;
 // priority (highest->lowest) to IRQ number
 static int defaultIRQPriorities[16] = { 0,1,2,11,12,13,14,15,3,4,5,6,7,8,9,10 };
 
+// bottom-half thread handling queued IRQs
 void IRQManager::softIRQ(ptr_t arg) {
   KASSERT0( initialized );
   for (;;) {
     mword irq = irqQueue.remove();  // sleep until interrupt occurs
+    DBG::outln(DBG::Basic, "IRQ ", irq, " occurred!");
     ScopedLock<> lo(lk[irq]);
     for (function_t f : irqHandlers[irq]) {
       (*f)(&irq);
@@ -62,6 +65,7 @@ void IRQManager::registerIRQ(unsigned int irq, function_t handler) {
   DBG::outln(DBG::Basic, "registered IRQ handler: ", FmtHex(ptr_t(handler)), " for IRQ ", irq);
 }
 
+// queue IRQ before returning from interrupt handler
 bool IRQManager::handleIRQ(mword vector) {
   KASSERT0( initialized );
   int irq = vectorToIRQ[vector];

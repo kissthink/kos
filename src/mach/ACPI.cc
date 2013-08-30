@@ -255,8 +255,6 @@ static ACPI_STATUS getPCIDevices(ACPI_HANDLE handle, UINT32 level, void* ctx, vo
       KASSERT1( status == AE_OK, status );
       status = AcpiWalkResources( resourceHandle, "_CRS", displayResource, NULL );
       KASSERT1( status == AE_OK, status );
-#endif
-#if 0
       // Get handle for resource
       ACPI_HANDLE resourceHandle;
       status = AcpiGetHandle( NULL, (ACPI_STRING)routingTable->Source, &resourceHandle );
@@ -277,9 +275,9 @@ static ACPI_STATUS getPCIDevices(ACPI_HANDLE handle, UINT32 level, void* ctx, vo
         }
         resourceEntry = (ACPI_RESOURCE *)((char *) resourceEntry + resourceEntry->Length);
       }
-#endif
       pciIrqMap[routingTable->Address] = routingTable->Pin;
       routingTable = (ACPI_PCI_ROUTING_TABLE *)((char *)routingTable + routingTable->Length);
+#endif
     }
     delete [] (char *)buffer.Pointer;
   }
@@ -311,8 +309,10 @@ void Machine::parseACPI() {
   KASSERT1( status == AE_OK, status );
 #endif
 
+#if 0
   status = AcpiGetDevices( NULL, getPCIDevices, NULL, NULL );
   KASSERT1( status == AE_OK, status );
+#endif
 
   // TODO: in principle, the ACPI subsystem keeps running...
   status = AcpiTerminate();

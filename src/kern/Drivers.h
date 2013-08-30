@@ -5,6 +5,7 @@
 #include "ipc/SyncQueues.h"
 #include "dev/Keyboard.h"
 
+// Used for testing drivers code
 class Command;
 class Drivers {
   Drivers() = delete;
