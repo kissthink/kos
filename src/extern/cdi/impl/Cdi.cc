@@ -13,6 +13,7 @@
 #include "cdi/printf.h"
 
 // KOS
+#include "ipc/BlockingSync.h"
 #include "mach/Device.h"
 #include "mach/PCI.h"
 
@@ -39,6 +40,9 @@ void cdi_init(void* arg) {
     pdrv += 1;
   }
   cdi_run_drivers();                    // match device/driver pairs
+
+  Semaphore* sem = (Semaphore *) arg;
+  sem->V();                             // continue initBSP2
 }
 
 void cdi_driver_init(cdi_driver* driver) {
