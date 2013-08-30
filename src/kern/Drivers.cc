@@ -17,6 +17,7 @@ void Drivers::showMenu() {
   StdOut.outln("[3] Read the hard disk");
   StdOut.outln("[4] Write to floppy disk");
   StdOut.outln("[5] Read from floppy disk");
+  StdOut.outln("[6] Send 1000 network packets");
   StdOut.outln("[q] Exit");
   StdOut.outln("");
 }
@@ -106,6 +107,18 @@ struct ReadFromFloppyDiskTest : public Command {
   }
 };
 
+struct Send1000NetworkPacketTest : public Command {
+  Send1000NetworkPacketTest(Keyboard& keyboard) : Command(keyboard) {}
+  bool run() {
+    for (int i = 0; i < 1000; i++) {
+      cdi_net_send((ptr_t) getBuffer(), getLength());
+      DBG::outln(DBG::Basic, "packet sent");
+    }
+    return true;
+  }
+};
+
+
 void Drivers::run(ptr_t arg) {
   while (running) {
     Command* cmd = testQueue.remove();
@@ -135,6 +148,10 @@ void Drivers::parseCommands(Keyboard& keyboard, char key) {
     } break;
     case '5': {
       Command* cmd = new ReadFromFloppyDiskTest(keyboard);
+      testQueue.append(cmd);
+    } break;
+    case '6': {
+      Command* cmd = new Send1000NetworkPacketTest(keyboard);
       testQueue.append(cmd);
     } break;
     case 'q': {
