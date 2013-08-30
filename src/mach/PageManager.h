@@ -129,7 +129,7 @@ private:
     memset(pdpt, 0, pagetablesize());
     memset(pd,   0, pagetablesize());
 
-    pml4[pml4entry].c = mword(pml4) | Kernel | PageTable; // recursive directory
+    pml4[pml4entry].c = mword(pml4) | Kernel | PageTable;   // recursive directory
     mword idx4 = VAddr(kernelBase).segval<4>();
     pml4[idx4].c = mword(pdpt) | Kernel | PageTable;
 //    pml4[0].c = mword(pdpt) | Kernel | PageTable;         // identity-mapping
@@ -154,7 +154,7 @@ private:
   }
 
   template<unsigned int N>
-  static inline mword vtolInternal( mword vma ) {
+  static mword vtolInternal( mword vma ) {
     static_assert( N > 0 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
     KASSERT1(pe->P, FmtHex(vma));
@@ -178,7 +178,7 @@ protected:
 
   // specialization for <pagelevels> below (must be outside of class scope)
   template <unsigned int N>
-  static inline void maprecursive( mword vma, Owner owner, FrameManager& fm ) {
+  static void maprecursive( mword vma, Owner owner, FrameManager& fm ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     maprecursive<N+1>(vma,owner,fm);
     PageEntry* pe = getEntry<N+1>(vma);
@@ -193,7 +193,7 @@ protected:
   }
 
   template <unsigned int N>
-  static inline void map( mword vma, mword lma, Owner owner, PageType type, FrameManager& fm ) {
+  static void map( mword vma, mword lma, Owner owner, PageType type, FrameManager& fm ) {
     static_assert( N >= 1 && N < pagelevels, "page level template violation" );
     KASSERT1( aligned(vma, pagesize<N>()), FmtHex(vma) );
     KASSERT1( (lma & ~ADDR()) == 0, FmtHex(lma) );
@@ -209,23 +209,35 @@ protected:
 
   // specialization for <pagelevels-1> below (must be outside of class scope)
   template <unsigned int N>
-  static inline void unmaprecursive( mword vma, FrameManager& fm, size_t levels ) {
+  static void unmaprecursive( mword vma, FrameManager& fm, size_t levels ) {
     static_assert( N >= 1 && N < pagelevels-1, "page level template violation" );
     laddr lma = unmap<N+1>(vma, fm, levels);
     fm.release(lma, pagetablesize());
   }
 
   template <unsigned int N>
-  static inline mword unmap( mword vma, FrameManager& fm, size_t levels = 0 ) {
+  static mword unmap( mword vma, FrameManager& fm, size_t levels = 0 ) {
     static_assert( N >= 1 && N <= pagelevels, "page level template violation" );
     PageEntry* pe = getEntry<N>(vma);
     DBG::outln(DBG::Paging, "unmapping ", FmtHex(vma), '/', FmtHex(pagesize<N>()), ": ", pe);
     KASSERT1( pe->P, FmtHex(vma) );
-    pe->P = 0;
-    mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before recursion
+//    pe->P = 0;
+//    if (N > 1) pe->PS = 0;                  // clear potential PS bit as well
+    mword ret = pe->ADDR << pageoffsetbits; // retrieve LMA, before reset & recursion
+    pe->c = 0;
     if (levels > 0) unmaprecursive<N>(vma, fm, levels - 1);
     else CPU::invTLB(vma);
     return ret;
+  }
+
+  static void clone(laddr pt, vaddr vpt, vaddr vptorig) {
+    memcpy(ptr_t(vpt), ptr_t(vptorig), pagetablesize());
+    PageEntry* pe = (PageEntry*)vpt;
+    pe[pml4entry].c = mword(pt) | Kernel | PageTable;
+  }
+
+  static void installAddressSpace(laddr pml4) {
+    CPU::writeCR3(pml4);
   }
 
 public:

@@ -131,12 +131,6 @@ bool Scheduler::sleep(mword t, SpinLock& rl) {
   return true;    // timed out
 }
 
-void Scheduler::suspend() {
-  lock.acquire();
-  schedule();
-  lock.release(enableInterrupts);
-}
-
 void Scheduler::suspend(SpinLock& rl) {
   lock.acquire();
   rl.release();

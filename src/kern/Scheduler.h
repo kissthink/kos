@@ -53,7 +53,6 @@ public:
   bool sleep(mword t, SpinLock& rl);
   bool cancelTimerEvent(Thread& t);
   void suspend(SpinLock& rl);
-  void suspend();
   void start(Thread& t) {
     ScopedLock<> sl(lock);
     ready(t);

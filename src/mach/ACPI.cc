@@ -160,9 +160,9 @@ laddr Machine::initACPI(vaddr r) {
   DBG::out(DBG::Acpi, kendl);
 
   // determine cpuCount and create processorTable
-  cpuCount = apicMap.size();
-  KASSERT0(cpuCount);
-  processorTable = new Processor[cpuCount];
+  Processor::cpuCount = apicMap.size();
+  KASSERT0(Processor::cpuCount);
+  processorTable = new Processor[Processor::cpuCount];
   int idx = 0;
   for (const pair<uint32_t,uint32_t>& ap : apicMap) {
     processorTable[idx].setup(ap.second, ap.first);

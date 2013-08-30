@@ -3,7 +3,6 @@ GRUBDIR=/usr/local/cross/grub
 TOOLSDIR=/usr/local
 TARGET=x86_64-pc-elf
 GCCVER=4.8.1
-LINUXVER=3.9.4
 
 # only used when setting up PXE booting
 TFTPSERVER=fileserver

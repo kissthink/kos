@@ -21,16 +21,16 @@
 void Thread::destroy() {
   // wake up joiners (keep in list)?
   vaddr mem = vaddr(this) + sizeof(Thread) - stackSize;
-  addressSpace->releasePages<1>(mem, stackSize);
+  addressSpace->releasePages<2>(mem, stackSize);
 }
 
 Thread* Thread::create(AddressSpace& as, size_t stackSize) {
-  vaddr mem = as.allocPages<1>(stackSize, AddressSpace::Data) + stackSize - sizeof(Thread);
+  vaddr mem = as.allocPages<2>(stackSize, AddressSpace::Data) + stackSize - sizeof(Thread);
   return new (ptr_t(mem)) Thread(as, mem, stackSize);
 }
 
 Thread* Thread::create(AddressSpace& as, const char *n, size_t stackSize) {
-  vaddr mem = as.allocPages<1>(stackSize, AddressSpace::Data) + stackSize - sizeof(Thread);
+  vaddr mem = as.allocPages<2>(stackSize, AddressSpace::Data) + stackSize - sizeof(Thread);
   return new (ptr_t(mem)) Thread(as, mem, stackSize, n);
 }
 

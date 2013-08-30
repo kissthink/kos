@@ -75,7 +75,6 @@ static bool tipiReceived                          __section(".boot.data");
 
 // processor/core information
 Processor* Machine::processorTable = nullptr;
-uint32_t Machine::cpuCount = 0;
 uint32_t Machine::bspIndex = ~0;
 uint32_t Machine::bspApicID = ~0;
 
@@ -231,7 +230,7 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   laddr apicPhysAddr = initACPI(rsdp);
 
   // initialize GDB object
-  Gdb::init(cpuCount);
+  Gdb::init(Processor::cpuCount);
 
   // remap screen page, before boot memory disappears (later)
   PageManager::map<1>(videoAddr, PageManager::vtol(Screen::getAddress()), PageManager::Kernel, PageManager::Data, frameManager);
@@ -241,10 +240,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   PageManager::map<1>(lapicAddr, apicPhysAddr, PageManager::Kernel, PageManager::Data, frameManager);
   Processor::enableAPIC();
   bspApicID = Processor::getLAPIC_ID();
-  for (size_t i = 0; i < cpuCount; i += 1) {
+  for (size_t i = 0; i < Processor::cpuCount; i += 1) {
     if (processorTable[i].rApicID() == bspApicID) bspIndex = i;
   }
-  DBG::outln(DBG::Basic, "CPUs: ", cpuCount, '/', bspIndex, '/', bspApicID);
+  DBG::outln(DBG::Basic, "CPUs: ", Processor::cpuCount, '/', bspIndex, '/', bspApicID);
 
   // init and install processor object
   processorTable[bspIndex].init(frameManager, kernelSpace, idt, sizeof(idt));
@@ -294,7 +293,7 @@ void Machine::initBSP2() {
 
   // start up APs (must be off boot stack): APs go into long mode and halt
   DBG::out(DBG::Basic, "AP init:");
-  for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
+  for ( uint32_t i = 0; i < Processor::cpuCount; i += 1 ) {
     if ( i != bspIndex ) {
       apIndex = i;                          // prepare sync variable
       processorTable[i].sendInitIPI();
@@ -320,7 +319,7 @@ void Machine::initBSP2() {
   DBG::outln(DBG::Basic, "VM/free16: ", kernelHeap);
 
   // wake up APs
-  for ( uint32_t i = 0; i < cpuCount; i += 1 ) {
+  for ( uint32_t i = 0; i < Processor::cpuCount; i += 1 ) {
     if ( i != bspIndex ) processorTable[i].sendWakeUpIPI();
   }
 
@@ -344,10 +343,10 @@ mword Machine::now() {
 }
 
 inline void Machine::rtcInterrupt(mword counter) {
-  if (counter % cpuCount == bspIndex) {
+  if (counter % Processor::cpuCount == bspIndex) {
     if (Processor::preempt()) kernelScheduler.preempt();
   } else {
-    processorTable[counter % cpuCount].sendWakeUpIPI();
+    processorTable[counter % Processor::cpuCount].sendWakeUpIPI();
   }
 }
 

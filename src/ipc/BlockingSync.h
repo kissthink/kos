@@ -30,7 +30,8 @@ protected:
   SpinLock lock;
   ~BlockingSync() {
     ScopedLock<> sl(lock);
-    while (!threadQueue.empty()) resume();
+    // don't release lock for restarting threads: shouldn't be necessary
+    while (!threadQueue.empty()) kernelScheduler.start(*resume());
   }
   void suspend() {
     threadQueue.push_back(Processor::getCurrThread());
@@ -39,7 +40,6 @@ protected:
   Thread* resume() {
     Thread* t = threadQueue.front();
     threadQueue.pop_front();
-    kernelScheduler.start(*t);
     return t;
   }
   bool waiting() {
@@ -52,6 +52,12 @@ class Semaphore : public BlockingSync {
 public:
   Semaphore(mword c = 0) : counter(c) {}
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Semaphore)); }
+  bool tryP() {
+    ScopedLock<> sl(lock);
+    if likely(counter < 1) return false;
+    counter -= 1;
+    return true;
+  }
   void P() {
     lock.acquire();
     if likely(counter < 1) {
@@ -61,16 +67,16 @@ public:
       lock.release();
     }
   }
-  bool tryP() {
-    ScopedLock<> sl(lock);
-    if likely(counter < 1) return false;
-    counter -= 1;
-    return true;
-  }
   void V() {
-    ScopedLock<> sl(lock);
-    if likely(waiting()) resume();         // baton-passing through counter == 0
-    else counter += 1;
+    lock.acquire();
+    if likely(waiting()) {                 // baton passing via counter == 0
+      Thread* t = resume();
+      lock.release();
+      kernelScheduler.start(*t);
+    } else {
+      counter += 1;
+      lock.release();
+    }
   }
 };
 
@@ -82,8 +88,20 @@ public:
   void operator delete(ptr_t ptr) { globaldelete(ptr, sizeof(Mutex)); }
   void acquire() {
     lock.acquire();
-    if (owner) {
+    if likely(owner != nullptr) {
       suspend();                           // releases lock, no re-acquire
+    } else {
+      owner = Processor::getCurrThread();
+      lock.release();
+    }
+  }
+  void release() {
+    lock.acquire();
+    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
+    if likely(waiting()) {
+      owner = resume();                    // baton-passing through 'owner' set
+      lock.release();
+      kernelScheduler.start(*owner);
     } else {
       owner = Processor::getCurrThread();
       lock.release();

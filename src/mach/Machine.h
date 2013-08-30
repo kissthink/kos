@@ -24,7 +24,6 @@ class Processor;
 
 class Machine {
   static Processor* processorTable;
-  static uint32_t cpuCount;
   static uint32_t bspIndex;
   static uint32_t bspApicID;
 
