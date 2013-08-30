@@ -107,12 +107,6 @@ public:
       lock.release();
     }
   }
-  void release() {
-    ScopedLock<> sl(lock);
-    KASSERT1(owner == Processor::getCurrThread(), "attempt to release lock by non-owner");
-    if likely(waiting()) owner = resume(); // baton-passing through owner set
-    else owner = nullptr;
-  }
 };
 
 #endif /* _BlockingSync_h_ */

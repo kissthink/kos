@@ -172,10 +172,6 @@ private:
   }
 
 protected:
-  static void installAddressSpace(laddr pml4) {
-    CPU::writeCR3(pml4);
-  }
-
   // specialization for <pagelevels> below (must be outside of class scope)
   template <unsigned int N>
   static void maprecursive( mword vma, Owner owner, FrameManager& fm ) {
