@@ -10,48 +10,9 @@
 #include "mach/platform.h"
 #include "mach/Machine.h"
 #include "util/basics.h"
+#include "util/SimpleProdConsQueue.h"
 
 #include <list>
-
-class IRQProducerConsumerQueue {
-  list<mword,KernelAllocator<mword>> queue;
-  SpinLock lk;
-  Semaphore available;
-  size_t maxSize;
-  InPlaceList<Thread*> waitQueue;
-
-public:
-  explicit IRQProducerConsumerQueue( size_t size ) : maxSize( size ) {}
-  bool tryAppend(mword elem) {
-    ScopedLock<> lo(lk);
-    if (queue.size() == maxSize) return false;
-    queue.push_back(elem);
-    return true;
-  }
-  void append(mword elem) {
-    lk.acquire();
-    while (queue.size() == maxSize) {
-      waitQueue.push_back(Processor::getCurrThread());
-      kernelScheduler.suspend(lk);
-      lk.acquire();
-    }
-    queue.push_back(elem);
-    lk.release();
-    available.V();
-  }
-  mword remove() {
-    available.P();
-    ScopedLock<> lo(lk);
-    mword irq = queue.front();
-    queue.pop_front();
-    if (!waitQueue.empty()) {
-      Thread* t = waitQueue.front();
-      waitQueue.pop_front();
-      kernelScheduler.start(*t);
-    }
-    return irq;
-  }
-};
 
 class IRQManager {
   IRQManager() = delete;
@@ -68,7 +29,8 @@ class IRQManager {
 
   static Thread* softIRQThread[4];     // bottom half
 //  static ProdConsQueue<StaticRingBuffer<mword, 256>> irqQueue;
-  static IRQProducerConsumerQueue irqQueue;
+//  static IRQProducerConsumerQueue irqQueue;
+  static SimpleProdConsQueue<mword> irqQueue;
   static void softIRQ(ptr_t arg);
 
   static void dump();

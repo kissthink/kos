@@ -4,6 +4,7 @@
 #include "ipc/BlockingSync.h"
 #include "ipc/SyncQueues.h"
 #include "dev/Keyboard.h"
+#include "util/SimpleProdConsQueue.h"
 
 // Used for testing drivers code
 class Command;
@@ -13,7 +14,8 @@ class Drivers {
   Drivers& operator=(const Drivers&) = delete;
 
   static Thread* testThread;
-  static ProdConsQueue<StaticRingBuffer<Command*,16>> testQueue;
+//  static ProdConsQueue<StaticRingBuffer<Command*,16>> testQueue;
+  static SimpleProdConsQueue<Command*> testQueue;
   static void showMenu();
   static Semaphore waitForKey;
   static volatile bool running;

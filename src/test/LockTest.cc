@@ -7,6 +7,7 @@
 #include "ipc/BlockingSync.h"
 #include "ipc/SyncQueues.h"
 #include "test/LockTest.h"
+#include "util/SimpleProdConsQueue.h"
 #include <atomic>
 
 Mutex mtx;
@@ -113,8 +114,10 @@ void SemaphoreTest() {
 
 // SyncQueue Test
 //static ProdConsQueue<StaticRingBuffer<mword, 256>> syncQueue;
-static IRQProducerConsumerQueue irqQueue(256);
+//static IRQProducerConsumerQueue irqQueue(256);
+static SimpleProdConsQueue<mword> irqQueue(256);
 static atomic<mword> numItems;
+static Semaphore syncQueueTestDone;
 static void consumer(ptr_t) {
   for (;;) {
 //    mword val = syncQueue.remove();
@@ -122,6 +125,7 @@ static void consumer(ptr_t) {
       DBG::outln(DBG::Basic, val, " removed! next item: ", numItems);
       if (val == 1000) break;
   }
+  syncQueueTestDone.V();
 }
 
 static void producer(ptr_t) {
@@ -129,7 +133,8 @@ static void producer(ptr_t) {
   for (;;) {
 //    while (!syncQueue.tryAppend(numItems)) Pause();
 //    syncQueue.append(numItems);
-    irqQueue.append(numItems);
+//    irqQueue.append(numItems);
+    while (!irqQueue.tryAppend(numItems)) Pause();
     if (numItems == 1000) break;
     numItems += 1;
   }
@@ -141,6 +146,6 @@ void SyncQueueTest() {
   Thread* prod = Thread::create(kernelSpace, "prod");
   kernelScheduler.run(*cons, consumer, nullptr);
   kernelScheduler.run(*prod, producer, nullptr);
-  while (numItems != 1000) Pause();
+  syncQueueTestDone.P();
   DBG::outln(DBG::Basic, "SyncQueueTest success");
 }

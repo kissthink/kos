@@ -5,7 +5,8 @@
 #include "dev/Keyboard.h"
 
 Thread* Drivers::testThread;
-ProdConsQueue<StaticRingBuffer<Command*,16>> Drivers::testQueue;
+//ProdConsQueue<StaticRingBuffer<Command*,16>> Drivers::testQueue;
+SimpleProdConsQueue<Command*> Drivers::testQueue(16);
 Semaphore Drivers::waitForKey;
 volatile bool Drivers::running = false;
 
