@@ -32,10 +32,10 @@ static SpinLock waitIrqLock[IRQ_COUNT];
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
   CdiPrintf("Got CDI interrupt %d\n", irq);
+  ScopedLock<> lo(waitIrqLock[irq]);
   if (driver_irq_handler[irq]) {
     driver_irq_handler[irq](driver_irq_device[irq]);
   }
-  ScopedLock<> lo(waitIrqLock[irq]);
   irqDone[irq] = true;
   if ( sleepingThread[irq] ) {                // a thread is sleeping for IRQ to occur
     if (!kernelScheduler.cancelTimerEvent( *sleepingThread[irq] )) {
@@ -52,6 +52,7 @@ void cdi_register_irq(uint8_t irq, void (*handler)(cdi_device *),
     return;
   }
 
+  ScopedLock<> lo(waitIrqLock[irq]);
   KASSERT0( driver_irq_handler[irq] == nullptr );
   driver_irq_handler[irq] = handler;
   driver_irq_device[irq] = device;

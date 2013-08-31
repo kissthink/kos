@@ -10,7 +10,7 @@ bool IRQManager::initialized = false;
 unsigned int IRQManager::numIRQ = 0;
 
 Thread* IRQManager::softIRQThread;
-ProdConsQueue<StaticRingBuffer<mword, 128>> IRQManager::irqQueue;
+ProdConsQueue<StaticRingBuffer<mword, 256>> IRQManager::irqQueue;
 
 // priority (highest->lowest) to IRQ number
 static int defaultIRQPriorities[16] = { 0,1,2,11,12,13,14,15,3,4,5,6,7,8,9,10 };
@@ -25,6 +25,7 @@ void IRQManager::softIRQ(ptr_t arg) {
     for (function_t f : irqHandlers[irq]) {
       (*f)(&irq);
     }
+    DBG::outln(DBG::Basic, "IRQ ", irq, " done!");
   }
 }
 
@@ -46,7 +47,7 @@ void IRQManager::init(int rdr) {
   initialized = true;
 
   softIRQThread = Thread::create(kernelSpace, "IRQ thread");
-  softIRQThread->setPriority(1);
+//  softIRQThread->setPriority(1);
   kernelScheduler.run(*softIRQThread, softIRQ, nullptr);      // start handling IRQ
 
   dump();
