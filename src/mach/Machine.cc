@@ -92,10 +92,6 @@ static Keyboard keyboard;
 static PIT pit;
 static RTC rtc;
 
-extern "C" void cdi_init(ptr_t);
-static Semaphore cdiSem;
-static volatile bool cdiInitialized = false;
-
 // simple thread to print keycode on screen
 static void keybLoop(ptr_t) {
   for (;;) {
@@ -274,25 +270,10 @@ void Machine::initBSP(mword magic, vaddr mbiAddr, funcvoid_t func) {
   Processor::start(func);
 }
 
-void idleCdiLoop(ptr_t) {
-  while (!cdiInitialized) Pause();
-}
-
 // on proper stack, processor initialized
 void Machine::initBSP2() {
   // enable interrupts (off boot stack)
   Processor::enableInterrupts();
-
-  // initialize CDI (run on separate thread because Thread::sleep() won't work as expected if it runs on the idle thread
-  Thread* cdiThread = Thread::create(kernelSpace, "CDI thread");
-  kernelScheduler.run(*cdiThread, cdi_init, &cdiSem);
-  // also create idle thread here so that there is at least one other thread that CDI thread can switch to for timed sleep
-  Thread* idleThread = Thread::create(kernelSpace, "Idle thread");
-  kernelScheduler.run(*idleThread, idleCdiLoop, nullptr);
-
-  cdiSem.P();   // wait until CDI initialization completes
-  cdiInitialized = true;
-  DBG::outln(DBG::Basic, "CDI initialization done");
 
   // with interrupts enabled (needed later for timeouts): set up keyboard
   keyboard.init();

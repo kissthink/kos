@@ -45,7 +45,7 @@ ATA_OBJS		=	$(CDI_ATA_OBJS) $(CDI_LIBEXT2_OBJS) $(CDI_EXT2_OBJS) $(CDI_FLOPPY_OB
 AUDIO_OBJS	=	$(CDI_AC97_OBJS) $(CDI_HDAUDIO_OBJS)
 OBJECTS			=	$(NET_OBJS) $(ATA_OBJS) $(AUDIO_OBJS)
 
-CFLAGS 		+= -Wno-missing-field-initializers -Wstrict-aliasing=0 -I$(SRCDIR) -Iinclude -D__KOS__ -DDEBUG -D_GNU_SOURCE $(OPTFLAGS)
+CFLAGS 		+= -Wno-missing-field-initializers -Wstrict-aliasing=0 -I$(SRCDIR) -Iinclude -D__KOS__ -D_GNU_SOURCE $(OPTFLAGS)
 CXXFLAGS 	+= -Wstrict-aliasing=0 -I$(SRCDIR) -Iinclude -D__KOS__ $(OPTFLAGS)
 
 vpath %.c $(CDI)

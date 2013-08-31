@@ -25,20 +25,20 @@ static const int IRQ_COUNT = 0x10;
 
 static void (*driver_irq_handler[IRQ_COUNT])(cdi_device*) = { nullptr };
 static cdi_device* volatile driver_irq_device[IRQ_COUNT] = { nullptr };
-static unsigned int irqCount[IRQ_COUNT] = { 0 };
+static bool irqDone[IRQ_COUNT] = { false };
 static Thread* sleepingThread[IRQ_COUNT] = { nullptr };
 static SpinLock waitIrqLock[IRQ_COUNT];
 
 static void cdiIrqHandler(ptr_t irqPtr) {
   mword irq = *(mword *) irqPtr;
   CdiPrintf("Got CDI interrupt %d\n", irq);
-  ScopedLock<> lo(waitIrqLock[irq]);
   if (driver_irq_handler[irq]) {
     driver_irq_handler[irq](driver_irq_device[irq]);
   }
-  irqCount[irq] += 1;
+  ScopedLock<> lo(waitIrqLock[irq]);
+  irqDone[irq] = true;
   if ( sleepingThread[irq] ) {                // a thread is sleeping for IRQ to occur
-    if (!kernelScheduler.cancelTimerEvent(*sleepingThread[irq])) {
+    if (!kernelScheduler.cancelTimerEvent( *sleepingThread[irq] )) {
       CdiPrintf("IRQ %d already canceled\n", irq);
     }
     sleepingThread[irq] = nullptr;
@@ -63,36 +63,31 @@ void cdi_register_irq(uint8_t irq, void (*handler)(cdi_device *),
 int cdi_reset_wait_irq(uint8_t irq) {
   if (irq > IRQ_COUNT) return -1;
   ScopedLock<> lo(waitIrqLock[irq]);
-  irqCount[irq] = 0;
+  irqDone[irq] = false;
   return 0;
 }
 
 int cdi_wait_irq(uint8_t irq, uint32_t timeout) {
-  if (irq >= IRQ_COUNT) {
-    CdiPrintf("Waiting for irq %d\n", irq);
-    return -1;
-  }
-  if (driver_irq_handler[irq] == nullptr) {
-    CdiPrintf("Handler not set for irq %d\n", irq);
-    return -2;
-  }
+  // reject invalid irq number
+  if (irq >= IRQ_COUNT) return -1;
+  // cannot wait for unregistered irq
+  if (driver_irq_handler[irq] == nullptr) return -2;
+  // Now, check if the IRQ already occurred
   waitIrqLock[irq].acquire();
-  if (irqCount[irq]) {            // IRQ occurred already
+  if (irqDone[irq]) {
     waitIrqLock[irq].release();
     return 0;
   }
-  KASSERT0( !sleepingThread[irq] );
+  // IRQ did not occur yet, therefore sleep
   sleepingThread[irq] = Processor::getCurrThread();
-  CdiPrintf("Sleeping %x %s\n", sleepingThread[irq], sleepingThread[irq]->getName());
-  if (kernelScheduler.sleep(Machine::now() + timeout, waitIrqLock[irq])) {
-    return -3;  // timedout
-  }
-  return 0;     // interrupted
+  if (kernelScheduler.sleep(Machine::now() + timeout, waitIrqLock[irq])) return -3; // timed out
+  
+  return 0;   // woken up by IRQ
 }
 
 int cdi_ioports_alloc(uint16_t start, uint16_t count) {
-  IOPort ioPort("cdi ioport");
-  bool success = IOPortManager::allocate(ioPort, start, count);
+  IOPort* ioPort = new IOPort("cdi ioport");
+  bool success = IOPortManager::allocate(*ioPort, start, count);
   return success ? 0 : -1;
 }
 

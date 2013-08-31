@@ -36,6 +36,8 @@ static void mainLoop(ptr_t);  // forward declaration
 static void timertest(ptr_t); // forward declaration
 static void task(ptr_t);      // forward declaration
 
+extern "C" void cdi_init(ptr_t);
+
 static void apIdleLoop() {
   Machine::initAP2();
   for (;;) Halt();
@@ -74,6 +76,9 @@ static void mainLoop(ptr_t) {
 
   Process p;
   p.execElfFile("testprogram2");
+
+  cdi_init(nullptr);
+  DBG::outln(DBG::CDI, "CDI initialization done!");
 
   Drivers::runTest();    // shows options for testing
 
