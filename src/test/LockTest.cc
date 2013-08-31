@@ -1,8 +1,11 @@
 #include "util/Output.h"
 #include "mach/Processor.h"
+#include "mach/IRQManager.h"
 #include "kern/Debug.h"
 #include "kern/Kernel.h"
+#include "kern/KernelQueues.h"
 #include "ipc/BlockingSync.h"
+#include "ipc/SyncQueues.h"
 #include "test/LockTest.h"
 #include <atomic>
 
@@ -106,4 +109,38 @@ void SemaphoreTest() {
   KASSERT1(acquireCount == releaseCount, "acquire/release count differ");
   KASSERT1(acquireCount == testcount * 10, "wrong number of acquire/release");
   DBG::outln(DBG::Basic, "SemaphoreTest success");
+}
+
+// SyncQueue Test
+//static ProdConsQueue<StaticRingBuffer<mword, 256>> syncQueue;
+static IRQProducerConsumerQueue irqQueue(256);
+static atomic<mword> numItems;
+static void consumer(ptr_t) {
+  for (;;) {
+//    mword val = syncQueue.remove();
+      mword val = irqQueue.remove();
+      DBG::outln(DBG::Basic, val, " removed! next item: ", numItems);
+      if (val == 1000) break;
+  }
+}
+
+static void producer(ptr_t) {
+  numItems = 0;
+  for (;;) {
+//    while (!syncQueue.tryAppend(numItems)) Pause();
+//    syncQueue.append(numItems);
+    irqQueue.append(numItems);
+    if (numItems == 1000) break;
+    numItems += 1;
+  }
+}
+
+void SyncQueueTest() {
+  DBG::outln(DBG::Basic, "running SyncQueueTest...");
+  Thread* cons = Thread::create(kernelSpace, "cons");
+  Thread* prod = Thread::create(kernelSpace, "prod");
+  kernelScheduler.run(*cons, consumer, nullptr);
+  kernelScheduler.run(*prod, producer, nullptr);
+  while (numItems != 1000) Pause();
+  DBG::outln(DBG::Basic, "SyncQueueTest success");
 }

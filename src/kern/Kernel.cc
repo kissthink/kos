@@ -73,6 +73,7 @@ static void mainLoop(ptr_t) {
 
   MutexTest();
   SemaphoreTest();
+  SyncQueueTest();
 
   Process p;
   p.execElfFile("testprogram2");

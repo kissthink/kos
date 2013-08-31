@@ -10,7 +10,8 @@ bool IRQManager::initialized = false;
 unsigned int IRQManager::numIRQ = 0;
 
 Thread* IRQManager::softIRQThread[4];
-ProdConsQueue<StaticRingBuffer<mword, 256>> IRQManager::irqQueue;
+//ProdConsQueue<StaticRingBuffer<mword, 256>> IRQManager::irqQueue;
+IRQProducerConsumerQueue IRQManager::irqQueue(256);
 
 // priority (highest->lowest) to IRQ number
 static int defaultIRQPriorities[16] = { 0,1,2,11,12,13,14,15,3,4,5,6,7,8,9,10 };
@@ -25,7 +26,7 @@ void IRQManager::softIRQ(ptr_t arg) {
     for (function_t f : irqHandlers[irq]) {
       (*f)(&irq);
     }
-    DBG::outln(DBG::Basic, "IRQ ", irq, " done!");
+//    DBG::outln(DBG::Basic, "IRQ ", irq, " done!");
   }
 }
 
@@ -77,7 +78,8 @@ bool IRQManager::handleIRQ(mword vector) {
   KASSERT0( initialized );
   int irq = vectorToIRQ[vector];
   if (irq == -1) return false;
-  while (!irqQueue.tryAppend(irq)) Pause();
+//  while (!irqQueue.tryAppend(irq)) Pause();
+  irqQueue.append(irq);
   return true;
 }
 

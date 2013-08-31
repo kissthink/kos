@@ -3,5 +3,6 @@
 
 void MutexTest();
 void SemaphoreTest();
+void SyncQueueTest();
 
 #endif /* _LockTest_h_ */
