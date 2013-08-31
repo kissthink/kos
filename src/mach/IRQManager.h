@@ -25,7 +25,7 @@ class IRQManager {
   static bool initialized;
   static unsigned int numIRQ;
 
-  static Thread* softIRQThread;     // bottom half
+  static Thread* softIRQThread[4];     // bottom half
   static ProdConsQueue<StaticRingBuffer<mword, 256>> irqQueue;
   static void softIRQ(ptr_t arg);
 

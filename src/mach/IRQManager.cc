@@ -9,7 +9,7 @@ SpinLock* IRQManager::lk;
 bool IRQManager::initialized = false;
 unsigned int IRQManager::numIRQ = 0;
 
-Thread* IRQManager::softIRQThread;
+Thread* IRQManager::softIRQThread[4];
 ProdConsQueue<StaticRingBuffer<mword, 256>> IRQManager::irqQueue;
 
 // priority (highest->lowest) to IRQ number
@@ -46,9 +46,15 @@ void IRQManager::init(int rdr) {
   numIRQ = rdr;
   initialized = true;
 
-  softIRQThread = Thread::create(kernelSpace, "IRQ thread");
+  softIRQThread[0] = Thread::create(kernelSpace, "IRQ thread1");
+  softIRQThread[1] = Thread::create(kernelSpace, "IRQ thread2");
+  softIRQThread[2] = Thread::create(kernelSpace, "IRQ thread3");
+  softIRQThread[3] = Thread::create(kernelSpace, "IRQ thread4");
 //  softIRQThread->setPriority(1);
-  kernelScheduler.run(*softIRQThread, softIRQ, nullptr);      // start handling IRQ
+  kernelScheduler.run(*softIRQThread[0], softIRQ, nullptr);      // start handling IRQ
+  kernelScheduler.run(*softIRQThread[1], softIRQ, nullptr);      // start handling IRQ
+  kernelScheduler.run(*softIRQThread[2], softIRQ, nullptr);      // start handling IRQ
+  kernelScheduler.run(*softIRQThread[3], softIRQ, nullptr);      // start handling IRQ
 
   dump();
 }
